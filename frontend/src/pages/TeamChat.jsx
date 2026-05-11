@@ -1791,7 +1791,7 @@ const TeamChat = () => {
                                         <div className="max-w-[72%] relative">
                                             {!msg.isDeleted && (
                                                 <div
-                                                    className={`absolute ${sender ? 'left-3' : 'right-3'} -top-4 z-10 flex items-center gap-1 rounded-full border px-2 py-1 opacity-0 shadow-sm transition-opacity group-hover:opacity-100`}
+                                                    className={`absolute ${sender ? 'right-0 sm:right-3' : 'left-0 sm:left-3'} -top-4 z-10 flex max-w-[calc(100vw-2rem)] items-center gap-1 overflow-x-auto rounded-full border px-2 py-1 opacity-0 shadow-sm transition-opacity group-hover:opacity-100`}
                                                     style={{
                                                         borderColor: 'var(--border-color)',
                                                         backgroundColor: 'var(--bg-surface)',
