@@ -167,19 +167,6 @@ const Navbar = ({ user, onMenu, onLogout }) => {
         </div>
 
         <div className="flex items-center gap-2">
-          <div className="hidden items-center gap-2 rounded-[0.8rem] px-3 py-2 md:flex" style={{ background: 'var(--c-panel-subtle)', color: 'var(--c-text-soft)' }}>
-            <div className="flex h-8 w-8 items-center justify-center rounded-full text-xs font-black text-white" style={{ background: 'var(--brand-secondary)' }}>
-              {(user?.firstName || 'A')[0].toUpperCase()}
-            </div>
-            <div className="min-w-0 text-left">
-              <p className="max-w-[10rem] truncate text-xs font-black" style={{ color: 'var(--c-text)' }}>
-                {user?.fullName || `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || 'Admin'}
-              </p>
-              <p className="text-[0.68rem]" style={{ color: 'var(--c-text-faint)' }}>
-                {user?.role === 'admin' ? 'Super Admin' : user?.role === 'executive' ? 'Executive' : user?.role === 'team-lead' ? 'Team Lead' : 'Admin'}
-              </p>
-            </div>
-          </div>
           <div ref={notificationRef} className="relative">
             <button
               type="button"
