@@ -44,6 +44,12 @@ import {
 // ← NEW: Lazy load the heavy report page
 const ReportGeneration = lazy(() => import('./pages/ReportGeneration'));
 
+const hasKnownUserSession = () => Boolean(
+  localStorage.getItem('token')
+  || localStorage.getItem('currentUser')
+  || localStorage.getItem('fundcoUserRefreshExpiresAt')
+);
+
 const App = () => {
   const navigate = useNavigate();
   const [currentUser, setCurrentUser] = useState(() => readStoredUser());
@@ -71,30 +77,60 @@ const App = () => {
   }, []);
 
   useEffect(() => {
-    if (!currentUser) return undefined;
+    if (!authReady) return undefined;
+
+    let active = true;
+    let resumeTimeoutId = null;
+
+    const syncFromStorage = () => {
+      if (!active) return;
+      setCurrentUser(readStoredUser());
+    };
 
     const refreshSession = async () => {
+      if (!currentUser && !hasKnownUserSession()) return;
+
       try {
         await refreshUserAccessToken();
-        setCurrentUser(readStoredUser());
       } catch {
-        setCurrentUser(readStoredUser());
+        try {
+          await bootstrapUserSession();
+        } catch {
+          // bootstrapUserSession already normalizes local state when recovery fails
+        }
+      } finally {
+        syncFromStorage();
       }
+    };
+
+    const scheduleRefresh = () => {
+      if (!active) return;
+      window.clearTimeout(resumeTimeoutId);
+      resumeTimeoutId = window.setTimeout(refreshSession, 180);
     };
 
     const intervalId = window.setInterval(refreshSession, 4 * 60 * 1000);
     const handleVisible = () => {
       if (document.visibilityState === 'visible') {
-        refreshSession();
+        scheduleRefresh();
       }
     };
 
+    window.addEventListener('focus', scheduleRefresh);
+    window.addEventListener('pageshow', scheduleRefresh);
+    window.addEventListener('online', scheduleRefresh);
     document.addEventListener('visibilitychange', handleVisible);
+
     return () => {
+      active = false;
       window.clearInterval(intervalId);
+      window.clearTimeout(resumeTimeoutId);
+      window.removeEventListener('focus', scheduleRefresh);
+      window.removeEventListener('pageshow', scheduleRefresh);
+      window.removeEventListener('online', scheduleRefresh);
       document.removeEventListener('visibilitychange', handleVisible);
     };
-  }, [currentUser]);
+  }, [authReady, currentUser]);
 
   useEffect(() => {
     if (currentUser) {

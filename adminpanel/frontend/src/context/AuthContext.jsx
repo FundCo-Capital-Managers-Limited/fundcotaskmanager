@@ -12,6 +12,12 @@ import {
 
 const AuthContext = createContext(null);
 
+const hasKnownAdminSession = () => Boolean(
+  localStorage.getItem('adminToken')
+  || localStorage.getItem('adminUser')
+  || localStorage.getItem('fundcoAdminRefreshExpiresAt')
+);
+
 export const useAuth = () => useContext(AuthContext);
 
 export const AuthProvider = ({ children }) => {
@@ -52,30 +58,60 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   useEffect(() => {
-    if (!user) return undefined;
+    if (loading) return undefined;
+
+    let active = true;
+    let resumeTimeoutId = null;
+
+    const syncFromStorage = () => {
+      if (!active) return;
+      setUser(readStoredAdminUser());
+    };
 
     const refreshSession = async () => {
+      if (!user && !hasKnownAdminSession()) return;
+
       try {
         await refreshAdminAccessToken();
-        setUser(readStoredAdminUser());
       } catch {
-        setUser(readStoredAdminUser());
+        try {
+          await bootstrapAdminSession();
+        } catch {
+          // bootstrapAdminSession already normalizes local state when recovery fails
+        }
+      } finally {
+        syncFromStorage();
       }
+    };
+
+    const scheduleRefresh = () => {
+      if (!active) return;
+      window.clearTimeout(resumeTimeoutId);
+      resumeTimeoutId = window.setTimeout(refreshSession, 180);
     };
 
     const intervalId = window.setInterval(refreshSession, 4 * 60 * 1000);
     const handleVisible = () => {
       if (document.visibilityState === 'visible') {
-        refreshSession();
+        scheduleRefresh();
       }
     };
 
+    window.addEventListener('focus', scheduleRefresh);
+    window.addEventListener('pageshow', scheduleRefresh);
+    window.addEventListener('online', scheduleRefresh);
     document.addEventListener('visibilitychange', handleVisible);
+
     return () => {
+      active = false;
       window.clearInterval(intervalId);
+      window.clearTimeout(resumeTimeoutId);
+      window.removeEventListener('focus', scheduleRefresh);
+      window.removeEventListener('pageshow', scheduleRefresh);
+      window.removeEventListener('online', scheduleRefresh);
       document.removeEventListener('visibilitychange', handleVisible);
     };
-  }, [user]);
+  }, [loading, user]);
 
   const syncUser = useCallback((nextUser) => {
     setUser(nextUser);
