@@ -1,6 +1,11 @@
 import axios from 'axios';
 
 const normalizeBase = (value) => String(value || '').trim().replace(/\/+$/, '');
+const AUTH_REFRESH_EXEMPT_PATHS = [
+  '/api/admin/auth/login',
+  '/api/admin/auth/forgot',
+  '/api/admin/auth/reset',
+];
 
 const isBrowserLocal = () => {
   if (typeof window === 'undefined') return false;
@@ -8,11 +13,17 @@ const isBrowserLocal = () => {
   return host === 'localhost' || host === '127.0.0.1';
 };
 
+const resolveLocalApiBase = (port) => {
+  if (typeof window === 'undefined') return `http://localhost:${port}`;
+  const { protocol, hostname } = window.location;
+  return `${protocol}//${hostname}:${port}`;
+};
+
 const resolveAdminApiBase = () => {
   if (import.meta.env.VITE_ADMIN_API_URL) return import.meta.env.VITE_ADMIN_API_URL;
-  if (isBrowserLocal()) return 'http://127.0.0.1:4002';
+  if (isBrowserLocal()) return resolveLocalApiBase(4002);
   if (typeof window !== 'undefined') return window.location.origin;
-  return 'http://127.0.0.1:4002';
+  return 'http://localhost:4002';
 };
 
 const API_BASE = normalizeBase(resolveAdminApiBase());
@@ -22,17 +33,6 @@ const ACCESS_EXPIRES_AT_KEY = 'fundcoAdminAccessExpiresAt';
 const REFRESH_EXPIRES_AT_KEY = 'fundcoAdminRefreshExpiresAt';
 const REMEMBER_ME_KEY = 'fundcoAdminRememberMe';
 const AUTH_CHANGE_EVENT = 'fundco-admin-auth:changed';
-const AUTH_FAILURE_MESSAGES = [
-  'token expired',
-  'invalid token',
-  'token invalid or expired',
-  'token missing',
-  'authentication required',
-  'account is deactivated',
-  'user not found',
-  'not authorized',
-  'auth required',
-];
 
 let refreshPromise = null;
 
@@ -41,16 +41,15 @@ const isManagedUrl = (url) => {
   return !normalized || normalized.startsWith('/') || normalized.startsWith(API_BASE);
 };
 
+const shouldSkipRefreshForRequest = (request) => {
+  const normalized = String(request?.url || '').trim().toLowerCase();
+  return AUTH_REFRESH_EXEMPT_PATHS.some((path) => normalized.includes(path));
+};
+
 const emitAuthChange = () => {
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new Event(AUTH_CHANGE_EVENT));
   }
-};
-
-const shouldAttemptRefresh = (error) => {
-  if (error.response?.status !== 401) return false;
-  const message = String(error.response?.data?.message || '').toLowerCase();
-  return AUTH_FAILURE_MESSAGES.some((part) => message.includes(part));
 };
 
 export const getAdminApiBase = () => API_BASE;
@@ -207,8 +206,7 @@ export const attachAdminAuthInterceptors = (instance) => {
         throw error;
       }
 
-      if (!shouldAttemptRefresh(error)) {
-        if (error.response?.status === 401) clearAdminSession();
+      if (error.response?.status !== 401 || shouldSkipRefreshForRequest(originalRequest)) {
         throw error;
       }
 

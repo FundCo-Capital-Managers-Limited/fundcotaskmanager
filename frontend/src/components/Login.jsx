@@ -4,9 +4,9 @@ import React, { useEffect, useState } from 'react';
 import { toast, ToastContainer } from 'react-toastify';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import { bootstrapUserSession, storeUserSession } from '../security/authClient.js';
+import { bootstrapUserSession, getUserApiBase, storeUserSession } from '../security/authClient.js';
 
-const API_URL    = import.meta.env.VITE_API_URL || 'http://localhost:4001';
+const API_URL    = getUserApiBase();
 const INIT_FORM  = { email: '', password: '' };
 
 const Login = ({ onSubmit, onSwitchMode }) => {
@@ -17,31 +17,26 @@ const Login = ({ onSubmit, onSwitchMode }) => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const token  = localStorage.getItem('token');
-    const userId = localStorage.getItem('userId');
-    if (token && userId) {
-      (async () => {
-        try {
-          const { data } = await axios.get(`${API_URL}/api/user/me`, { headers: { Authorization: `Bearer ${token}` } });
-          if (data.success) { onSubmit?.({ token, user: data.user }); toast.success('Welcome back!'); navigate('/'); }
-          else { localStorage.clear(); toast.error('Session invalid.'); }
-        } catch { localStorage.clear(); }
-      })();
-      return;
-    }
+    let active = true;
 
     bootstrapUserSession().then((restored) => {
-      if (!restored) return;
+      if (!active || !restored) return;
+
       const refreshedToken = localStorage.getItem('token');
       const rawUser = localStorage.getItem('currentUser');
       if (!refreshedToken || !rawUser) return;
+
       try {
         onSubmit?.({ token: refreshedToken, user: JSON.parse(rawUser) });
-        navigate('/');
+        navigate('/', { replace: true });
       } catch {
-        localStorage.clear();
+        // Keep the recoverable session intact instead of wiping it eagerly.
       }
     });
+
+    return () => {
+      active = false;
+    };
   }, [navigate, onSubmit]);
 
   const handleSubmit = async (e) => {
