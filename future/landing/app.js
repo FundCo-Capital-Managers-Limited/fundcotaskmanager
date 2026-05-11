@@ -5,7 +5,7 @@
 const params = new URLSearchParams(window.location.search);
 
 const futureConfig = {
-  userAppUrl: params.get("user") || "https://www.fundcoai.com",
+  userAppUrl: params.get("user") || "https://user.fundcoai.com",
   adminAppUrl: params.get("admin") || "https://admin.fundcoai.com",
   financeAppUrl: params.get("finance") || "https://finance.fundcoai.com",
   themeStorageKey: "fundco-ai-theme",
