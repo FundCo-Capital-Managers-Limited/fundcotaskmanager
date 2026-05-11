@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
 import { format } from 'date-fns';
-import { ArrowLeft, Calendar, FolderKanban, ListTodo, Search, Target, Users } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, Calendar, CircleDollarSign, Flag, FolderKanban, ListTodo, Search, ShieldAlert, Target, Users } from 'lucide-react';
 import { io } from 'socket.io-client';
 import { useNavigate, useOutletContext, useParams } from 'react-router-dom';
 import { useNotifications } from '../context/NotificationContext.jsx';
@@ -24,6 +24,34 @@ const healthMeta = {
   settled: { label: 'Settled', bg: '#eef2ff', color: '#4338ca' },
 };
 
+const milestoneStatusMeta = {
+  planned: { label: 'Planned', bg: '#eff6ff', color: '#2563eb' },
+  active: { label: 'Active', bg: '#eef2ff', color: '#4338ca' },
+  blocked: { label: 'Blocked', bg: '#fef2f2', color: '#dc2626' },
+  completed: { label: 'Completed', bg: '#ecfdf5', color: '#15803d' },
+};
+
+const severityMeta = {
+  low: { label: 'Low', bg: '#f3f4f6', color: '#4b5563' },
+  medium: { label: 'Medium', bg: '#eff6ff', color: '#2563eb' },
+  high: { label: 'High', bg: '#fff7ed', color: '#c2410c' },
+  critical: { label: 'Critical', bg: '#fef2f2', color: '#dc2626' },
+};
+
+const riskStatusMeta = {
+  open: { label: 'Open', bg: '#fef2f2', color: '#dc2626' },
+  mitigating: { label: 'Mitigating', bg: '#fff7ed', color: '#c2410c' },
+  watching: { label: 'Watching', bg: '#eff6ff', color: '#2563eb' },
+  closed: { label: 'Closed', bg: '#ecfdf5', color: '#15803d' },
+};
+
+const issueStatusMeta = {
+  open: { label: 'Open', bg: '#fff7ed', color: '#c2410c' },
+  'in-progress': { label: 'In Progress', bg: '#eff6ff', color: '#2563eb' },
+  escalated: { label: 'Escalated', bg: '#fef2f2', color: '#dc2626' },
+  resolved: { label: 'Resolved', bg: '#ecfdf5', color: '#15803d' },
+};
+
 const readToken = () => getAccessToken();
 const authHeaders = () => {
   const token = readToken();
@@ -35,6 +63,20 @@ const formatShortDate = (value) => {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return 'No date';
   return format(date, 'MMM d, yyyy');
+};
+
+const formatCurrency = (value, currency = 'NGN') => {
+  const amount = Number(value || 0);
+  if (!Number.isFinite(amount)) return '-';
+  try {
+    return new Intl.NumberFormat('en-NG', {
+      style: 'currency',
+      currency,
+      maximumFractionDigits: 0,
+    }).format(amount);
+  } catch {
+    return `${currency} ${amount.toLocaleString()}`;
+  }
 };
 
 const formatTaskMoment = (value) => {
@@ -196,11 +238,28 @@ const TimelineRow = ({ label, date, tone = 'var(--brand-primary)' }) => (
 
 const ProjectDetail = ({ project, onBack }) => {
   const navigate = useNavigate();
+  const milestones = project.milestones || [];
+  const risks = project.risks || [];
+  const issues = project.issues || [];
+  const activity = project.activity || [];
+  const client = project.client || {};
+  const budget = project.budget || {};
   const myOpenTasks = (project.tasks || []).filter((task) => String(task.owner?._id || task.owner) === String(project.viewerId || '') && !task.completed);
   const teamTasks = (project.tasks || []).filter((task) => String(task.owner?._id || task.owner) !== String(project.viewerId || ''));
   const timeline = useMemo(() => {
     const rows = [];
     if (project.startDate) rows.push({ label: 'Project start', date: project.startDate, tone: 'var(--brand-primary)' });
+    milestones
+      .filter((milestone) => milestone.dueDate)
+      .sort((left, right) => new Date(left.dueDate) - new Date(right.dueDate))
+      .slice(0, 6)
+      .forEach((milestone) => {
+        rows.push({
+          label: milestone.status === 'completed' ? `Milestone complete: ${milestone.title}` : `Milestone due: ${milestone.title}`,
+          date: milestone.dueDate,
+          tone: milestone.status === 'completed' ? '#15803d' : milestone.status === 'blocked' ? '#dc2626' : 'var(--brand-secondary)',
+        });
+      });
     (project.tasks || [])
       .filter((task) => task.dueDate)
       .sort((left, right) => new Date(left.dueDate) - new Date(right.dueDate))
@@ -214,7 +273,7 @@ const ProjectDetail = ({ project, onBack }) => {
       });
     if (project.endDate) rows.push({ label: 'Project end', date: project.endDate, tone: '#dc2626' });
     return rows.sort((left, right) => new Date(left.date) - new Date(right.date));
-  }, [project]);
+  }, [milestones, project]);
 
   return (
     <div className="space-y-5 py-4">
@@ -248,11 +307,13 @@ const ProjectDetail = ({ project, onBack }) => {
               <span>End: {formatShortDate(project.endDate)}</span>
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-3 xl:w-[18rem]">
+          <div className="grid grid-cols-2 gap-3 xl:w-[22rem]">
             <SummaryCard label="Completion" value={`${project.metrics?.completion || 0}%`} tone="var(--brand-primary)" />
             <SummaryCard label="Open tasks" value={project.metrics?.openTasks || 0} tone="#c2410c" />
             <SummaryCard label="My open tasks" value={project.metrics?.myOpenTasks || 0} tone="#2563eb" />
             <SummaryCard label="Team members" value={project.metrics?.members || 0} tone="#15803d" />
+            <SummaryCard label="Milestones" value={project.metrics?.milestones || 0} tone="var(--brand-secondary)" />
+            <SummaryCard label="Open risks" value={project.metrics?.openRisks || 0} tone="#dc2626" />
           </div>
         </div>
       </div>
@@ -317,9 +378,54 @@ const ProjectDetail = ({ project, onBack }) => {
               </div>
             </div>
           ) : null}
+
+          {milestones.length ? (
+            <div className="rounded-xl border p-5" style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border-color)' }}>
+              <div className="flex items-center gap-2">
+                <Flag className="w-5 h-5" style={{ color: 'var(--brand-primary)' }} />
+                <h2 className="text-lg font-black" style={{ color: 'var(--text-primary)' }}>Milestones</h2>
+              </div>
+              <div className="mt-4 space-y-3">
+                {milestones.map((milestone) => (
+                  <div key={milestone._id} className="rounded-xl border p-4" style={{ backgroundColor: 'var(--bg-subtle)', borderColor: 'var(--border-color)' }}>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="px-2.5 py-1 rounded-lg text-[11px] font-bold" style={{ backgroundColor: (milestoneStatusMeta[milestone.status] || milestoneStatusMeta.planned).bg, color: (milestoneStatusMeta[milestone.status] || milestoneStatusMeta.planned).color }}>
+                        {(milestoneStatusMeta[milestone.status] || milestoneStatusMeta.planned).label}
+                      </span>
+                      {milestone.dueDate ? <span className="px-2.5 py-1 rounded-lg text-[11px] font-bold" style={{ backgroundColor: '#f3f4f6', color: '#4b5563' }}>{formatShortDate(milestone.dueDate)}</span> : null}
+                    </div>
+                    <p className="mt-2 font-bold" style={{ color: 'var(--text-primary)' }}>{milestone.title}</p>
+                    <p className="mt-2 text-sm leading-6" style={{ color: 'var(--text-secondary)' }}>{milestone.description || 'No description provided.'}</p>
+                    <p className="mt-2 text-xs" style={{ color: 'var(--text-muted)' }}>{milestone.owner ? getPersonName(milestone.owner, 'Unassigned') : 'Unassigned'}</p>
+                    {milestone.notes ? <p className="mt-2 text-sm" style={{ color: 'var(--text-secondary)' }}>{milestone.notes}</p> : null}
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
         </div>
 
         <div className="space-y-5">
+          <div className="rounded-xl border p-5" style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border-color)' }}>
+            <div className="flex items-center gap-2">
+              <CircleDollarSign className="w-5 h-5" style={{ color: 'var(--brand-primary)' }} />
+              <h2 className="text-lg font-black" style={{ color: 'var(--text-primary)' }}>Client and budget</h2>
+            </div>
+            <div className="mt-4 space-y-3">
+              <div className="rounded-xl border p-4" style={{ backgroundColor: 'var(--bg-subtle)', borderColor: 'var(--border-color)' }}>
+                <p className="font-bold" style={{ color: 'var(--text-primary)' }}>{client.name || 'Internal project'}</p>
+                <p className="mt-1 text-sm" style={{ color: 'var(--text-secondary)' }}>{client.account || 'No account stream set'}</p>
+                {(client.contactName || client.contactEmail) ? <p className="mt-2 text-sm" style={{ color: 'var(--text-secondary)' }}>{client.contactName || 'No contact'} {client.contactEmail ? `· ${client.contactEmail}` : ''}</p> : null}
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <SummaryCard label="Planned" value={formatCurrency(budget.planned, budget.currency)} tone="var(--brand-primary)" />
+                <SummaryCard label="Actual" value={formatCurrency(budget.actual, budget.currency)} tone="#c2410c" />
+                <SummaryCard label="Revenue" value={formatCurrency(budget.revenueTarget, budget.currency)} tone="#15803d" />
+                <SummaryCard label="Variance" value={formatCurrency((Number(budget.actual || 0) - Number(budget.planned || 0)), budget.currency)} tone={Number(budget.actual || 0) > Number(budget.planned || 0) ? '#dc2626' : 'var(--brand-secondary)'} />
+              </div>
+            </div>
+          </div>
+
           <div className="rounded-xl border p-5" style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border-color)' }}>
             <div className="flex items-center gap-2">
               <Users className="w-5 h-5" style={{ color: 'var(--brand-primary)' }} />
@@ -332,6 +438,58 @@ const ProjectDetail = ({ project, onBack }) => {
             </div>
           </div>
 
+          {risks.length ? (
+            <div className="rounded-xl border p-5" style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border-color)' }}>
+              <div className="flex items-center gap-2">
+                <ShieldAlert className="w-5 h-5" style={{ color: 'var(--brand-primary)' }} />
+                <h2 className="text-lg font-black" style={{ color: 'var(--text-primary)' }}>Risk register</h2>
+              </div>
+              <div className="mt-4 space-y-3">
+                {risks.map((risk) => (
+                  <div key={risk._id} className="rounded-xl border p-4" style={{ backgroundColor: 'var(--bg-subtle)', borderColor: 'var(--border-color)' }}>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="px-2.5 py-1 rounded-lg text-[11px] font-bold" style={{ backgroundColor: (severityMeta[risk.severity] || severityMeta.medium).bg, color: (severityMeta[risk.severity] || severityMeta.medium).color }}>
+                        {(severityMeta[risk.severity] || severityMeta.medium).label}
+                      </span>
+                      <span className="px-2.5 py-1 rounded-lg text-[11px] font-bold" style={{ backgroundColor: (riskStatusMeta[risk.status] || riskStatusMeta.open).bg, color: (riskStatusMeta[risk.status] || riskStatusMeta.open).color }}>
+                        {(riskStatusMeta[risk.status] || riskStatusMeta.open).label}
+                      </span>
+                    </div>
+                    <p className="mt-2 font-bold" style={{ color: 'var(--text-primary)' }}>{risk.title}</p>
+                    <p className="mt-2 text-sm leading-6" style={{ color: 'var(--text-secondary)' }}>{risk.description || 'No description provided.'}</p>
+                    {risk.mitigation ? <p className="mt-2 text-sm" style={{ color: 'var(--text-secondary)' }}><strong>Mitigation:</strong> {risk.mitigation}</p> : null}
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
+
+          {issues.length ? (
+            <div className="rounded-xl border p-5" style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border-color)' }}>
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="w-5 h-5" style={{ color: 'var(--brand-primary)' }} />
+                <h2 className="text-lg font-black" style={{ color: 'var(--text-primary)' }}>Issue tracker</h2>
+              </div>
+              <div className="mt-4 space-y-3">
+                {issues.map((issue) => (
+                  <div key={issue._id} className="rounded-xl border p-4" style={{ backgroundColor: 'var(--bg-subtle)', borderColor: 'var(--border-color)' }}>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="px-2.5 py-1 rounded-lg text-[11px] font-bold" style={{ backgroundColor: (severityMeta[issue.severity] || severityMeta.medium).bg, color: (severityMeta[issue.severity] || severityMeta.medium).color }}>
+                        {(severityMeta[issue.severity] || severityMeta.medium).label}
+                      </span>
+                      <span className="px-2.5 py-1 rounded-lg text-[11px] font-bold" style={{ backgroundColor: (issueStatusMeta[issue.status] || issueStatusMeta.open).bg, color: (issueStatusMeta[issue.status] || issueStatusMeta.open).color }}>
+                        {(issueStatusMeta[issue.status] || issueStatusMeta.open).label}
+                      </span>
+                    </div>
+                    <p className="mt-2 font-bold" style={{ color: 'var(--text-primary)' }}>{issue.title}</p>
+                    <p className="mt-2 text-sm leading-6" style={{ color: 'var(--text-secondary)' }}>{issue.description || 'No description provided.'}</p>
+                    {issue.resolution ? <p className="mt-2 text-sm" style={{ color: 'var(--text-secondary)' }}><strong>Resolution:</strong> {issue.resolution}</p> : null}
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
+
           <div className="rounded-xl border p-5" style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border-color)' }}>
             <div className="flex items-center gap-2">
               <Calendar className="w-5 h-5" style={{ color: 'var(--brand-primary)' }} />
@@ -343,6 +501,23 @@ const ProjectDetail = ({ project, onBack }) => {
               )}
             </div>
           </div>
+
+          {activity.length ? (
+            <div className="rounded-xl border p-5" style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border-color)' }}>
+              <div className="flex items-center gap-2">
+                <Calendar className="w-5 h-5" style={{ color: 'var(--brand-primary)' }} />
+                <h2 className="text-lg font-black" style={{ color: 'var(--text-primary)' }}>Recent activity</h2>
+              </div>
+              <div className="mt-4 space-y-3">
+                {activity.slice(0, 8).map((item) => (
+                  <div key={item._id} className="rounded-xl border p-4" style={{ backgroundColor: 'var(--bg-subtle)', borderColor: 'var(--border-color)' }}>
+                    <p className="font-bold" style={{ color: 'var(--text-primary)' }}>{item.message}</p>
+                    <p className="mt-1 text-xs" style={{ color: 'var(--text-muted)' }}>{item.actorName || getPersonName(item.actor, 'Unassigned')} · {formatTaskMoment(item.createdAt)}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
         </div>
       </div>
     </div>

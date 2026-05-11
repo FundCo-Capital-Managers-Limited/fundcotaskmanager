@@ -2,9 +2,9 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useOutletContext, useNavigate } from 'react-router-dom';
 import {
-    Send, Smile, Paperclip, Users, Plus, X, Search, Edit2, Trash2,
+    Send, Smile, SmilePlus, Paperclip, Users, Plus, X, Search, Edit2, Trash2,
     ArrowLeft, ArrowDown, Check, CheckCheck, CornerUpLeft,
-    MoreVertical, FileText as FileIcon, Clock, Pin, PinOff,
+    MoreVertical, FileText as FileIcon, Clock, Pin, PinOff, Sparkles,
     Share2, Forward, ChevronDown, Copy,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -15,9 +15,13 @@ import toast, { Toaster } from 'react-hot-toast';
 import moment from 'moment-timezone';
 import { debounce } from 'lodash';
 import { useNotifications } from '../context/NotificationContext.jsx';
+import LinkPreviewCard from '../components/LinkPreviewCard.jsx';
+import StickerPicker, { getStickerByKey } from '../components/StickerPicker.jsx';
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:4001';
 const SOCKET_URL = API_BASE_URL;
 const TZ = 'Africa/Lagos';
+const URL_RE = /(https?:\/\/[^\s<]+[^\s<.,:;"')\]])/gi;
+const COMMON_REACTIONS = ['👍', '❤️', '😂', '🎉', '🔥', '✅'];
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const getFullName = (user) => {
     if (!user) return 'Unknown';
@@ -108,7 +112,7 @@ const renderMentionContent = (message, sender) => {
     const text = String(message?.content || '');
     const mentions = Array.isArray(message?.mentions) ? message.mentions.filter((item) => item?.label) : [];
     if (!mentions.length) {
-        return <p className="text-[13.5px] leading-[1.5] break-words whitespace-pre-wrap">{text}</p>;
+        return <p className="text-[13.5px] leading-[1.5] break-words whitespace-pre-wrap">{renderTextWithLinks(text)}</p>;
     }
 
     const tokens = [...new Set(mentions.map((item) => `@${item.label}`))]
@@ -116,7 +120,7 @@ const renderMentionContent = (message, sender) => {
         .sort((left, right) => right.length - left.length);
 
     if (!tokens.length) {
-        return <p className="text-[13.5px] leading-[1.5] break-words whitespace-pre-wrap">{text}</p>;
+        return <p className="text-[13.5px] leading-[1.5] break-words whitespace-pre-wrap">{renderTextWithLinks(text)}</p>;
     }
 
     const pattern = new RegExp(`(${tokens.map(escapeMentionPattern).join('|')})`, 'g');
@@ -126,7 +130,7 @@ const renderMentionContent = (message, sender) => {
         <p className="text-[13.5px] leading-[1.5] break-words whitespace-pre-wrap">
             {parts.map((part, index) => {
                 const matched = mentions.find((item) => part.toLowerCase() === `@${String(item.label).toLowerCase()}`);
-                if (!matched) return <React.Fragment key={index}>{part}</React.Fragment>;
+                if (!matched) return <React.Fragment key={index}>{renderTextWithLinks(part)}</React.Fragment>;
                 return (
                     <span
                         key={index}
@@ -142,6 +146,49 @@ const renderMentionContent = (message, sender) => {
             })}
         </p>
     );
+};
+
+const renderTextWithLinks = (text) => {
+    const value = String(text || '');
+    const parts = value.split(URL_RE);
+    return parts.map((part, index) => {
+        if (!part) return null;
+        URL_RE.lastIndex = 0;
+        if (!URL_RE.test(part)) return <React.Fragment key={index}>{part}</React.Fragment>;
+        return (
+            <a
+                key={index}
+                href={part}
+                target="_blank"
+                rel="noreferrer"
+                className="font-semibold underline underline-offset-2"
+                style={{ color: 'inherit' }}
+            >
+                {part}
+            </a>
+        );
+    });
+};
+
+const extractFirstUrl = (text) => {
+    URL_RE.lastIndex = 0;
+    return String(text || '').match(URL_RE)?.[0] || '';
+};
+
+const getReactionUserId = (reaction) => String(reaction?.userId?._id || reaction?.userId || '');
+
+const groupReactions = (message, currentUserId) => {
+    const grouped = new Map();
+    const reactions = Array.isArray(message?.reactions) ? message.reactions : [];
+    reactions.forEach((reaction) => {
+        const emoji = String(reaction?.emoji || '').trim();
+        if (!emoji) return;
+        if (!grouped.has(emoji)) grouped.set(emoji, { emoji, count: 0, mine: false });
+        const entry = grouped.get(emoji);
+        entry.count += 1;
+        if (getReactionUserId(reaction) === String(currentUserId)) entry.mine = true;
+    });
+    return [...grouped.values()];
 };
 
 // ─── Avatar ───────────────────────────────────────────────────────────────────
@@ -606,6 +653,7 @@ const TeamChat = () => {
     const [groups, setGroups] = useState([]);
     const [typingUsers, setTypingUsers] = useState({});
     const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+    const [showStickerPicker, setShowStickerPicker] = useState(false);
     const [groupModalMode, setGroupModalMode] = useState(null);
     const [showMembersModal, setShowMembersModal] = useState(false);
     const [file, setFile] = useState(null);
@@ -1061,6 +1109,7 @@ const TeamChat = () => {
             setDraftMentions([]);
             setMentionState(EMPTY_MENTION_STATE);
             setFile(null);
+            setShowStickerPicker(false);
             setEditingMessage(null);
             setReplyTo(null);
             if (fileInputRef.current) fileInputRef.current.value = '';
@@ -1070,6 +1119,46 @@ const TeamChat = () => {
             if (error.response?.status === 401) onLogout?.();
         }
     }, [selectedChat, newMessage, file, editingMessage, replyTo, getAuthHeaders, onLogout, uploadFile, draftMentions]);
+    const sendSticker = useCallback(async (sticker) => {
+        if (!selectedChat?._id || !sticker?.key) return;
+        try {
+            await axios.post(`${API_BASE_URL}/api/chats/${selectedChat._id}/messages`, {
+                content: sticker.label,
+                contentType: 'sticker',
+                stickerKey: sticker.key,
+                stickerLabel: sticker.label,
+            }, { headers: getAuthHeaders() });
+            setShowStickerPicker(false);
+            setChatTimestamps((prev) => ({ ...prev, [selectedChat._id]: new Date().toISOString() }));
+        } catch (error) {
+            toast.error(error.response?.data?.message || 'Failed to send sticker.');
+            if (error.response?.status === 401) onLogout?.();
+        }
+    }, [selectedChat, getAuthHeaders, onLogout]);
+    const updateMessageInState = useCallback((nextMessage) => {
+        if (!nextMessage?._id) return;
+        setMessages((prev) => prev.map((item) => item._id === nextMessage._id ? { ...item, ...nextMessage } : item));
+    }, []);
+    const reactToMessage = useCallback(async (message, emoji) => {
+        if (!message?._id || !emoji) return;
+        try {
+            const res = await axios.post(`${API_BASE_URL}/api/chats/messages/${message._id}/reactions`, { emoji }, { headers: getAuthHeaders() });
+            if (res.data?.message) updateMessageInState(res.data.message);
+        } catch (error) {
+            toast.error(error.response?.data?.message || 'Failed to add reaction.');
+            if (error.response?.status === 401) onLogout?.();
+        }
+    }, [getAuthHeaders, onLogout, updateMessageInState]);
+    const removeReaction = useCallback(async (message) => {
+        if (!message?._id) return;
+        try {
+            const res = await axios.delete(`${API_BASE_URL}/api/chats/messages/${message._id}/reactions`, { headers: getAuthHeaders() });
+            if (res.data?.message) updateMessageInState(res.data.message);
+        } catch (error) {
+            toast.error(error.response?.data?.message || 'Failed to remove reaction.');
+            if (error.response?.status === 401) onLogout?.();
+        }
+    }, [getAuthHeaders, onLogout, updateMessageInState]);
     const openDeleteModal = useCallback((msg) => {
         setContextMenu(null);
         setDeleteModal({ msg });
@@ -1394,14 +1483,19 @@ const TeamChat = () => {
                         const isItemOnline = !isGroup && (onlineUsers.has(item._id) || item.online);
                         let snippet = 'No messages yet';
                         if (lastMsg) {
-                            if (lastMsg.isDeleted) snippet = '🚫 This message was deleted';
-                            else if (lastMsg.content) {
+                            if (lastMsg.isDeleted) {
+                                snippet = 'This message was deleted';
+                            } else if (lastMsg.contentType === 'sticker' || lastMsg.stickerLabel) {
                                 const isMyMsg = lastMsg.sender?._id === user?._id;
                                 const prefix = isGroup ? `${isMyMsg ? 'You' : (lastMsg.sender?.firstName || 'Someone')}: ` : (isMyMsg ? 'You: ' : '');
-                                snippet = prefix + lastMsg.content.slice(0, 38) + (lastMsg.content.length > 38 ? '…' : '');
+                                snippet = `${prefix}Sticker: ${lastMsg.stickerLabel || lastMsg.content || 'Reaction'}`;
+                            } else if (lastMsg.content) {
+                                const isMyMsg = lastMsg.sender?._id === user?._id;
+                                const prefix = isGroup ? `${isMyMsg ? 'You' : (lastMsg.sender?.firstName || 'Someone')}: ` : (isMyMsg ? 'You: ' : '');
+                                snippet = prefix + lastMsg.content.slice(0, 38) + (lastMsg.content.length > 38 ? '...' : '');
                             } else if (lastMsg.fileUrl) {
-                                const icons = { image: '📷 Photo', video: '🎥 Video', audio: '🎵 Audio', application: '📄 Document' };
-                                snippet = icons[lastMsg.contentType] || '📎 Attachment';
+                                const icons = { image: 'Photo', video: 'Video', audio: 'Audio', application: 'Document' };
+                                snippet = icons[lastMsg.contentType] || 'Attachment';
                             }
                         }
                         return (
@@ -1471,14 +1565,14 @@ const TeamChat = () => {
             </aside>
             {/* CHAT AREA */}
             <section
-                className={`flex-1 flex flex-col min-w-0 relative ${selectedChat ? 'flex' : 'hidden lg:flex'}`}
+                className={`flex-1 flex h-[calc(100vh-8.5rem)] min-w-0 flex-col overflow-hidden relative ${selectedChat ? 'flex' : 'hidden lg:flex'}`}
                 style={{ backgroundColor: 'var(--bg-app)' }}
             >
                 {selectedChat ? (
                     <>
                         {/* Header */}
                         <header
-                            className="flex-shrink-0 border-b px-4 py-3 flex items-center gap-3 z-10 shadow-sm"
+                            className="sticky top-0 flex-shrink-0 border-b px-4 py-3 flex items-center gap-3 z-20 shadow-sm"
                             style={{
                                 backgroundColor: 'var(--bg-surface)',
                                 borderColor: 'var(--border-color)',
@@ -1615,7 +1709,7 @@ const TeamChat = () => {
                         <div
                             ref={messagesContainerRef}
                             onScroll={handleScroll}
-                            className="flex-1 overflow-y-auto px-3 sm:px-5 py-4 scrollbar-thin"
+                            className="min-h-0 flex-1 overflow-y-auto px-3 sm:px-5 py-4 scrollbar-thin"
                             style={{
                                 backgroundColor: 'var(--bg-app)',
                                 backgroundImage:
@@ -1695,6 +1789,52 @@ const TeamChat = () => {
                                             </div>
                                         )}
                                         <div className="max-w-[72%] relative">
+                                            {!msg.isDeleted && (
+                                                <div
+                                                    className={`absolute ${sender ? 'left-3' : 'right-3'} -top-4 z-10 flex items-center gap-1 rounded-full border px-2 py-1 opacity-0 shadow-sm transition-opacity group-hover:opacity-100`}
+                                                    style={{
+                                                        borderColor: 'var(--border-color)',
+                                                        backgroundColor: 'var(--bg-surface)',
+                                                    }}
+                                                >
+                                                    {COMMON_REACTIONS.map((emoji) => {
+                                                        const myReaction = (msg.reactions || []).find((reaction) => getReactionUserId(reaction) === String(currentUserId));
+                                                        const toggleReaction = () => {
+                                                            if (myReaction?.emoji === emoji) {
+                                                                removeReaction(msg);
+                                                            } else {
+                                                                reactToMessage(msg, emoji);
+                                                            }
+                                                        };
+                                                        return (
+                                                            <button
+                                                                key={emoji}
+                                                                type="button"
+                                                                className="text-sm transition-transform hover:scale-110"
+                                                                onClick={(event) => {
+                                                                    event.stopPropagation();
+                                                                    toggleReaction();
+                                                                }}
+                                                            >
+                                                                {emoji}
+                                                            </button>
+                                                        );
+                                                    })}
+                                                    <button
+                                                        type="button"
+                                                        className="flex h-6 w-6 items-center justify-center rounded-full transition-colors hover:bg-[var(--bg-hover)]"
+                                                        onClick={(event) => {
+                                                            event.stopPropagation();
+                                                            const emoji = window.prompt('Enter an emoji reaction');
+                                                            if (!emoji) return;
+                                                            reactToMessage(msg, String(emoji).trim());
+                                                        }}
+                                                        title="Choose any emoji"
+                                                    >
+                                                        <SmilePlus className="w-3.5 h-3.5" style={{ color: 'var(--text-muted)' }} />
+                                                    </button>
+                                                </div>
+                                            )}
                                             {msg.forwardedFrom && (
                                                 <div
                                                     className={`flex items-center gap-1 text-[10px] mb-0.5 ${sender ? 'justify-end' : 'justify-start'}`}
@@ -1741,7 +1881,14 @@ const TeamChat = () => {
                                                     </p>
                                                 ) : (
                                                     <>
-                                                        {msg.content && renderMentionContent(msg, sender)}
+                                                        {msg.contentType === 'sticker' ? (
+                                                            <StickerMessage message={msg} sender={sender} />
+                                                        ) : (
+                                                            msg.content && renderMentionContent(msg, sender)
+                                                        )}
+                                                        {msg.content && msg.contentType !== 'sticker' && !msg.fileUrl && (
+                                                            <LinkPreviewCard url={extractFirstUrl(msg.content)} compact />
+                                                        )}
                                                         {msg.isEdited && <span className="text-[10px] opacity-50 ml-1 italic">edited</span>}
                                                         {msg.fileUrl && (
                                                             <div className="mt-1.5">
@@ -1786,6 +1933,30 @@ const TeamChat = () => {
                                                             </div>
                                                         )}
                                                     </>
+                                                )}
+                                                {groupReactions(msg, currentUserId).length > 0 && (
+                                                    <div className="mt-2 flex flex-wrap gap-1.5">
+                                                        {groupReactions(msg, currentUserId).map((reaction) => (
+                                                            <button
+                                                                key={reaction.emoji}
+                                                                type="button"
+                                                                onClick={(event) => {
+                                                                    event.stopPropagation();
+                                                                    if (reaction.mine) removeReaction(msg);
+                                                                    else reactToMessage(msg, reaction.emoji);
+                                                                }}
+                                                                className="inline-flex items-center gap-1 rounded-full border px-2 py-1 text-[11px] font-semibold transition-colors"
+                                                                style={{
+                                                                    borderColor: reaction.mine ? 'var(--brand-primary)' : sender ? 'rgba(255,255,255,0.28)' : 'var(--border-color)',
+                                                                    backgroundColor: reaction.mine ? 'var(--brand-light)' : sender ? 'rgba(255,255,255,0.12)' : 'var(--bg-subtle)',
+                                                                    color: sender ? '#ffffff' : 'var(--text-primary)',
+                                                                }}
+                                                            >
+                                                                <span>{reaction.emoji}</span>
+                                                                <span>{reaction.count}</span>
+                                                            </button>
+                                                        ))}
+                                                    </div>
                                                 )}
                                                 <div className="flex items-center justify-end gap-1 mt-1">
                                                     <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
@@ -1844,7 +2015,7 @@ const TeamChat = () => {
                         </AnimatePresence>
                         {/* Input area */}
                         <div
-                            className="flex-shrink-0 border-t px-3 sm:px-4 py-3"
+                            className="sticky bottom-0 z-20 flex-shrink-0 border-t px-3 sm:px-4 py-3"
                             style={{
                                 backgroundColor: 'var(--bg-surface)',
                                 borderColor: 'var(--border-color)',
@@ -1940,6 +2111,28 @@ const TeamChat = () => {
                                                         height={340}
                                                         width={320}
                                                     />
+                                                </motion.div>
+                                            )}
+                                        </AnimatePresence>
+                                    </div>
+                                    <div className="relative">
+                                        <button
+                                            onClick={() => setShowStickerPicker((current) => !current)}
+                                            className="p-2 rounded-xl transition-colors hover:bg-[var(--bg-hover)]"
+                                            style={{ color: 'var(--brand-primary)' }}
+                                            title="Open stickers"
+                                        >
+                                            <SmilePlus className="w-5 h-5" />
+                                        </button>
+                                        <AnimatePresence>
+                                            {showStickerPicker && (
+                                                <motion.div
+                                                    initial={{ opacity: 0, y: 8, scale: 0.95 }}
+                                                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                                                    exit={{ opacity: 0, scale: 0.95 }}
+                                                    className="absolute bottom-full left-0 z-30 mb-2 w-[21rem] max-w-[calc(100vw-2rem)]"
+                                                >
+                                                    <StickerPicker onPick={sendSticker} onClose={() => setShowStickerPicker(false)} />
                                                 </motion.div>
                                             )}
                                         </AnimatePresence>
@@ -2327,4 +2520,27 @@ const TeamChat = () => {
         </div>
     );
 };
+
+const StickerMessage = ({ message, sender }) => {
+    const sticker = getStickerByKey(message?.stickerKey) || {
+        emoji: message?.content || 'OK',
+        label: message?.stickerLabel || 'Sticker',
+        background: sender
+            ? 'linear-gradient(135deg, rgba(255,255,255,0.24), rgba(255,255,255,0.08))'
+            : 'linear-gradient(135deg, rgba(49,39,131,0.12), rgba(93,63,211,0.18))',
+    };
+
+    return (
+        <div
+            className="mt-0.5 flex min-w-[11rem] max-w-[16rem] flex-col gap-1 rounded-[1.15rem] px-3 py-3"
+            style={{ background: sticker.background }}
+        >
+            <span className="text-4xl leading-none">{sticker.emoji}</span>
+            <span className={`text-xs font-semibold ${sender ? 'text-white/90' : ''}`} style={sender ? undefined : { color: 'var(--text-primary)' }}>
+                {sticker.label}
+            </span>
+        </div>
+    );
+};
+
 export default TeamChat;

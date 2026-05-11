@@ -1,2 +1,4 @@
 **/.env
 **/node_modules/
+**/v2-client-docs/
+**/v2-planning/

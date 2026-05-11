@@ -54,6 +54,21 @@ const UserDetailModal = ({ isOpen, onClose, data, userId }) => {
   const taskPoints  = data.taskPoints || 0;
   const goalPoints  = data.goalPoints || 0;
   const penalties   = breakdown.penaltyTotal || 0;
+  const goalDetails = Array.isArray(data.goalDetails) ? data.goalDetails : [];
+  const goalSummary = goalDetails.reduce((accumulator, goal) => {
+    const timeframe = goal.timeframe || 'custom';
+    accumulator.byTimeframe[timeframe] = (accumulator.byTimeframe[timeframe] || 0) + 1;
+    accumulator.totalProgress += Number(goal.progress || 0);
+    accumulator.totalSubGoals += Number(goal.total || 0);
+    accumulator.completedSubGoals += Number(goal.done || 0);
+    return accumulator;
+  }, {
+    byTimeframe: {},
+    totalProgress: 0,
+    totalSubGoals: 0,
+    completedSubGoals: 0,
+  });
+  const averageGoalProgress = goalDetails.length ? Math.round(goalSummary.totalProgress / goalDetails.length) : 0;
 
   const exportToPDF = async () => {
     if (!contentRef.current) return;
@@ -312,7 +327,7 @@ const UserDetailModal = ({ isOpen, onClose, data, userId }) => {
               </div>
 
               {/* Goals */}
-              {data.goalDetails?.length > 0 && (
+              {goalDetails.length > 0 && (
                 <div className="rounded-xl border overflow-hidden"
                   style={{ backgroundColor:'var(--bg-surface)', borderColor:'var(--border-color)' }}>
                   <div className="px-5 py-3 border-b" style={{ borderColor:'var(--border-color)', backgroundColor:'var(--bg-subtle)' }}>
@@ -320,24 +335,23 @@ const UserDetailModal = ({ isOpen, onClose, data, userId }) => {
                       Goals ({data.completedGoals || 0}/{data.totalGoals || 0} complete)
                     </h3>
                   </div>
-                  <div className="divide-y" style={{ divideColor:'var(--border-color)' }}>
-                    {data.goalDetails.map((g, i) => (
-                      <div key={i} className="px-5 py-3">
-                        <div className="flex items-center justify-between mb-1.5">
-                          <p className="text-sm font-semibold truncate" style={{ color:'var(--text-primary)' }}>{g.title}</p>
-                          <div className="flex items-center gap-2 flex-shrink-0">
-                            <span className="text-xs capitalize" style={{ color:'var(--text-muted)' }}>{g.timeframe}</span>
-                            <span className="text-sm font-bold" style={{ color:'#16a34a' }}>+{g.points}pts</span>
-                          </div>
+                  <div className="grid grid-cols-2 gap-3 px-5 py-4 sm:grid-cols-4">
+                    <StatPill label="Goal Points" value={goalPoints} color="#16a34a" bg="rgba(22,163,74,.08)" />
+                    <StatPill label="Avg Progress" value={`${averageGoalProgress}%`} color="#2563eb" bg="rgba(37,99,235,.08)" />
+                    <StatPill label="Sub-goals Done" value={`${goalSummary.completedSubGoals}/${goalSummary.totalSubGoals}`} color="#d97706" bg="rgba(217,119,6,.08)" />
+                    <StatPill label="Goal Count" value={goalDetails.length} color="#7c3aed" bg="rgba(124,58,237,.08)" />
+                  </div>
+                  <div className="border-t px-5 py-4" style={{ borderColor:'var(--border-color)' }}>
+                    <p className="text-xs font-bold uppercase tracking-wide mb-3" style={{ color:'var(--text-muted)' }}>Goal distribution</p>
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      {Object.entries(goalSummary.byTimeframe).map(([timeframe, count]) => (
+                        <div key={timeframe} className="rounded-xl border px-4 py-3 flex items-center justify-between"
+                          style={{ borderColor:'var(--border-color)', backgroundColor:'var(--bg-subtle)' }}>
+                          <span className="text-sm font-semibold capitalize" style={{ color:'var(--text-primary)' }}>{timeframe}</span>
+                          <span className="text-sm font-black" style={{ color:'#16a34a' }}>{count}</span>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ backgroundColor:'var(--bg-hover)' }}>
-                            <div className="h-full rounded-full" style={{ width:`${g.progress}%`, backgroundColor:'#16a34a' }} />
-                          </div>
-                          <span className="text-xs font-bold" style={{ color:'#16a34a' }}>{g.done}/{g.total}</span>
-                        </div>
-                      </div>
-                    ))}
+                      ))}
+                    </div>
                   </div>
                 </div>
               )}

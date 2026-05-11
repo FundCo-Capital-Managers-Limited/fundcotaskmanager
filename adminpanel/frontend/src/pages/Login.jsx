@@ -8,6 +8,7 @@ const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPw, setShowPw] = useState(false);
+  const [rememberMe, setRememberMe] = useState(true);
   const [loading, setLoading] = useState(false);
 
   const { login } = useAuth();
@@ -20,7 +21,7 @@ const Login = () => {
     setLoading(true);
 
     try {
-      const data = await login(email, password);
+      const data = await login(email, password, rememberMe);
 
       if (data.success) {
         // Show toast with auto-dismiss
@@ -139,6 +140,17 @@ const Login = () => {
                   </button>
                 </div>
               </div>
+
+              <label className="flex items-center gap-2.5 text-sm" style={{ color: 'var(--c-text-soft)' }}>
+                <input
+                  type="checkbox"
+                  checked={rememberMe}
+                  onChange={() => setRememberMe((current) => !current)}
+                  className="h-4 w-4 rounded"
+                  style={{ accentColor: 'var(--brand-primary)' }}
+                />
+                Keep me signed in
+              </label>
 
               <button type="submit" disabled={loading} className="btn-primary w-full rounded-full">
                 {loading ? (

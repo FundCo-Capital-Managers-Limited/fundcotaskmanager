@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { attachAdminAuthInterceptors, getAdminApiBase } from '../security/authClient.js';
+import { attachAdminAuthInterceptors } from '../security/authClient.js';
 
 const normalizeBase = (value, fallback) => {
   const raw = String(value || fallback || '').trim().replace(/\/+$/, '');
@@ -20,19 +20,15 @@ const isBrowserLocal = () => {
   return host === 'localhost' || host === '127.0.0.1';
 };
 
-const getBrowserOrigin = () => (typeof window !== 'undefined' ? window.location.origin : '');
-
-const getDefaultAdminApiBase = () => (isBrowserLocal() ? 'http://127.0.0.1:4002' : getBrowserOrigin());
 const getDefaultUserApiBase = () => (isBrowserLocal() ? 'http://127.0.0.1:4001' : 'https://negtm.onrender.com');
 const getDefaultUserFrontendBase = () => (isBrowserLocal() ? 'http://127.0.0.1:5173' : 'https://fundcoaiopm.vercel.app');
 
-const ADMIN_API_BASE = normalizeBase(getAdminApiBase(), getDefaultAdminApiBase());
 export const USER_API_BASE = normalizeBase(import.meta.env.VITE_USER_API_URL, getDefaultUserApiBase());
 export const USER_FRONTEND_BASE = normalizeBase(import.meta.env.VITE_USER_FRONTEND_URL, getDefaultUserFrontendBase());
 
 const userApi = attachAdminAuthInterceptors(
   axios.create({
-    baseURL: `${ADMIN_API_BASE}/api/admin/shared`,
+    baseURL: USER_API_BASE,
     withCredentials: true,
   })
 );

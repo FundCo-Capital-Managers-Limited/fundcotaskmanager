@@ -20,9 +20,11 @@ const messageSchema = new mongoose.Schema(
         fileName:    { type: String, trim: true },
         contentType: {
             type: String,
-            enum: ['image', 'video', 'audio', 'application', ''],
+            enum: ['image', 'video', 'audio', 'application', 'sticker', ''],
             default: '',
         },
+        stickerKey: { type: String, trim: true, default: '' },
+        stickerLabel: { type: String, trim: true, default: '' },
         isDeleted:  { type: Boolean, default: false },
         isEdited:   { type: Boolean, default: false },
         // Per-user soft delete — message stays in DB, hidden only for this user
@@ -42,6 +44,34 @@ const messageSchema = new mongoose.Schema(
             senderName: { type: String },
             chatName:   { type: String },
         },
+        readBy: [{
+            userId: {
+                type: mongoose.Schema.Types.ObjectId,
+                ref: 'user',
+                required: true,
+            },
+            timestamp: {
+                type: Date,
+                default: Date.now,
+            },
+        }],
+        reactions: [{
+            userId: {
+                type: mongoose.Schema.Types.ObjectId,
+                ref: 'user',
+                required: true,
+            },
+            emoji: {
+                type: String,
+                required: true,
+                trim: true,
+                maxlength: 16,
+            },
+            timestamp: {
+                type: Date,
+                default: Date.now,
+            },
+        }],
         mentions: [{
             user: { type: mongoose.Schema.Types.ObjectId, ref: 'user', required: true },
             label: { type: String, trim: true, required: true },

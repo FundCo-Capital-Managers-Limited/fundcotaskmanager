@@ -33,6 +33,10 @@ const refreshTokenSchema = new mongoose.Schema(
       type: String,
       default: '',
     },
+    persistent: {
+      type: Boolean,
+      default: false,
+    },
     lastUsedAt: {
       type: Date,
       default: Date.now,

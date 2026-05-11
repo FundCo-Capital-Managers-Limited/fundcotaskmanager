@@ -17,6 +17,7 @@ import userApi from '../utils/userApi.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useNotifications } from '../context/NotificationContext.jsx';
 import { EmptyState, FilterChip, LoadingScreen, PageHeader, Panel, SearchInput, StatusPill } from '../components/ui.jsx';
+import LinkPreviewCard from '../components/LinkPreviewCard.jsx';
 import { formatPersonName, getInitials } from '../utils/adminFormat.js';
 
 const FILTER_ITEMS = [
@@ -24,6 +25,35 @@ const FILTER_ITEMS = [
   { value: 'announcements', label: 'Announcements' },
   { value: 'media', label: 'Media' },
 ];
+
+const URL_RE = /(https?:\/\/[^\s<]+[^\s<.,:;"')\]])/gi;
+
+const renderTextWithLinks = (text) => {
+  const value = String(text || '');
+  const parts = value.split(URL_RE);
+  return parts.map((part, index) => {
+    if (!part) return null;
+    URL_RE.lastIndex = 0;
+    if (!URL_RE.test(part)) return <React.Fragment key={index}>{part}</React.Fragment>;
+    return (
+      <a
+        key={index}
+        href={part}
+        target="_blank"
+        rel="noreferrer"
+        className="font-semibold underline underline-offset-2"
+        style={{ color: 'inherit' }}
+      >
+        {part}
+      </a>
+    );
+  });
+};
+
+const extractFirstUrl = (text) => {
+  URL_RE.lastIndex = 0;
+  return String(text || '').match(URL_RE)?.[0] || '';
+};
 
 const Avatar = ({ user }) => (
   <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-[0.85rem] text-xs font-black text-white" style={{ background: 'var(--brand-primary)' }}>
@@ -333,9 +363,11 @@ const Social = () => {
                 <div className="space-y-4 px-4 py-4 lg:px-5">
                   {post.content ? (
                     <p className="whitespace-pre-wrap text-sm leading-7" style={{ color: 'var(--c-text-soft)' }}>
-                      {post.content}
+                      {renderTextWithLinks(post.content)}
                     </p>
                   ) : null}
+
+                  {post.content ? <LinkPreviewCard url={extractFirstUrl(post.content)} /> : null}
 
                   {post.fileUrl && post.contentType === 'image' ? (
                     <a href={post.fileUrl} target="_blank" rel="noreferrer">
@@ -392,7 +424,7 @@ const Social = () => {
                             </span>
                           </div>
                           <p className="mt-1 whitespace-pre-wrap text-sm leading-6" style={{ color: 'var(--c-text-soft)' }}>
-                            {comment.content}
+                            {renderTextWithLinks(comment.content)}
                           </p>
                         </div>
                         <button type="button" className="btn-danger h-9 w-9 rounded-[0.7rem] p-0" onClick={() => deleteComment(post._id, comment._id)} aria-label="Delete comment">

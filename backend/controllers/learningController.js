@@ -29,6 +29,44 @@ const examSubmitSchema = Joi.object({
   timeSpent: Joi.number().min(0).optional(),
 });
 
+const normalizeLearningText = (value) => {
+  if (Array.isArray(value)) {
+    if (value.every((item) => Number.isFinite(Number(item)))) {
+      return String.fromCharCode(...value.map((item) => Number(item)).filter((item) => Number.isFinite(item)));
+    }
+    return value.map((item) => normalizeLearningText(item)).filter(Boolean).join(' ');
+  }
+  if (value && typeof value === 'object') {
+    return normalizeLearningText(
+      value.text
+      || value.value
+      || value.label
+      || value.question
+      || value.option
+      || value.prompt
+      || ''
+    );
+  }
+  return String(value ?? '').replace(/\s+/g, ' ').trim();
+};
+
+const normalizeQuestionRecord = (question, index = 0) => {
+  const options = Array.isArray(question?.options)
+    ? question.options.map((item) => normalizeLearningText(item)).filter(Boolean)
+    : [];
+  const answer = normalizeLearningText(question?.answer);
+  return {
+    _id: question?._id,
+    index,
+    question: normalizeLearningText(question?.question),
+    options,
+    answer: options.includes(answer) ? answer : (options[0] || answer),
+    explanation: normalizeLearningText(question?.explanation),
+    difficulty: question?.difficulty || 'medium',
+    moduleRef: normalizeLearningText(question?.moduleRef),
+  };
+};
+
 // ─── GET /courses — list with filters ────────────────────────────────────────
 export const getCourses = async (req, res) => {
   const { error } = filterSchema.validate(req.query);
@@ -268,8 +306,9 @@ export const submitExam = async (req, res) => {
 
     // Grade
     let correct = 0;
-    const gradedAnswers = course.exam.map((q, i) => {
-      const selected   = answers[i] || '';
+    const normalizedExam = (course.exam || []).map((q, i) => normalizeQuestionRecord(q, i));
+    const gradedAnswers = normalizedExam.map((q, i) => {
+      const selected   = normalizeLearningText(answers[i] || '');
       const isCorrect  = selected.trim() === q.answer.trim();
       if (isCorrect) correct++;
       return {
@@ -281,7 +320,7 @@ export const submitExam = async (req, res) => {
       };
     });
 
-    const total  = course.exam.length;
+    const total  = normalizedExam.length;
     const score  = Math.round((correct / total) * 100);
     const passed = score >= (course.passingScore || 70);
 
@@ -307,7 +346,7 @@ export const submitExam = async (req, res) => {
       total,
       passingScore: course.passingScore,
       answers:      gradedAnswers,
-      questions:    course.exam.map(q => ({
+      questions:    normalizedExam.map((q) => ({
         question:    q.question,
         options:     q.options,
         answer:      q.answer,
@@ -330,14 +369,17 @@ export const getExam = async (req, res) => {
     }
 
     // Strip answers before sending to client
-    const questions = course.exam.map((q, i) => ({
-      _id:        q._id,
-      index:      i,
-      question:   q.question,
-      options:    q.options,
-      difficulty: q.difficulty,
-      moduleRef:  q.moduleRef,
-    }));
+    const questions = course.exam.map((q, i) => {
+      const normalized = normalizeQuestionRecord(q, i);
+      return {
+        _id: normalized._id,
+        index: normalized.index,
+        question: normalized.question,
+        options: normalized.options,
+        difficulty: normalized.difficulty,
+        moduleRef: normalized.moduleRef,
+      };
+    });
 
     res.json({
       success:      true,

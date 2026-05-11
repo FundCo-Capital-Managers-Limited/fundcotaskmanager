@@ -31,6 +31,7 @@ const Sidebar = ({ user, isExpanded, onToggle, mobileOpen = false, onCloseMobile
   const projectBadge = counts.projects || 0;
   const goalBadge = counts.goals || 0;
   const reportBadge = counts.reports || 0;
+  const meetingReportBadge = counts.meetingReports || 0;
   const fileBadge = counts.files || 0;
 
   /* ── Fetch unread counts ─────────────────────────────────────────────── */
@@ -100,6 +101,7 @@ const Sidebar = ({ user, isExpanded, onToggle, mobileOpen = false, onCloseMobile
     { text: 'AI Tools',       path: '/ai-tools',           icon: Sparkles },
     { text: 'File Storage',   path: '/file-storage',       icon: File,            badge: fileBadge },
     { text: 'Reports',        path: '/reports',            icon: FileText,        badge: reportBadge },
+    { text: 'Meeting Reports', path: '/meeting-reports',   icon: FileText,        badge: meetingReportBadge },
     { text: 'Performance',    path: '/performance',        icon: CreditCard },
     { text: 'Deck Prep',      path: '/document-converter', icon: Presentation },
     { text: 'Training',       path: '/training',           icon: BookOpen },

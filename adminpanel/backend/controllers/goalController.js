@@ -2,15 +2,37 @@ import Goal from '../models/goalModel.js';
 import { buildTeamQuery } from '../middleware/teamFilter.js';
 import { createNotification } from '../utils/notificationService.js';
 
+const getCurrentAdminId = (req) => String(req.user?._id || req.user?.id || '');
+
+const computeGoalStats = (goals = []) => {
+  const total = goals.length;
+  const completed = goals.filter((goal) => goal.subGoals?.length > 0 && goal.subGoals.every((item) => item.completed)).length;
+  const active = total - completed;
+  const avgProgress = total > 0
+    ? Math.round(goals.reduce((sum, goal) => {
+        if (!goal.subGoals?.length) return sum;
+        return sum + (goal.subGoals.filter((item) => item.completed).length / goal.subGoals.length) * 100;
+      }, 0) / total)
+    : 0;
+  return { total, completed, active, avgProgress };
+};
+
 // ── Get all goals (team-filtered) ─────────────────────────────────────────────
 export const getAllGoals = async (req, res) => {
   try {
     const query = buildTeamQuery(req.teamMemberIds, 'owner');
-    const { search, type, timeframe } = req.query;
+    const { search, type, timeframe, ownerId } = req.query;
 
     if (search) query.title = { $regex: search, $options: 'i' };
     if (type) query.type = type;
     if (timeframe) query.timeframe = timeframe;
+    if (ownerId) {
+      const ownerKey = String(ownerId);
+      if (req.teamMemberIds && !req.teamMemberIds.map(String).includes(ownerKey)) {
+        return res.json({ success: true, goals: [], total: 0 });
+      }
+      query.owner = ownerKey;
+    }
 
     const goals = await Goal.find(query)
       .populate('owner', 'firstName lastName otherName email position unitSector avatar')
@@ -147,6 +169,16 @@ export const addGoalComment = async (req, res) => {
 export const getGoalStats = async (req, res) => {
   try {
     const query = buildTeamQuery(req.teamMemberIds, 'owner');
+    const { ownerId } = req.query;
+
+    if (ownerId) {
+      const ownerKey = String(ownerId);
+      if (req.teamMemberIds && !req.teamMemberIds.map(String).includes(ownerKey)) {
+        return res.json({ success: true, stats: { total: 0, completed: 0, active: 0, avgProgress: 0 } });
+      }
+      query.owner = ownerKey;
+    }
+
     const goals = await Goal.find(query).lean();
 
     const total = goals.length;
@@ -162,5 +194,135 @@ export const getGoalStats = async (req, res) => {
     res.json({ success: true, stats: { total, completed, active, avgProgress } });
   } catch (err) {
     res.status(500).json({ success: false, message: 'Failed to fetch goal stats' });
+  }
+};
+
+export const getMyGoals = async (req, res) => {
+  try {
+    const currentAdminId = getCurrentAdminId(req);
+    const query = { owner: currentAdminId };
+    const { search, type, timeframe } = req.query;
+
+    if (search) query.title = { $regex: search, $options: 'i' };
+    if (type) query.type = type;
+    if (timeframe) query.timeframe = timeframe;
+
+    const goals = await Goal.find(query)
+      .populate('owner', 'firstName lastName otherName email position unitSector avatar')
+      .populate('adminComments.user', 'firstName lastName avatar')
+      .sort({ createdAt: -1 })
+      .lean();
+
+    res.json({ success: true, goals, total: goals.length });
+  } catch (err) {
+    console.error('getMyGoals error:', err.message);
+    res.status(500).json({ success: false, message: 'Failed to fetch your goals' });
+  }
+};
+
+export const getMyGoalsOverview = async (req, res) => {
+  try {
+    const currentAdminId = getCurrentAdminId(req);
+    const query = { owner: currentAdminId };
+    const { search, type, timeframe } = req.query;
+
+    if (search) query.title = { $regex: search, $options: 'i' };
+    if (type) query.type = type;
+    if (timeframe) query.timeframe = timeframe;
+
+    const goals = await Goal.find(query)
+      .populate('owner', 'firstName lastName otherName email position unitSector avatar')
+      .populate('adminComments.user', 'firstName lastName avatar')
+      .sort({ createdAt: -1 })
+      .lean();
+
+    res.json({
+      success: true,
+      goals,
+      total: goals.length,
+      stats: computeGoalStats(goals),
+    });
+  } catch (err) {
+    console.error('getMyGoalsOverview error:', err.message);
+    res.status(500).json({ success: false, message: 'Failed to fetch your goals' });
+  }
+};
+
+export const getMyGoalStats = async (req, res) => {
+  try {
+    const currentAdminId = getCurrentAdminId(req);
+    const goals = await Goal.find({ owner: currentAdminId }).lean();
+    res.json({ success: true, stats: computeGoalStats(goals) });
+  } catch (err) {
+    console.error('getMyGoalStats error:', err.message);
+    res.status(500).json({ success: false, message: 'Failed to fetch your goal stats' });
+  }
+};
+
+export const createMyGoal = async (req, res) => {
+  try {
+    const currentAdminId = getCurrentAdminId(req);
+    const { title, subGoals, type, timeframe, startDate, endDate, associatedTasks } = req.body;
+
+    if (!title || !timeframe || !startDate || !endDate) {
+      return res.status(400).json({ success: false, message: 'Missing required fields' });
+    }
+
+    const goal = new Goal({
+      title,
+      subGoals: subGoals || [],
+      type: type || 'personal',
+      timeframe,
+      startDate: new Date(startDate),
+      endDate: new Date(endDate),
+      associatedTasks: associatedTasks || [],
+      owner: currentAdminId,
+    });
+
+    const saved = await goal.save();
+    const populated = await Goal.findById(saved._id)
+      .populate('owner', 'firstName lastName email avatar')
+      .lean();
+
+    res.status(201).json({ success: true, goal: populated });
+  } catch (err) {
+    console.error('createMyGoal error:', err.message);
+    res.status(400).json({ success: false, message: err.message });
+  }
+};
+
+export const updateMyGoal = async (req, res) => {
+  try {
+    const currentAdminId = getCurrentAdminId(req);
+    const goal = await Goal.findOne({ _id: req.params.id, owner: currentAdminId });
+    if (!goal) return res.status(404).json({ success: false, message: 'Goal not found' });
+
+    const data = { ...req.body, owner: currentAdminId };
+    if (data.startDate) data.startDate = new Date(data.startDate);
+    if (data.endDate) data.endDate = new Date(data.endDate);
+
+    const updated = await Goal.findByIdAndUpdate(goal._id, data, { returnDocument: 'after', runValidators: true })
+      .populate('owner', 'firstName lastName email avatar')
+      .populate('adminComments.user', 'firstName lastName avatar')
+      .lean();
+
+    res.json({ success: true, goal: updated });
+  } catch (err) {
+    console.error('updateMyGoal error:', err.message);
+    res.status(400).json({ success: false, message: err.message });
+  }
+};
+
+export const deleteMyGoal = async (req, res) => {
+  try {
+    const currentAdminId = getCurrentAdminId(req);
+    const goal = await Goal.findOne({ _id: req.params.id, owner: currentAdminId });
+    if (!goal) return res.status(404).json({ success: false, message: 'Goal not found' });
+
+    await Goal.findByIdAndDelete(goal._id);
+    res.json({ success: true, message: 'Goal deleted' });
+  } catch (err) {
+    console.error('deleteMyGoal error:', err.message);
+    res.status(500).json({ success: false, message: 'Failed to delete goal' });
   }
 };

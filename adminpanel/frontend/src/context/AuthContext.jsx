@@ -5,6 +5,7 @@ import {
   bootstrapAdminSession,
   clearAdminSession,
   logoutAdminSession,
+  refreshAdminAccessToken,
   readStoredAdminUser,
   storeAdminSession,
 } from '../security/authClient.js';
@@ -50,6 +51,32 @@ export const AuthProvider = ({ children }) => {
     };
   }, []);
 
+  useEffect(() => {
+    if (!user) return undefined;
+
+    const refreshSession = async () => {
+      try {
+        await refreshAdminAccessToken();
+        setUser(readStoredAdminUser());
+      } catch {
+        setUser(readStoredAdminUser());
+      }
+    };
+
+    const intervalId = window.setInterval(refreshSession, 4 * 60 * 1000);
+    const handleVisible = () => {
+      if (document.visibilityState === 'visible') {
+        refreshSession();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisible);
+    return () => {
+      window.clearInterval(intervalId);
+      document.removeEventListener('visibilitychange', handleVisible);
+    };
+  }, [user]);
+
   const syncUser = useCallback((nextUser) => {
     setUser(nextUser);
     if (nextUser) {
@@ -68,10 +95,16 @@ export const AuthProvider = ({ children }) => {
     return null;
   }, [syncUser]);
 
-  const login = async (email, password) => {
-    const { data } = await api.post('/auth/login', { email, password }, { withCredentials: true });
+  const login = async (email, password, rememberMe = false) => {
+    const { data } = await api.post('/auth/login', { email, password, rememberMe }, { withCredentials: true });
     if (data.success) {
-      storeAdminSession({ token: data.token, user: data.user });
+      storeAdminSession({
+        token: data.token,
+        user: data.user,
+        accessTokenExpiresInSeconds: data.accessTokenExpiresInSeconds,
+        refreshSessionExpiresAt: data.refreshSessionExpiresAt,
+        rememberMe,
+      });
       setUser(data.user);
     }
     return data;

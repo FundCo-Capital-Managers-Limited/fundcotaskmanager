@@ -205,8 +205,8 @@ export const Modal = ({ open, title, subtitle, onClose, children, width = 'max-w
                 </p>
               ) : null}
             </div>
-            <button type="button" onClick={onClose} className="btn-ghost h-9 w-9 rounded-[0.7rem] p-0" aria-label="Close dialog">
-              <X className="h-4 w-4" />
+            <button type="button" onClick={onClose} className="btn-ghost h-11 w-11 rounded-[0.8rem] p-0" aria-label="Close dialog">
+              <X className="h-5 w-5" />
             </button>
           </div>
           <div className="max-h-[calc(90vh-72px)] overflow-y-auto p-4 lg:p-5">{children}</div>

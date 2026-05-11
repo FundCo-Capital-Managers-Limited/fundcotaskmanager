@@ -5,6 +5,7 @@ import Document from '../models/documentModel.js';
 import File from '../models/fileModel.js';
 import { repairAndParseJson } from '../utils/jsonRepair.js';
 import {
+  buildPresentationDigest,
   buildOutlineFromBlocks,
   structurePdfText,
 } from '../utils/documentText.js';
@@ -13,6 +14,7 @@ import {
   buildFallbackDeck,
   buildFallbackSlide,
 } from '../utils/deckBuilder.js';
+import { createNotification } from '../utils/notificationService.js';
 
 const openai = process.env.GROK_API_KEY
   ? new OpenAI({
@@ -28,6 +30,10 @@ const VALID_SLIDE_TYPES = new Set(['title', 'section', 'bullets', 'two-column', 
 const VALID_CHART_TYPES = new Set(['bar', 'column', 'line', 'pie', 'doughnut']);
 const VALID_THEME_NAMES = new Set(['consulting', 'professional', 'clean', 'ocean', 'midnight', 'coral', 'slate']);
 const PDF_FETCH_TIMEOUT_MS = 180_000;
+const DOCUMENT_ROUTE = '/deck-prep';
+const ACTIVE_GENERATION_STATUSES = new Set(['queued', 'processing']);
+const generationJobs = new Set();
+const LOW_SIGNAL_SOURCE_RE = /\b(disclaimer|table of contents|contents)\b/i;
 
 const cleanText = (value) =>
   String(value || '')
@@ -186,6 +192,146 @@ const hasSufficientDeckContent = (deck) => {
   return meaningfulSlides >= minimumMeaningfulSlides && corpusLength >= 220;
 };
 
+const slideHasStructuredDepth = (slide) => {
+  const type = cleanText(slide?.layout || slide?.type || '');
+  if (type === 'title') return Boolean(cleanText(slide?.subtitle));
+  if (type === 'closing') return (slide?.bullets?.length || 0) >= 3;
+  if (type === 'bullets') return (slide?.bullets?.length || 0) >= 3;
+  if (type === 'cards') return (slide?.cards?.length || 0) >= 2;
+  if (type === 'timeline') return (slide?.timeline?.length || 0) >= 3;
+  if (type === 'process') return (slide?.processSteps?.length || 0) >= 3;
+  if (type === 'comparison') return Boolean(cleanText(slide?.leftContent) && cleanText(slide?.rightContent));
+  if (type === 'two-column') return Boolean(cleanText(slide?.leftContent) && cleanText(slide?.rightContent));
+  if (type === 'data') return (slide?.stats?.length || 0) >= 2 || (slide?.chart?.categories?.length || 0) >= 2;
+  return getSlideBodySignal(slide);
+};
+
+const enrichSparseSlide = (primarySlide, fallbackSlide, index) => {
+  if (!fallbackSlide) return normaliseSlide(primarySlide, index);
+
+  const primaryType = cleanText(primarySlide?.layout || primarySlide?.type || '');
+  const fallbackType = cleanText(fallbackSlide?.layout || fallbackSlide?.type || '');
+  const shouldReplaceWholeSlide =
+    !primarySlide ||
+    primaryType === 'section' ||
+    (!getSlideBodySignal(primarySlide) && fallbackType && fallbackType !== 'title');
+
+  if (shouldReplaceWholeSlide) {
+    return normaliseSlide({
+      ...fallbackSlide,
+      title: cleanText(primarySlide?.title || fallbackSlide?.title),
+      objective: cleanText(primarySlide?.objective || fallbackSlide?.objective),
+      keyMessage: cleanText(primarySlide?.keyMessage || fallbackSlide?.keyMessage),
+      note: cleanText(primarySlide?.note || fallbackSlide?.note),
+    }, index);
+  }
+
+  const merged = {
+    ...fallbackSlide,
+    ...primarySlide,
+    objective: cleanText(primarySlide?.objective || fallbackSlide?.objective),
+    keyMessage: cleanText(primarySlide?.keyMessage || fallbackSlide?.keyMessage),
+    note: cleanText(primarySlide?.note || fallbackSlide?.note),
+  };
+
+  if ((merged.type === 'bullets' || merged.layout === 'bullets') && (primarySlide?.bullets?.length || 0) < 3) {
+    merged.bullets = fallbackSlide?.bullets || merged.bullets;
+  }
+  if ((merged.type === 'cards' || merged.layout === 'cards') && (primarySlide?.cards?.length || 0) < 2) {
+    merged.cards = fallbackSlide?.cards || merged.cards;
+  }
+  if ((merged.type === 'timeline' || merged.layout === 'timeline') && (primarySlide?.timeline?.length || 0) < 3) {
+    merged.timeline = fallbackSlide?.timeline || merged.timeline;
+  }
+  if ((merged.type === 'process' || merged.layout === 'process') && (primarySlide?.processSteps?.length || 0) < 3) {
+    merged.processSteps = fallbackSlide?.processSteps || merged.processSteps;
+  }
+  if ((merged.type === 'data' || merged.layout === 'data') && (primarySlide?.stats?.length || 0) < 2 && (primarySlide?.chart?.categories?.length || 0) < 2) {
+    merged.stats = fallbackSlide?.stats || merged.stats;
+    merged.chart = fallbackSlide?.chart || merged.chart;
+  }
+  if ((merged.type === 'comparison' || merged.layout === 'comparison') && (!cleanText(primarySlide?.leftContent) || !cleanText(primarySlide?.rightContent))) {
+    merged.leftTitle = cleanText(primarySlide?.leftTitle || fallbackSlide?.leftTitle);
+    merged.leftContent = cleanText(primarySlide?.leftContent || fallbackSlide?.leftContent);
+    merged.rightTitle = cleanText(primarySlide?.rightTitle || fallbackSlide?.rightTitle);
+    merged.rightContent = cleanText(primarySlide?.rightContent || fallbackSlide?.rightContent);
+  }
+  if ((merged.type === 'two-column' || merged.layout === 'two-column') && (!cleanText(primarySlide?.leftContent) || !cleanText(primarySlide?.rightContent))) {
+    merged.leftTitle = cleanText(primarySlide?.leftTitle || fallbackSlide?.leftTitle);
+    merged.leftContent = cleanText(primarySlide?.leftContent || fallbackSlide?.leftContent);
+    merged.rightTitle = cleanText(primarySlide?.rightTitle || fallbackSlide?.rightTitle);
+    merged.rightContent = cleanText(primarySlide?.rightContent || fallbackSlide?.rightContent);
+  }
+
+  return normaliseSlide(merged, index);
+};
+
+const blendDeckWithFallback = (primaryDeck, fallbackDeck) => {
+  if (!fallbackDeck?.slides?.length) return primaryDeck;
+  if (!primaryDeck?.slides?.length) {
+    return { ...fallbackDeck, meta: { ...(fallbackDeck.meta || {}), generator: 'fallback' } };
+  }
+
+  const slideCount = Math.max(primaryDeck.slides.length, fallbackDeck.slides.length);
+  const slides = Array.from({ length: slideCount }, (_, index) =>
+    enrichSparseSlide(primaryDeck.slides[index], fallbackDeck.slides[index], index + 1)
+  );
+
+  const enhanced = {
+    ...primaryDeck,
+    title: cleanText(primaryDeck.title || fallbackDeck.title || 'Presentation'),
+    purpose: cleanText(primaryDeck.purpose || fallbackDeck.purpose || ''),
+    audience: cleanText(primaryDeck.audience || fallbackDeck.audience || ''),
+    storyArc: Array.isArray(primaryDeck.storyArc) && primaryDeck.storyArc.length ? primaryDeck.storyArc : fallbackDeck.storyArc || [],
+    slides,
+    meta: {
+      ...(fallbackDeck.meta || {}),
+      ...(primaryDeck.meta || {}),
+      blendedWithFallback: true,
+    },
+  };
+
+  const structuredSlides = enhanced.slides.filter((slide) => slideHasStructuredDepth(slide)).length;
+  if (structuredSlides < Math.max(3, Math.floor(enhanced.slides.length * 0.55))) {
+    return fallbackDeck;
+  }
+
+  return enhanced;
+};
+
+const ensureContentfulSlide = (slide, index, sourceText, instruction = '') => {
+  const type = cleanText(slide?.layout || slide?.type || 'bullets');
+  const forceNarrativeContent =
+    (type === 'title' && index > 1) ||
+    type === 'section' ||
+    type === 'quote' ||
+    (type === 'closing' && (slide?.bullets?.length || 0) < 3);
+  const needsBody = forceNarrativeContent || !slideHasStructuredDepth(slide) || !getSlideBodySignal(slide);
+
+  if (!needsBody) {
+    return normaliseSlide(slide, index);
+  }
+
+  const fallbackType = type === 'data' ? 'data' : 'bullets';
+  return buildFallbackSlide({
+    currentSlide: {
+      ...slide,
+      type: index === 1 ? 'title' : fallbackType,
+      layout: index === 1 ? 'title' : fallbackType,
+    },
+    sourceText,
+    instruction,
+  });
+};
+
+const ensureDeckHasPresentationBody = (deck, sourceText, instruction = '') => {
+  if (!deck?.slides?.length) return deck;
+  return {
+    ...deck,
+    slides: deck.slides.map((slide, index) => ensureContentfulSlide(slide, index + 1, sourceText, instruction)),
+  };
+};
+
 const isValidObjectId = (value) => mongoose.Types.ObjectId.isValid(value);
 
 const getOwnedDocument = async (userId, documentId) => {
@@ -233,6 +379,65 @@ const normalizeDocumentForResponse = (document) => {
     };
   }
   return payload;
+};
+
+const buildDeckInstruction = (baseInstruction, additionalContext = '') => {
+  const extra = cleanText(additionalContext);
+  if (!extra) return baseInstruction;
+  return [
+    baseInstruction,
+    '',
+    'Additional author context and emphasis to respect:',
+    extra,
+    '',
+    'Use the extra context to shape the story, tone, emphasis, and slide choices without inventing facts that are not supported by the source document.',
+  ].join('\n');
+};
+
+const buildPromptSourceDigest = (sourceText, outlineText = '') => {
+  const digestBudget = Math.max(6000, MAX_TEXT_FOR_SLIDES - 3800);
+  const digest = cleanText(buildPresentationDigest(sourceText, digestBudget));
+  if (!outlineText) return digest;
+
+  const cleanOutline = cleanText(outlineText).slice(0, 3400).trim();
+  if (!cleanOutline) return digest;
+
+  return cleanText([
+    'High-signal source digest:',
+    digest,
+    'Structured outline extracted from the document:',
+    cleanOutline,
+  ].join('\n\n')).slice(0, MAX_TEXT_FOR_SLIDES);
+};
+
+const markGenerationState = (document, next = {}) => {
+  if (!document) return document;
+  Object.assign(document, next);
+  document.updatedAt = new Date();
+  return document;
+};
+
+const queueDocumentNotification = async ({ userId, documentId, title, body, status }) => {
+  if (!userId || !title) return;
+  try {
+    await createNotification({
+      userId,
+      type: 'system',
+      title,
+      body,
+      entityId: String(documentId || ''),
+      entityType: 'document',
+      data: {
+        route: DOCUMENT_ROUTE,
+        documentId: String(documentId || ''),
+        kind: 'deckprep',
+        status,
+      },
+      allowSelf: true,
+    });
+  } catch (error) {
+    console.error('Deck Prep notification error:', error.message);
+  }
 };
 
 const applyExtractionMetadata = (document, extracted, file = null) => {
@@ -445,13 +650,16 @@ Rules:
 - Last slide must be type "closing" titled "Key Takeaways".
 - Every slide must have an objective.
 - Every slide must include a layout value and visualElements list.
-- Keep bullets punchy: max 10 words each.
+- Keep bullets concise but meaningful: ideally 10 to 16 words each.
 - Avoid standalone section-divider slides unless the deck is long and a divider is required for clarity.
 - Use cards, comparison, timeline, process, and data layouts when they communicate better than bullets.
 - For data slides, recommend the best chart type and what should be plotted when the source contains numeric evidence.
 - Avoid overcrowded text and avoid raw paragraphs unless absolutely necessary.
 - Write in a modern consulting-style tone: clear, decisive, and professional.
 - Every non-title slide must contain substantive document content.
+- Most content slides should have at least 3 strong bullets or the structured equivalent in cards, timeline items, process steps, comparison points, or data callouts.
+- Do not return sparse slides with only a heading and one weak line.
+- Use the objective, key message, and note fields to make each slide genuinely presentation-ready.
 - Do not invent facts or figures.`;
 
 const callSlideModel = async ({ systemPrompt, userPrompt, responseFormat = false, temperature = 0.35, maxTokens = 6000 }) => {
@@ -480,8 +688,9 @@ const generateSlideJson = async ({
   instruction,
   titleHint = '',
 }) => {
+  const promptSourceDigest = buildPromptSourceDigest(sourceText, outlineText);
   const userPrompt = [
-    instruction || 'Transform the document into a consulting-style presentation with a clear story, sharp messaging, smart layout choices, and strong visual structure.',
+    instruction || 'Transform the document into a consulting-style presentation with a clear story, sharp messaging, smart layout choices, strong visual structure, and enough substance on every slide to support a real meeting or executive review.',
     `Audience: ${audience || 'business'}`,
     `Visual theme: ${theme || 'consulting'}`,
     `Target slide count: ${slideCount}`,
@@ -493,14 +702,14 @@ const generateSlideJson = async ({
     '- surface the strongest insights and evidence',
     '- use charts, timelines, comparisons, cards, or process layouts when they communicate better than bullets',
     '- end with a strong conclusion and next-step orientation',
+    '- avoid thin slides with only one short line of text',
+    '- make sure every content slide has enough substance to stand on its own in presentation mode',
     '- use the source document as the sole factual basis for the deck',
+    '- ignore page counters, repeated headers, repeated footers, and table-of-contents fragments',
     '- never talk about Deck Prep, Quick Convert, AI Guided Builder, prompts, conversion steps, or the presentation-building process unless those exact terms appear in the source document',
     '',
     'SOURCE DOCUMENT (single source of truth):',
-    sourceText.slice(0, MAX_TEXT_FOR_SLIDES),
-    outlineText
-      ? ['', 'OPTIONAL STRUCTURED NOTES (organization hint only; defer to the source document if there is any difference):', outlineText.slice(0, 6000)].join('\n')
-      : '',
+    promptSourceDigest,
   ].join('\n');
 
   const fallbackDeck = buildFallbackDeck({
@@ -511,7 +720,7 @@ const generateSlideJson = async ({
     titleHint,
   });
 
-  if (!openai) return fallbackDeck;
+  if (!openai) return ensureDeckHasPresentationBody(fallbackDeck, sourceText, instruction);
 
   let raw = '';
   try {
@@ -532,20 +741,28 @@ const generateSlideJson = async ({
         maxTokens: 6000,
       });
     } catch {
-      return fallbackDeck;
+      return ensureDeckHasPresentationBody(fallbackDeck, sourceText, instruction);
     }
   }
 
-  if (!cleanText(raw) || containsUnexpectedRefusalLanguage(raw, sourceText)) return fallbackDeck;
+  if (!cleanText(raw) || containsUnexpectedRefusalLanguage(raw, sourceText)) {
+    return ensureDeckHasPresentationBody(fallbackDeck, sourceText, instruction);
+  }
 
   try {
     const parsed = repairAndParseJson(raw);
     const normalized = normalizeDeckPayload(parsed, { theme, fallbackTitle: titleHint || 'Presentation' });
-    if (normalized?.slides?.length && !isMetaContaminatedDeck(normalized, sourceText, titleHint) && hasSufficientDeckContent(normalized)) {
-      return {
-        ...normalized,
-        meta: { ...(normalized.meta || {}), generator: 'ai' },
-      };
+    if (normalized?.slides?.length && !isMetaContaminatedDeck(normalized, sourceText, titleHint)) {
+      const blended = blendDeckWithFallback(normalized, fallbackDeck);
+      if (hasSufficientDeckContent(blended)) {
+        return ensureDeckHasPresentationBody({
+          ...blended,
+          meta: {
+            ...(blended.meta || {}),
+            generator: hasSufficientDeckContent(normalized) ? 'ai' : 'ai-blended',
+          },
+        }, sourceText, instruction);
+      }
     }
   } catch {
     try {
@@ -556,21 +773,29 @@ const generateSlideJson = async ({
         temperature: 0.2,
         maxTokens: 6000,
       });
-      if (containsUnexpectedRefusalLanguage(retryRaw, sourceText)) return fallbackDeck;
+      if (containsUnexpectedRefusalLanguage(retryRaw, sourceText)) {
+        return ensureDeckHasPresentationBody(fallbackDeck, sourceText, instruction);
+      }
       const retryParsed = repairAndParseJson(retryRaw);
       const normalized = normalizeDeckPayload(retryParsed, { theme, fallbackTitle: titleHint || 'Presentation' });
-      if (normalized?.slides?.length && !isMetaContaminatedDeck(normalized, sourceText, titleHint) && hasSufficientDeckContent(normalized)) {
-        return {
-          ...normalized,
-          meta: { ...(normalized.meta || {}), generator: 'ai-retry' },
-        };
+      if (normalized?.slides?.length && !isMetaContaminatedDeck(normalized, sourceText, titleHint)) {
+        const blended = blendDeckWithFallback(normalized, fallbackDeck);
+        if (hasSufficientDeckContent(blended)) {
+          return ensureDeckHasPresentationBody({
+            ...blended,
+            meta: {
+              ...(blended.meta || {}),
+              generator: hasSufficientDeckContent(normalized) ? 'ai-retry' : 'ai-retry-blended',
+            },
+          }, sourceText, instruction);
+        }
       }
     } catch {
-      return fallbackDeck;
+      return ensureDeckHasPresentationBody(fallbackDeck, sourceText, instruction);
     }
   }
 
-  return fallbackDeck;
+  return ensureDeckHasPresentationBody(fallbackDeck, sourceText, instruction);
 };
 
 const generateStructuredOutline = async ({ prompt, sourceText }) => {
@@ -579,6 +804,120 @@ const generateStructuredOutline = async ({ prompt, sourceText }) => {
     maxBulletsPerSection: 6,
   });
   return { extractedText: fallback, mode: 'deterministic' };
+};
+
+const startBackgroundDeckGeneration = async ({
+  documentId,
+  userId,
+  mode = 'quick-convert',
+  slideCount = 12,
+  theme = 'consulting',
+  audience = 'business',
+  sourceText = '',
+  outlineText = '',
+  instruction = '',
+  titleHint = '',
+  additionalContext = '',
+}) => {
+  const key = String(documentId || '');
+  if (!key || generationJobs.has(key)) return;
+  generationJobs.add(key);
+
+  setTimeout(async () => {
+    let document = null;
+    try {
+      document = await Document.findById(documentId);
+      if (!document || String(document.userId) !== String(userId)) return;
+
+      const file = document.originalFileId ? await File.findById(document.originalFileId) : null;
+      markGenerationState(document, {
+        generationStatus: 'processing',
+        generationPhase: mode === 'quick-convert' ? 'Designing slides' : 'Building presentation',
+        generationStartedAt: new Date(),
+        generationPercent: 35,
+        generationError: '',
+      });
+      await document.save();
+
+      let resolvedSourceText = cleanText(sourceText || document.fullText || '');
+      let resolvedOutlineText = cleanText(outlineText || document.extractedText || '');
+
+      if (!resolvedSourceText && file) {
+        const extracted = await extractAndPersistFullText(document, file);
+        resolvedSourceText = extracted.fullText;
+      }
+      if (!resolvedSourceText) {
+        throw new Error('This document no longer has extracted text. Upload the PDF again.');
+      }
+
+      const normalizedSourceText = structurePdfText(resolvedSourceText).text || resolvedSourceText;
+      if (!resolvedOutlineText) {
+        resolvedOutlineText = buildOutlineFromBlocks(normalizedSourceText, {
+          maxSections: 8,
+          maxBulletsPerSection: 6,
+        });
+      }
+
+      document.fullText = normalizedSourceText;
+      document.extractedText = cleanText(resolvedOutlineText);
+      document.sourceCharCount = normalizedSourceText.length;
+      document.sourceWordCount = countWords(normalizedSourceText);
+      markGenerationState(document, {
+        generationPhase: 'Generating presentation content',
+        generationPercent: 72,
+      });
+      await document.save();
+
+      const pptJson = await generateSlideJson({
+        slideCount,
+        theme,
+        audience,
+        sourceText: normalizedSourceText,
+        outlineText: resolvedOutlineText,
+        instruction: buildDeckInstruction(instruction, additionalContext),
+        titleHint: titleHint || getDocumentTitle(document, file),
+      });
+
+      document.pptJson = pptJson;
+      markGenerationState(document, {
+        generationStatus: 'ready',
+        generationPhase: 'Ready',
+        generationCompletedAt: new Date(),
+        generationPercent: 100,
+        generationError: '',
+      });
+      await document.save();
+
+      await queueDocumentNotification({
+        userId,
+        documentId: document._id,
+        title: 'Presentation ready',
+        body: `${getDocumentTitle(document, file)} is ready to review and export.`,
+        status: 'ready',
+      });
+    } catch (error) {
+      if (document) {
+        markGenerationState(document, {
+          generationStatus: 'failed',
+          generationPhase: 'Failed',
+          generationCompletedAt: new Date(),
+          generationPercent: 0,
+          generationError: cleanText(error?.message || 'Presentation generation failed'),
+        });
+        await document.save().catch(() => {});
+      }
+
+      await queueDocumentNotification({
+        userId,
+        documentId,
+        title: 'Presentation generation failed',
+        body: cleanText(error?.message || 'Something went wrong while generating this presentation.'),
+        status: 'failed',
+      });
+    } finally {
+      generationJobs.delete(key);
+    }
+  }, 0);
 };
 
 const sendError = (res, error, fallbackMessage) => {
@@ -770,24 +1109,95 @@ export const quickConvert = async (req, res) => {
     document.extractedText = outlineText;
     document.sourceCharCount = normalizedSourceText.length;
     document.sourceWordCount = countWords(normalizedSourceText);
+    const slideCount = Number(req.body.slideCount) || 12;
+    const theme = req.body.theme || 'consulting';
+    const audience = req.body.audience || 'business';
+    const additionalContext = cleanText(req.body.additionalContext || '');
+    const instruction = buildDeckInstruction(
+      'Build a consulting-style deck with strong story flow, clear slide objectives, smart visual layouts, concise executive messaging, and enough body content on each slide to support a real presentation.',
+      additionalContext,
+    );
+    const titleHint = getDocumentTitle(document, file);
+    const runAsync = req.body.runAsync !== false;
+
+    if (runAsync) {
+      markGenerationState(document, {
+        generationStatus: 'queued',
+        generationPhase: 'Queued for generation',
+        generationRequestedAt: new Date(),
+        generationStartedAt: null,
+        generationCompletedAt: null,
+        generationPercent: 10,
+        generationError: '',
+        generationMeta: {
+          mode: 'quick-convert',
+          slideCount,
+          theme,
+          audience,
+          additionalContext,
+          prompt: instruction,
+        },
+      });
+      await document.save();
+
+      await startBackgroundDeckGeneration({
+        documentId: document._id,
+        userId: req.user._id,
+        mode: 'quick-convert',
+        slideCount,
+        theme,
+        audience,
+        sourceText: normalizedSourceText,
+        outlineText,
+        instruction,
+        titleHint,
+        additionalContext,
+      });
+
+      return res.status(202).json({
+        success: true,
+        queued: true,
+        document: normalizeDocumentForResponse(document),
+        fullText: normalizedSourceText,
+        extractedText: document.extractedText || '',
+        message: 'Presentation generation started. You can leave Deck Prep and return later.',
+      });
+    }
 
     const pptJson = await generateSlideJson({
-      slideCount: req.body.slideCount || 12,
-      theme: req.body.theme || 'consulting',
-      audience: req.body.audience || 'business',
+      slideCount,
+      theme,
+      audience,
       sourceText: normalizedSourceText,
       outlineText,
-      instruction: 'Build a consulting-style deck with strong story flow, clear slide objectives, smart visual layouts, and concise executive messaging.',
-      titleHint: getDocumentTitle(document, file),
+      instruction,
+      titleHint,
     });
 
     document.pptJson = pptJson;
-    document.updatedAt = new Date();
+    markGenerationState(document, {
+      generationStatus: 'ready',
+      generationPhase: 'Ready',
+      generationRequestedAt: document.generationRequestedAt || new Date(),
+      generationStartedAt: document.generationStartedAt || new Date(),
+      generationCompletedAt: new Date(),
+      generationPercent: 100,
+      generationError: '',
+      generationMeta: {
+        mode: 'quick-convert',
+        slideCount,
+        theme,
+        audience,
+        additionalContext,
+        prompt: instruction,
+      },
+    });
     await document.save();
 
     return res.json({
       success: true,
       pptJson,
+      document: normalizeDocumentForResponse(document),
       fullText: normalizedSourceText,
       extractedText: document.extractedText || '',
       generationMode: pptJson?.meta?.generator || 'ai',
@@ -833,24 +1243,95 @@ export const generatePPT = async (req, res) => {
     const storedText = cleanText(document.fullText || normalizedSourceText);
     document.sourceCharCount = storedText.length;
     document.sourceWordCount = countWords(storedText);
+    const slideCount = Number(req.body.slideCount) || 12;
+    const theme = req.body.theme || 'consulting';
+    const audience = req.body.audience || 'business';
+    const additionalContext = cleanText(req.body.additionalContext || '');
+    const instruction = buildDeckInstruction(
+      req.body.prompt || 'Create a consulting-style presentation with clear objectives, strong insight hierarchy, well-structured visual storytelling, and enough depth on each slide to support real discussion.',
+      additionalContext,
+    );
+    const titleHint = getDocumentTitle(document, file);
+    const runAsync = req.body.runAsync !== false;
+
+    if (runAsync) {
+      markGenerationState(document, {
+        generationStatus: 'queued',
+        generationPhase: 'Queued for generation',
+        generationRequestedAt: new Date(),
+        generationStartedAt: null,
+        generationCompletedAt: null,
+        generationPercent: 10,
+        generationError: '',
+        generationMeta: {
+          mode: 'guided',
+          slideCount,
+          theme,
+          audience,
+          additionalContext,
+          prompt: instruction,
+        },
+      });
+      await document.save();
+
+      await startBackgroundDeckGeneration({
+        documentId: document._id,
+        userId: req.user._id,
+        mode: 'guided',
+        slideCount,
+        theme,
+        audience,
+        sourceText: normalizedSourceText,
+        outlineText,
+        instruction,
+        titleHint,
+        additionalContext,
+      });
+
+      return res.status(202).json({
+        success: true,
+        queued: true,
+        document: normalizeDocumentForResponse(document),
+        fullText: normalizedSourceText,
+        extractedText: document.extractedText || '',
+        message: 'Presentation generation started. You can leave Deck Prep and return later.',
+      });
+    }
 
     const pptJson = await generateSlideJson({
-      slideCount: req.body.slideCount || 12,
-      theme: req.body.theme || 'consulting',
-      audience: req.body.audience || 'business',
+      slideCount,
+      theme,
+      audience,
       sourceText: normalizedSourceText,
       outlineText,
-      instruction: req.body.prompt || 'Create a consulting-style presentation with clear objectives, strong insight hierarchy, and well-structured visual storytelling.',
-      titleHint: getDocumentTitle(document, file),
+      instruction,
+      titleHint,
     });
 
     document.pptJson = pptJson;
-    document.updatedAt = new Date();
+    markGenerationState(document, {
+      generationStatus: 'ready',
+      generationPhase: 'Ready',
+      generationRequestedAt: document.generationRequestedAt || new Date(),
+      generationStartedAt: document.generationStartedAt || new Date(),
+      generationCompletedAt: new Date(),
+      generationPercent: 100,
+      generationError: '',
+      generationMeta: {
+        mode: 'guided',
+        slideCount,
+        theme,
+        audience,
+        additionalContext,
+        prompt: instruction,
+      },
+    });
     await document.save();
 
     return res.json({
       success: true,
       pptJson,
+      document: normalizeDocumentForResponse(document),
       generationMode: pptJson?.meta?.generator || 'ai',
     });
   } catch (error) {

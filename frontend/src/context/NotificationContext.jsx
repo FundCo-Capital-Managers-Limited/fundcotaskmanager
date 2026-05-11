@@ -4,7 +4,7 @@ import { io } from 'socket.io-client';
 
 const NotificationContext = createContext(null);
 const USER_API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:4001';
-const EMPTY_COUNTS = { total: 0, chat: 0, social: 0, tasks: 0, reminders: 0, meetings: 0, reports: 0, goals: 0, projects: 0, files: 0, system: 0 };
+const EMPTY_COUNTS = { total: 0, chat: 0, social: 0, tasks: 0, reminders: 0, meetings: 0, reports: 0, meetingReports: 0, goals: 0, projects: 0, files: 0, system: 0 };
 
 const getToken = () => localStorage.getItem('token');
 const getHeaders = () => {
@@ -13,8 +13,12 @@ const getHeaders = () => {
 };
 const toCount = (value) => Math.max(0, Number(value) || 0);
 const getTaskId = (value) => String(value?._id || value?.id || value?.taskId || '');
-const countKeyForType = (type) => {
-  switch (String(type || '').trim()) {
+const countKeyForNotification = (notification) => {
+  const type = String(notification?.type || '').trim();
+  const kind = String(notification?.data?.kind || '').trim();
+  if (type === 'report' && kind === 'meeting-report') return 'meetingReports';
+
+  switch (type) {
     case 'chat': return 'chat';
     case 'social': return 'social';
     case 'task': return 'tasks';
@@ -29,16 +33,27 @@ const countKeyForType = (type) => {
   }
 };
 
+const normalizeRoute = (value) => {
+  const route = String(value || '').trim();
+  if (!route) return '';
+  return route.startsWith('/') ? route : `/${route}`;
+};
+
 const routeFor = (notification) => {
   const data = notification?.data || {};
-  if (typeof data.route === 'string' && data.route.trim()) return data.route.trim();
+  const explicitRoute = normalizeRoute(data.route);
+  if (explicitRoute) return explicitRoute;
+  if (data.projectId) return `/projects/${data.projectId}`;
+  if (data.kind === 'meeting-report' || notification?.entityType === 'MeetingReport') return '/meeting-reports';
+  if (data.kind === 'deckprep' || notification?.entityType === 'document') return '/deck-prep';
+  if (data.kind === 'ai-report-draft') return '/reports';
   switch (notification?.type) {
     case 'chat': return '/team-chat';
     case 'social': return '/social-feed';
     case 'task': return '/assigned';
     case 'reminder': return '/reminders';
     case 'meeting': return data.roomId ? `/room/${data.roomId}` : '/calendar';
-    case 'report': return '/reports';
+    case 'report': return data.kind === 'meeting-report' ? '/meeting-reports' : '/reports';
     case 'goal': return '/goals';
     case 'project': return '/projects';
     case 'file': return '/file-storage';
@@ -174,8 +189,8 @@ export const NotificationProvider = ({ children }) => {
 
   const counts = useMemo(() => {
     const nextCounts = { ...baseCounts };
-    const liveCounts = liveItems.reduce((accumulator, item) => {
-      const key = countKeyForType(item?.type);
+      const liveCounts = liveItems.reduce((accumulator, item) => {
+      const key = countKeyForNotification(item);
       if (key) accumulator[key] = (accumulator[key] || 0) + 1;
       return accumulator;
     }, { ...EMPTY_COUNTS });
@@ -211,17 +226,25 @@ export const NotificationProvider = ({ children }) => {
       const unreadByType = notificationRes.data.unreadByType || {};
       const unreadChat = toCount(chatRes.data.unreadTotal ?? chatRes.data.totalUnread ?? chatRes.data.total ?? chatRes.data.count);
 
+      const storedUnreadCounts = notifications.reduce((accumulator, item) => {
+        if (item.isRead) return accumulator;
+        const key = countKeyForNotification(item);
+        if (key) accumulator[key] = (accumulator[key] || 0) + 1;
+        return accumulator;
+      }, { ...EMPTY_COUNTS });
+
       const nextCounts = {
-        chat: Math.max(toCount(unreadByType.chat), unreadChat),
-        social: toCount(unreadByType.social),
-        tasks: toCount(unreadByType.task),
-        reminders: toCount(unreadByType.reminder),
-        meetings: toCount(unreadByType.meeting),
-        reports: toCount(unreadByType.report),
-        goals: toCount(unreadByType.goal),
-        projects: toCount(unreadByType.project),
-        files: toCount(unreadByType.file),
-        system: toCount(unreadByType.system),
+        chat: Math.max(toCount(storedUnreadCounts.chat), unreadChat, toCount(unreadByType.chat)),
+        social: Math.max(toCount(storedUnreadCounts.social), toCount(unreadByType.social)),
+        tasks: Math.max(toCount(storedUnreadCounts.tasks), toCount(unreadByType.task)),
+        reminders: Math.max(toCount(storedUnreadCounts.reminders), toCount(unreadByType.reminder)),
+        meetings: Math.max(toCount(storedUnreadCounts.meetings), toCount(unreadByType.meeting)),
+        reports: Math.max(toCount(storedUnreadCounts.reports), toCount(unreadByType.report)),
+        meetingReports: toCount(storedUnreadCounts.meetingReports),
+        goals: Math.max(toCount(storedUnreadCounts.goals), toCount(unreadByType.goal)),
+        projects: Math.max(toCount(storedUnreadCounts.projects), toCount(unreadByType.project)),
+        files: Math.max(toCount(storedUnreadCounts.files), toCount(unreadByType.file)),
+        system: Math.max(toCount(storedUnreadCounts.system), toCount(unreadByType.system)),
       };
       nextCounts.total = Object.values(nextCounts).reduce((sum, value) => sum + value, 0);
 
@@ -423,6 +446,15 @@ export const NotificationProvider = ({ children }) => {
     } catch {}
   }, [refresh]);
 
+  const markMeetingReportsRead = useCallback(async () => {
+    setLiveItems((current) => current.filter((item) => !(item.type === 'report' && String(item?.data?.kind || '').trim() === 'meeting-report')));
+
+    try {
+      await axios.patch(`${USER_API_BASE}/api/notifications/context-read`, { type: 'report', dataKey: 'kind', dataValue: 'meeting-report' }, { headers: getHeaders() });
+      await refresh();
+    } catch {}
+  }, [refresh]);
+
   const dismissPopup = useCallback((notificationId) => {
     if (!notificationId) return;
     setPopupItems((current) => current.filter((item) => item.id !== notificationId));
@@ -446,13 +478,14 @@ export const NotificationProvider = ({ children }) => {
       markRead,
       markAllRead,
       markTypeRead,
+      markMeetingReportsRead,
       popupItems,
       popupsExpanded,
       dismissPopup,
       clearPopups,
       togglePopupsExpanded,
     }),
-    [clearPopups, counts, dismissPopup, items, lastUpdated, loading, markAllRead, markRead, markTypeRead, popupItems, popupsExpanded, refresh, togglePopupsExpanded],
+    [clearPopups, counts, dismissPopup, items, lastUpdated, loading, markAllRead, markMeetingReportsRead, markRead, markTypeRead, popupItems, popupsExpanded, refresh, togglePopupsExpanded],
   );
 
   return <NotificationContext.Provider value={value}>{children}</NotificationContext.Provider>;
@@ -470,6 +503,7 @@ export const useNotifications = () => {
       markRead: async () => {},
       markAllRead: async () => {},
       markTypeRead: async () => {},
+      markMeetingReportsRead: async () => {},
       popupItems: [],
       popupsExpanded: false,
       dismissPopup: () => {},

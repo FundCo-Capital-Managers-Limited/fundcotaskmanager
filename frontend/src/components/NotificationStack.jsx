@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Bell, ChevronDown, ChevronUp, ExternalLink, X } from 'lucide-react';
@@ -26,11 +26,6 @@ const NotificationStack = () => {
   const visibleItems = popupsExpanded ? popupItems : popupItems.slice(0, 3);
 
   const openNotification = async (item) => {
-    if (!popupsExpanded && popupItems.length > 1) {
-      togglePopupsExpanded(true);
-      return;
-    }
-
     if (item?.id && !String(item.id).startsWith('live-')) {
       await markRead(item.id);
     }
@@ -87,7 +82,7 @@ const NotificationStack = () => {
                           ) : null}
                           <div className="mt-2 flex items-center gap-2 text-[0.68rem] font-black uppercase tracking-[0.08em]" style={{ color: 'var(--text-muted)' }}>
                             <span>{item.type || 'system'}</span>
-                            <span>•</span>
+                            <span>&bull;</span>
                             <span>{new Date(item.createdAt || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                           </div>
                         </div>
@@ -109,3 +104,4 @@ const NotificationStack = () => {
 };
 
 export default NotificationStack;
+

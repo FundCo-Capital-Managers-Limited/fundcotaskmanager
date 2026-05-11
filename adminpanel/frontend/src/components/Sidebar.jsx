@@ -14,8 +14,8 @@ import {
   HardDrive,
   LayoutDashboard,
   ListTodo,
-  LogOut,
   MessageSquare,
+  MessageCircleMore,
   Presentation,
   Settings,
   Target,
@@ -30,10 +30,13 @@ const navConfig = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard', roles: ['team-lead', 'executive', 'admin'] },
   { to: '/tasks', icon: ListTodo, label: 'Tasks', roles: ['team-lead', 'executive', 'admin'], badge: 'tasks' },
   { to: '/my-tasks', icon: ClipboardList, label: 'My Tasks', roles: ['team-lead', 'executive', 'admin'] },
+  { to: '/tasks-assigned-by-me', icon: ClipboardList, label: 'Tasks Assigned by Me', roles: ['team-lead', 'executive', 'admin'] },
+  { to: '/my-goals', icon: Target, label: 'My Goals', roles: ['team-lead', 'executive', 'admin'] },
   { to: '/calendar', icon: CalendarDays, label: 'Calendar', roles: ['team-lead', 'executive', 'admin'], badge: 'meetings' },
   { to: '/projects', icon: FolderKanban, label: 'Projects', roles: ['team-lead', 'executive', 'admin'], badge: 'projects' },
-  { to: '/goals', icon: Target, label: 'Goals', roles: ['team-lead', 'executive', 'admin'], badge: 'goals' },
+  { to: '/goals', icon: Target, label: 'Team Goals', roles: ['team-lead', 'executive', 'admin'], badge: 'goals' },
   { to: '/reports', icon: FileText, label: 'Reports', roles: ['team-lead', 'executive', 'admin'], badge: 'reports' },
+  { to: '/meeting-reports', icon: FileText, label: 'Meeting Reports', roles: ['team-lead', 'executive', 'admin'], badge: 'meetingReports' },
   { to: '/performance', icon: TrendingUp, label: 'Performance', roles: ['team-lead', 'executive', 'admin'] },
   { divider: true },
   { to: '/my-team', icon: UsersRound, label: 'My Team', roles: ['team-lead', 'executive', 'admin'] },
@@ -46,6 +49,7 @@ const navConfig = [
   { to: '/deck-prep', icon: Presentation, label: 'Deck Prep', roles: ['team-lead', 'executive', 'admin'] },
   { to: '/settings', icon: Settings, label: 'Profile Settings', roles: ['team-lead', 'executive', 'admin'] },
   { divider: true },
+  { to: '/feedbacks', icon: MessageCircleMore, label: 'User Feedback', roles: ['admin'] },
   { to: '/users', icon: Users, label: 'Users', roles: ['admin'] },
 ];
 
@@ -133,12 +137,6 @@ const SidebarInner = ({ user, hasRole, onLogout, collapsed, onNavigate, counts, 
         </ul>
       </nav>
 
-      <div className="border-t p-3" style={{ borderColor: 'var(--c-border)' }}>
-        <button type="button" onClick={onLogout} className={`btn-danger w-full ${showText ? 'justify-start' : 'justify-center px-0'}`}>
-          <LogOut className="h-4 w-4" />
-          {showText ? 'Sign Out' : null}
-        </button>
-      </div>
       {onToggleCollapse ? (
         <button
           type="button"

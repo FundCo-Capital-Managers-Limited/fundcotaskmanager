@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Bell, CheckCheck, Menu, Moon, RefreshCw, Sun } from 'lucide-react';
+import { Bell, CheckCheck, LogOut, Menu, Moon, RefreshCw, Sun } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext.jsx';
 import { useNotifications } from '../context/NotificationContext.jsx';
 
@@ -104,7 +104,7 @@ const NotificationDropdown = ({ items, total, loading, lastUpdated, onRefresh, o
   </div>
 );
 
-const Navbar = ({ onMenu }) => {
+const Navbar = ({ user, onMenu, onLogout }) => {
   const navigate = useNavigate();
   const { resolvedTheme, toggleTheme } = useTheme();
   const { items, counts, loading, lastUpdated, refresh, markRead, markAllRead, markTypeRead } = useNotifications();
@@ -167,6 +167,19 @@ const Navbar = ({ onMenu }) => {
         </div>
 
         <div className="flex items-center gap-2">
+          <div className="hidden items-center gap-2 rounded-[0.8rem] px-3 py-2 md:flex" style={{ background: 'var(--c-panel-subtle)', color: 'var(--c-text-soft)' }}>
+            <div className="flex h-8 w-8 items-center justify-center rounded-full text-xs font-black text-white" style={{ background: 'var(--brand-secondary)' }}>
+              {(user?.firstName || 'A')[0].toUpperCase()}
+            </div>
+            <div className="min-w-0 text-left">
+              <p className="max-w-[10rem] truncate text-xs font-black" style={{ color: 'var(--c-text)' }}>
+                {user?.fullName || `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || 'Admin'}
+              </p>
+              <p className="text-[0.68rem]" style={{ color: 'var(--c-text-faint)' }}>
+                {user?.role === 'admin' ? 'Super Admin' : user?.role === 'executive' ? 'Executive' : user?.role === 'team-lead' ? 'Team Lead' : 'Admin'}
+              </p>
+            </div>
+          </div>
           <div ref={notificationRef} className="relative">
             <button
               type="button"
@@ -209,6 +222,16 @@ const Navbar = ({ onMenu }) => {
             ) : (
               <Moon className="h-5 w-5" style={{ color: 'var(--c-text)' }} />
             )}
+          </button>
+
+          <button
+            type="button"
+            onClick={onLogout}
+            className="flex h-10 items-center justify-center gap-2 rounded-[0.75rem] px-3 transition-colors hover:bg-[var(--c-panel-subtle)]"
+            aria-label="Sign out"
+          >
+            <LogOut className="h-4.5 w-4.5" style={{ color: 'var(--c-text)' }} />
+            <span className="hidden text-sm font-bold md:inline" style={{ color: 'var(--c-text)' }}>Sign out</span>
           </button>
         </div>
       </div>

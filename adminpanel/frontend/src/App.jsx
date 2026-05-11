@@ -11,11 +11,15 @@ import { LoadingScreen } from './components/ui.jsx';
 const Dashboard = lazy(() => import('./pages/Dashboard.jsx'));
 const Tasks = lazy(() => import('./pages/Tasks.jsx'));
 const MyTasks = lazy(() => import('./pages/MyTasks.jsx'));
+const TasksAssignedByMe = lazy(() => import('./pages/TasksAssignedByMe.jsx'));
+const MyGoals = lazy(() => import('./pages/MyGoals.jsx'));
 const Calendar = lazy(() => import('./pages/Calendar.jsx'));
 const Goals = lazy(() => import('./pages/Goals.jsx'));
 const Reports = lazy(() => import('./pages/Reports.jsx'));
+const MeetingReports = lazy(() => import('./pages/MeetingReports.jsx'));
 const Performance = lazy(() => import('./pages/Performance.jsx'));
 const Users = lazy(() => import('./pages/Users.jsx'));
+const Feedbacks = lazy(() => import('./pages/Feedbacks.jsx'));
 const MyTeam = lazy(() => import('./pages/MyTeam.jsx'));
 const Projects = lazy(() => import('./pages/Projects.jsx'));
 const Social = lazy(() => import('./pages/Social.jsx'));
@@ -69,9 +73,12 @@ const AppRoutes = () => {
           <Route path="/" element={<Suspense fallback={<Loader />}><Dashboard /></Suspense>} />
           <Route path="/tasks" element={<Suspense fallback={<Loader />}><Tasks /></Suspense>} />
           <Route path="/my-tasks" element={<Suspense fallback={<Loader />}><MyTasks /></Suspense>} />
+          <Route path="/tasks-assigned-by-me" element={<Suspense fallback={<Loader />}><TasksAssignedByMe /></Suspense>} />
+          <Route path="/my-goals" element={<Suspense fallback={<Loader />}><MyGoals /></Suspense>} />
           <Route path="/calendar" element={<Suspense fallback={<Loader />}><Calendar /></Suspense>} />
           <Route path="/goals" element={<Suspense fallback={<Loader />}><Goals /></Suspense>} />
           <Route path="/reports" element={<Suspense fallback={<Loader />}><Reports /></Suspense>} />
+          <Route path="/meeting-reports" element={<Suspense fallback={<Loader />}><MeetingReports /></Suspense>} />
           <Route path="/performance" element={<Suspense fallback={<Loader />}><Performance /></Suspense>} />
           <Route path="/users" element={<Suspense fallback={<Loader />}><Users /></Suspense>} />
           <Route path="/my-team" element={<Suspense fallback={<Loader />}><MyTeam /></Suspense>} />
@@ -84,6 +91,7 @@ const AppRoutes = () => {
           <Route path="/training" element={<Suspense fallback={<Loader />}><Training /></Suspense>} />
           <Route path="/reminders" element={<Suspense fallback={<Loader />}><Reminders /></Suspense>} />
           <Route path="/meetings" element={<Suspense fallback={<Loader />}><Meetings /></Suspense>} />
+          <Route path="/feedbacks" element={<Suspense fallback={<Loader />}><Feedbacks /></Suspense>} />
           <Route path="/settings" element={<Suspense fallback={<Loader />}><ProfileSettings /></Suspense>} />
           <Route path="/profile" element={<Navigate to="/settings" replace />} />
         </Route>

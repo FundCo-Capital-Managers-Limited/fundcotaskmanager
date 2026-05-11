@@ -10,7 +10,7 @@ import {
 
 // ── Admin Login ───────────────────────────────────────────────────────────────
 export const adminLogin = async (req, res) => {
-  const { email, password } = req.body;
+  const { email, password, rememberMe } = req.body;
   if (!email || !password) return res.status(400).json({ success: false, message: 'Email and password required' });
 
   try {
@@ -32,12 +32,13 @@ export const adminLogin = async (req, res) => {
     user.activityLogs.push({ action: 'admin_login', details: `Admin logged in from IP ${req.ip}` });
     await user.save();
 
-    const session = await issueAdminSession({ user, req, res });
+    const session = await issueAdminSession({ user, req, res, rememberMe: Boolean(rememberMe) });
     res.json({
       success: true,
       token: session.token,
       accessTokenExpiresInSeconds: session.accessTokenExpiresInSeconds,
       refreshSessionExpiresAt: session.refreshSessionExpiresAt,
+      rememberMe: session.rememberMe,
       user: {
         id: user._id,
         firstName: user.firstName,
@@ -130,6 +131,7 @@ export const refreshAdminSession = async (req, res) => {
       token: session.token,
       accessTokenExpiresInSeconds: session.accessTokenExpiresInSeconds,
       refreshSessionExpiresAt: session.refreshSessionExpiresAt,
+      rememberMe: session.rememberMe,
       user: session.user,
     });
   } catch (err) {

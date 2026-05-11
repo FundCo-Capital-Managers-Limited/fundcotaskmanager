@@ -6,9 +6,11 @@ import { ADMIN_JWT_SECRET, IS_PRODUCTION } from '../config/security.js';
 
 const ACCESS_TOKEN_TTL_MINUTES = Math.max(5, Number(process.env.ACCESS_TOKEN_TTL_MINUTES) || 60);
 const REFRESH_TOKEN_TTL_DAYS = Math.max(1, Number(process.env.REFRESH_TOKEN_TTL_DAYS) || 14);
+const SESSION_REFRESH_TOKEN_TTL_DAYS = Math.max(1, Number(process.env.SESSION_REFRESH_TOKEN_TTL_DAYS) || 3);
 export const REFRESH_COOKIE_NAME = String(process.env.ADMIN_REFRESH_COOKIE_NAME || 'fc_admin_rt').trim();
 const ACCESS_TOKEN_TTL_SECONDS = ACCESS_TOKEN_TTL_MINUTES * 60;
 const REFRESH_TOKEN_TTL_MS = REFRESH_TOKEN_TTL_DAYS * 24 * 60 * 60 * 1000;
+const SESSION_REFRESH_TOKEN_TTL_MS = SESSION_REFRESH_TOKEN_TTL_DAYS * 24 * 60 * 60 * 1000;
 
 const hashToken = (value) => crypto.createHash('sha256').update(String(value || '')).digest('hex');
 const randomToken = () => crypto.randomBytes(48).toString('base64url');
@@ -28,13 +30,20 @@ const parseCookies = (cookieHeader) =>
       return accumulator;
     }, {});
 
-const getCookieOptions = (maxAgeMs) => ({
-  httpOnly: true,
-  secure: IS_PRODUCTION,
-  sameSite: IS_PRODUCTION ? 'none' : 'lax',
-  path: '/',
-  maxAge: maxAgeMs,
-});
+const getCookieOptions = ({ persistent = false, maxAgeMs } = {}) => {
+  const options = {
+    httpOnly: true,
+    secure: IS_PRODUCTION,
+    sameSite: IS_PRODUCTION ? 'none' : 'lax',
+    path: '/',
+  };
+  if (persistent && Number.isFinite(maxAgeMs) && maxAgeMs > 0) {
+    options.maxAge = maxAgeMs;
+  }
+  return options;
+};
+
+const getRefreshTtlMs = (persistent) => (persistent ? REFRESH_TOKEN_TTL_MS : SESSION_REFRESH_TOKEN_TTL_MS);
 
 export const createAdminAccessToken = (userId) =>
   jwt.sign({ id: userId }, ADMIN_JWT_SECRET, {
@@ -68,13 +77,14 @@ export const findAdminByRefreshToken = async (rawToken) => {
 };
 
 export const clearRefreshCookie = (res) => {
-  res.clearCookie(REFRESH_COOKIE_NAME, getCookieOptions(undefined));
+  res.clearCookie(REFRESH_COOKIE_NAME, getCookieOptions({ persistent: false }));
 };
 
-const issueRefreshToken = async ({ userId, familyId, ipAddress, userAgent }) => {
+const issueRefreshToken = async ({ userId, familyId, ipAddress, userAgent, persistent = false }) => {
   const rawToken = randomToken();
   const tokenHash = hashToken(rawToken);
-  const expiresAt = new Date(Date.now() + REFRESH_TOKEN_TTL_MS);
+  const refreshTtlMs = getRefreshTtlMs(persistent);
+  const expiresAt = new Date(Date.now() + refreshTtlMs);
 
   await RefreshToken.create({
     userId,
@@ -83,27 +93,37 @@ const issueRefreshToken = async ({ userId, familyId, ipAddress, userAgent }) => 
     familyId,
     createdByIp: ipAddress || '',
     userAgent: userAgent || '',
+    persistent,
     lastUsedAt: new Date(),
     expiresAt,
   });
 
-  return { rawToken, tokenHash, expiresAt };
+  return { rawToken, tokenHash, expiresAt, persistent, refreshTtlMs };
 };
 
-export const issueAdminSession = async ({ user, req, res, familyId }) => {
+export const issueAdminSession = async ({ user, req, res, familyId, rememberMe = false }) => {
   const refreshToken = await issueRefreshToken({
     userId: user._id,
     familyId: familyId || makeFamilyId(),
     ipAddress: req.ip,
     userAgent: req.get('user-agent'),
+    persistent: Boolean(rememberMe),
   });
 
-  res.cookie(REFRESH_COOKIE_NAME, refreshToken.rawToken, getCookieOptions(REFRESH_TOKEN_TTL_MS));
+  res.cookie(
+    REFRESH_COOKIE_NAME,
+    refreshToken.rawToken,
+    getCookieOptions({
+      persistent: refreshToken.persistent,
+      maxAgeMs: refreshToken.refreshTtlMs,
+    })
+  );
 
   return {
     token: createAdminAccessToken(user._id),
     accessTokenExpiresInSeconds: ACCESS_TOKEN_TTL_SECONDS,
     refreshSessionExpiresAt: refreshToken.expiresAt.toISOString(),
+    rememberMe: refreshToken.persistent,
   };
 };
 
@@ -212,6 +232,7 @@ export const rotateAdminRefreshSession = async ({ req, res }) => {
     familyId: existing.familyId,
     ipAddress: req.ip,
     userAgent: req.get('user-agent'),
+    persistent: Boolean(existing.persistent),
   });
 
   existing.revokedAt = new Date();
@@ -220,12 +241,20 @@ export const rotateAdminRefreshSession = async ({ req, res }) => {
   existing.lastUsedAt = new Date();
   await existing.save();
 
-  res.cookie(REFRESH_COOKIE_NAME, replacement.rawToken, getCookieOptions(REFRESH_TOKEN_TTL_MS));
+  res.cookie(
+    REFRESH_COOKIE_NAME,
+    replacement.rawToken,
+    getCookieOptions({
+      persistent: replacement.persistent,
+      maxAgeMs: replacement.refreshTtlMs,
+    })
+  );
 
   return {
     token: createAdminAccessToken(user._id),
     accessTokenExpiresInSeconds: ACCESS_TOKEN_TTL_SECONDS,
     refreshSessionExpiresAt: replacement.expiresAt.toISOString(),
+    rememberMe: replacement.persistent,
     user: {
       id: user._id,
       firstName: user.firstName,

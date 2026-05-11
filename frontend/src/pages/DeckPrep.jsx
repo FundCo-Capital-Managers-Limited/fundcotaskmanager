@@ -1,5 +1,5 @@
 // src/pages/DeckPrep.jsx
-// Ultimate AI-Powered PDF → PowerPoint Builder
+// Ultimate AI-Powered PDF -> PowerPoint Builder
 // Two modes: Quick Convert + AI-Guided | Full slide editor | Real PPTX export
 // NEW: Delete button appears on hover for every history card (Recent + full History view)
 import React, { useState, useEffect, useRef, useCallback } from 'react';
@@ -16,6 +16,29 @@ import {
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:4001';
 const headers = () => ({ Authorization: `Bearer ${localStorage.getItem('token')}` });
+const DECK_SESSION_KEY = 'fundco-deckprep-session-v1';
+const readDeckSession = () => {
+  try {
+    const raw = localStorage.getItem(DECK_SESSION_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+};
+const writeDeckSession = (value) => {
+  try {
+    localStorage.setItem(DECK_SESSION_KEY, JSON.stringify(value));
+  } catch {
+    // ignore session persistence failures
+  }
+};
+const clearDeckSession = () => {
+  try {
+    localStorage.removeItem(DECK_SESSION_KEY);
+  } catch {
+    // ignore session persistence failures
+  }
+};
 const downloadPlainText = (text, baseName = 'deckprep-text') => {
   const safeName = String(baseName || 'deckprep-text').replace(/[^a-z0-9]+/gi, '_').replace(/^_+|_+$/g, '') || 'deckprep-text';
   const blob = new Blob([text || ''], { type: 'text/plain;charset=utf-8' });
@@ -29,6 +52,21 @@ const downloadPlainText = (text, baseName = 'deckprep-text') => {
   URL.revokeObjectURL(url);
 };
 const getDocumentFileName = (entry) => entry?.originalFileId?.fileName || entry?.sourceFileName || 'Untitled';
+const isGenerationPending = (entry) => ['queued', 'processing'].includes(String(entry?.generationStatus || '').toLowerCase());
+const isGenerationFailed = (entry) => String(entry?.generationStatus || '').toLowerCase() === 'failed';
+const getGenerationLabel = (entry) => {
+  const status = String(entry?.generationStatus || '').toLowerCase();
+  if (status === 'queued') {
+    return entry?.generationPercent ? `Queued (${entry.generationPercent}%)` : 'Queued';
+  }
+  if (status === 'processing') {
+    const phase = entry?.generationPhase || 'Generating';
+    return entry?.generationPercent ? `${phase} (${entry.generationPercent}%)` : phase;
+  }
+  if (status === 'failed') return 'Failed';
+  if (status === 'ready' || entry?.pptJson) return 'Ready';
+  return 'Draft';
+};
 
 // ── Themes ───────────────────────────────────────────────────────────────────
 const THEMES = {
@@ -141,7 +179,7 @@ const SlidePreview = ({ slide, theme, scale = 1, isActive = false, onClick }) =>
       }}>
         <div style={{ color: `#${t.accent}`, fontSize: 40 * scale, marginBottom: 8 * scale, fontFamily: 'Georgia,serif' }}>"</div>
         <div style={{ color: `#${t.text}`, fontSize: 14 * scale, lineHeight: 1.5, fontStyle: 'italic', maxWidth: '85%' }}>{slide.quote || slide.title}</div>
-        {slide.attribution && <div style={{ color: `#${t.subtext}`, fontSize: 11 * scale, marginTop: 10 * scale }}>— {slide.attribution}</div>}
+        {slide.attribution && <div style={{ color: `#${t.subtext}`, fontSize: 11 * scale, marginTop: 10 * scale }}>- {slide.attribution}</div>}
       </div>}
       {isTwoCol && <div style={{ position: 'absolute', inset: 0, paddingTop: 14 * scale, padding: `${14 * scale}px ${20 * scale}px` }}>
         <div style={{ color: `#${t.text}`, fontWeight: 700, fontSize: 13 * scale, marginBottom: 8 * scale, paddingTop: 8 * scale }}>{slide.title}</div>
@@ -201,7 +239,7 @@ const SlidePreview = ({ slide, theme, scale = 1, isActive = false, onClick }) =>
                 <div style={{ color: `#${t.accent}`, fontSize: 8 * scale, fontWeight: 800, marginBottom: 4 * scale }}>STEP {index + 1}</div>
                 <div style={{ color: `#${t.text}`, fontSize: 10 * scale, fontWeight: 700, lineHeight: 1.35 }}>{step}</div>
               </div>
-              {index < Math.min(processSteps.length, 4) - 1 && <div style={{ color: `#${t.accent}`, fontSize: 18 * scale, fontWeight: 800 }}>→</div>}
+              {index < Math.min(processSteps.length, 4) - 1 && <div style={{ color: `#${t.accent}`, fontSize: 18 * scale, fontWeight: 800 }}>{'>'}</div>}
             </React.Fragment>
           ))}
         </div>
@@ -254,7 +292,7 @@ const SlidePreview = ({ slide, theme, scale = 1, isActive = false, onClick }) =>
 };
 
 // ── PPTX Export ───────────────────────────────────────────────────────────────
-// Slide canvas: 13.333 × 7.5 in (16:9 wide). All measurements in inches.
+// Slide canvas: 13.333 x 7.5 in (16:9 wide). All measurements in inches.
 const SLIDE_W = 13.333;
 const SLIDE_H = 7.5;
 const MARGIN_X = 0.7;
@@ -772,12 +810,12 @@ const SlideEditor = ({ slide, onUpdate, onRegenerate, onDelete, onAddSlide, isRe
           <div className="rounded-xl p-3 space-y-2" style={{ backgroundColor: 'var(--bg-subtle)', borderLeft: '3px solid var(--brand-accent)' }}>
             <p className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>How to improve this slide:</p>
             <textarea value={regenPrompt} onChange={e => setRegenPrompt(e.target.value)} rows={2}
-              placeholder="e.g. More concise, add data, change layout…" style={{ ...inp, resize: 'none' }} />
+              placeholder="e.g. More concise, add data, change layout..." style={{ ...inp, resize: 'none' }} />
             <button onClick={() => { onRegenerate(regenPrompt); setShowRegen(false); setRegenPrompt(''); }}
               disabled={isRegenerating}
               className="w-full py-2 rounded-lg text-sm font-bold text-white flex items-center justify-center gap-2 hover:opacity-90 disabled:opacity-50"
               style={{ backgroundColor: 'var(--brand-primary)' }}>
-              {isRegenerating ? <><Loader2 className="w-4 h-4 animate-spin" />Regenerating…</> : <><Wand2 className="w-4 h-4" />Regenerate</>}
+              {isRegenerating ? <><Loader2 className="w-4 h-4 animate-spin" />Regenerating...</> : <><Wand2 className="w-4 h-4" />Regenerate</>}
             </button>
           </div>
         </motion.div>}
@@ -825,7 +863,7 @@ const SlideEditor = ({ slide, onUpdate, onRegenerate, onDelete, onAddSlide, isRe
       <div>
         <label className="block text-xs font-bold uppercase tracking-wide mb-1.5" style={{ color: 'var(--text-muted)' }}>Speaker Note</label>
         <textarea value={local.note || ''} onChange={e => upd('note', e.target.value)} rows={2}
-          placeholder="Optional notes…" style={{ ...inp, resize: 'none' }} />
+          placeholder="Optional notes..." style={{ ...inp, resize: 'none' }} />
       </div>
       <div>
         <label className="block text-xs font-bold uppercase tracking-wide mb-1.5" style={{ color: 'var(--text-muted)' }}>Slide Type</label>
@@ -848,7 +886,8 @@ const SlideEditor = ({ slide, onUpdate, onRegenerate, onDelete, onAddSlide, isRe
 
 // ── MAIN COMPONENT ────────────────────────────────────────────────────────────
 const DeckPrep = () => {
-  const { user } = useOutletContext();
+  const outlet = useOutletContext();
+  const { user = null } = outlet || {};
   const [mode, setMode] = useState('home');
   const [step, setStep] = useState(1);
   const [docId, setDocId] = useState(null);
@@ -865,15 +904,41 @@ const DeckPrep = () => {
   const [theme, setTheme] = useState('consulting');
   const [slideCount, setSlideCount] = useState(12);
   const [audience, setAudience] = useState('business');
+  const [additionalContext, setAdditionalContext] = useState('');
   const [extractPrompt, setExtractPrompt] = useState('Read the full document like a strategist and presentation editor. Preserve the real meaning, identify audience and purpose, extract the strongest arguments and data, group content into a clear narrative, and structure the text into presentation-ready sections instead of raw paragraphs.');
   const [pptPrompt, setPptPrompt] = useState('Design a consulting-style presentation with a compelling title slide, clear story flow, concise executive messaging, strong slide objectives, and smart visual layouts. Use comparisons, timelines, cards, process diagrams, and data-focused slides whenever they communicate better than bullets.');
   const [file, setFile] = useState(null);
   const [uploading, setUploading] = useState(false);
+  const [leftPaneCollapsed, setLeftPaneCollapsed] = useState(false);
+  const [rightPaneCollapsed, setRightPaneCollapsed] = useState(false);
   const fileRef = useRef();
   const autoSaveRef = useRef(null);
+  const resumeAttemptedRef = useRef(false);
 
   const load = (msg) => { setLoading(true); setLoadingMsg(msg); setError(''); };
   const done = () => { setLoading(false); setLoadingMsg(''); };
+
+  const persistDeckSession = useCallback((patch = {}) => {
+    const nextDocumentId = patch.documentId ?? docId;
+    const nextMode = patch.mode ?? mode;
+    if (!nextDocumentId && nextMode === 'home') {
+      clearDeckSession();
+      return;
+    }
+    writeDeckSession({
+      documentId: nextDocumentId,
+      mode: nextMode,
+      step: patch.step ?? step,
+      activeSlide: patch.activeSlide ?? activeSlide,
+      theme: patch.theme ?? theme,
+      slideCount: patch.slideCount ?? slideCount,
+      audience: patch.audience ?? audience,
+      additionalContext: patch.additionalContext ?? additionalContext,
+      leftPaneCollapsed: patch.leftPaneCollapsed ?? leftPaneCollapsed,
+      rightPaneCollapsed: patch.rightPaneCollapsed ?? rightPaneCollapsed,
+      updatedAt: Date.now(),
+    });
+  }, [activeSlide, additionalContext, audience, docId, leftPaneCollapsed, mode, rightPaneCollapsed, slideCount, step, theme]);
 
   const persistFullText = useCallback(async (documentId = docId, nextText = fullText) => {
     if (!documentId) return;
@@ -907,6 +972,7 @@ const DeckPrep = () => {
         setDocId(null);
         setPptJson(null);
         setMode('home');
+        clearDeckSession();
       }
     } catch (err) {
       console.error(err);
@@ -915,6 +981,96 @@ const DeckPrep = () => {
   }, [docId, fetchHistory]);
 
   useEffect(() => { fetchHistory(); }, [fetchHistory]);
+  const hasPendingDecks = history.some((entry) => isGenerationPending(entry));
+
+  useEffect(() => {
+    if (!hasPendingDecks) return undefined;
+    const interval = setInterval(() => {
+      fetchHistory();
+    }, 12000);
+    return () => clearInterval(interval);
+  }, [fetchHistory, hasPendingDecks]);
+
+  useEffect(() => {
+    if (docId || mode !== 'home') {
+      persistDeckSession();
+    }
+  }, [activeSlide, additionalContext, audience, docId, leftPaneCollapsed, mode, persistDeckSession, rightPaneCollapsed, slideCount, step, theme]);
+
+  useEffect(() => {
+    if (resumeAttemptedRef.current || !history.length) return;
+    resumeAttemptedRef.current = true;
+    const session = readDeckSession();
+    if (!session?.documentId) return;
+
+    setTheme(session.theme || 'consulting');
+    setSlideCount(session.slideCount || 12);
+    setAudience(session.audience || 'business');
+    setAdditionalContext(session.additionalContext || '');
+    setLeftPaneCollapsed(!!session.leftPaneCollapsed);
+    setRightPaneCollapsed(!!session.rightPaneCollapsed);
+
+    const match = history.find((entry) => String(entry._id) === String(session.documentId));
+    if (!match) {
+      clearDeckSession();
+      return;
+    }
+
+    setFile(null);
+    setDocId(match._id);
+    setFullText(match.fullText || '');
+    setExtractedText(match.extractedText || '');
+
+    if (isGenerationPending(match)) {
+      setMode('history');
+      toast.success('Resumed your in-progress presentation.');
+      return;
+    }
+
+    if (match.pptJson) {
+      setPptJson(match.pptJson);
+      setMode('editor');
+      setActiveSlide(Math.min(session.activeSlide || 0, Math.max((match.pptJson?.slides?.length || 1) - 1, 0)));
+      toast.success('Resumed your last presentation session.');
+      return;
+    }
+
+    if (isGenerationFailed(match)) {
+      setMode('guided');
+      setStep(5);
+      setError(match.generationError || 'Presentation generation failed');
+      toast.success('Restored your last deck workspace.');
+      return;
+    }
+
+    if (match.extractedText) {
+      setMode('guided');
+      setStep(session.step || 5);
+      toast.success('Restored your last deck workspace.');
+      return;
+    }
+
+    if (match.fullText) {
+      setMode('reader');
+      toast.success('Restored your last deck workspace.');
+      return;
+    }
+
+    setMode('guided');
+    setStep(session.step || 2);
+    toast.success('Restored your last deck workspace.');
+  }, [history]);
+
+  const handleQueuedGeneration = useCallback(async (responseData = {}, nextMode = 'history') => {
+    const nextDocumentId = responseData?.document?._id || docId;
+    if (responseData?.document?._id) setDocId(responseData.document._id);
+    if (typeof responseData?.fullText === 'string') setFullText(responseData.fullText);
+    if (typeof responseData?.extractedText === 'string') setExtractedText(responseData.extractedText);
+    setMode(nextMode);
+    persistDeckSession({ documentId: nextDocumentId, mode: nextMode });
+    await fetchHistory();
+    toast.success(responseData?.message || 'Presentation generation started. You can leave this section and return later.');
+  }, [docId, fetchHistory, persistDeckSession]);
 
   const triggerAutoSave = useCallback((json) => {
     if (!docId || !json) return;
@@ -959,26 +1115,32 @@ const DeckPrep = () => {
 
   const handleQuickConvert = async () => {
     if (!file && !docId) return toast.error('Upload a PDF first');
-    load('Uploading PDF…');
+    load('Uploading PDF...');
     let id = docId;
     if (file && !docId) { id = await uploadPDF(file); if (!id) { done(); return; } }
-    setLoadingMsg('AI is reading and building your presentation…');
+    setLoadingMsg('AI is reading and building your presentation...');
     try {
       const r = await axios.post(`${API}/api/documents/quick-convert`, {
         documentId: id,
         slideCount,
         theme,
         audience,
+        additionalContext,
+        runAsync: true,
         sourceText: fullText.trim() || undefined,
       }, { headers: headers() });
-      setPptJson(r.data.pptJson); setFullText(r.data.fullText || ''); setActiveSlide(0); setMode('editor'); fetchHistory();
-      toast.success(`${r.data.pptJson.slides.length} slides generated!`);
+      if (r.data?.queued || !r.data?.pptJson) {
+        await handleQueuedGeneration(r.data, 'history');
+      } else {
+        setPptJson(r.data.pptJson); setFullText(r.data.fullText || ''); setActiveSlide(0); setMode('editor'); fetchHistory();
+        toast.success(`${r.data.pptJson.slides.length} slides generated!`);
+      }
     } catch (e) { setError(e.response?.data?.message || 'Quick convert failed'); toast.error('Failed'); }
     finally { done(); }
   };
 
   const handleRawExtract = async () => {
-    load('Reading the PDF…');
+    load('Reading the PDF...');
     try {
       const r = await axios.post(`${API}/api/documents/pdf-to-text`, { documentId: docId }, { headers: headers() });
       setFullText(r.data.fullText); setStep(3);
@@ -990,13 +1152,13 @@ const DeckPrep = () => {
   // PDF Reader mode: deterministic full extraction, then user picks the next step.
   const handlePdfToText = async () => {
     if (!file && !docId) return toast.error('Upload a PDF first');
-    load('Uploading PDF…');
+    load('Uploading PDF...');
     let id = docId;
     if (file && !docId) {
       id = await uploadPDF(file);
       if (!id) { done(); return; }
     }
-    setLoadingMsg('Extracting full text…');
+    setLoadingMsg('Extracting full text...');
     try {
       const r = await axios.post(`${API}/api/documents/pdf-to-text`, { documentId: id }, { headers: headers() });
       setFullText(r.data.fullText);
@@ -1009,10 +1171,10 @@ const DeckPrep = () => {
     } finally { done(); }
   };
 
-  // From Reader → Quick Convert (re-uses the cached fullText on the server).
+  // From Reader -> Quick Convert (re-uses the cached fullText on the server).
   const handleReaderToQuick = async () => {
     if (!docId) return toast.error('No document loaded');
-    load('Building your presentation from the extracted text…');
+    load('Building your presentation from the extracted text...');
     try {
       const r = await axios.post(`${API}/api/documents/quick-convert`,
         {
@@ -1020,17 +1182,23 @@ const DeckPrep = () => {
           slideCount,
           theme,
           audience,
+          additionalContext,
+          runAsync: true,
           sourceText: fullText.trim() || undefined,
         }, { headers: headers() });
-      setPptJson(r.data.pptJson); setActiveSlide(0); setMode('editor'); fetchHistory();
-      toast.success(`${r.data.pptJson.slides.length} slides generated!`);
+      if (r.data?.queued || !r.data?.pptJson) {
+        await handleQueuedGeneration(r.data, 'history');
+      } else {
+        setPptJson(r.data.pptJson); setActiveSlide(0); setMode('editor'); fetchHistory();
+        toast.success(`${r.data.pptJson.slides.length} slides generated!`);
+      }
     } catch (e) {
       setError(e.response?.data?.message || 'Generation failed');
       toast.error(e.response?.data?.message || 'Generation failed');
     } finally { done(); }
   };
 
-  // From Reader → Guided Builder (skip upload + extract since we already have text).
+  // From Reader -> Guided Builder (skip upload + extract since we already have text).
   const handleReaderToGuided = () => {
     if (!docId) return toast.error('No document loaded');
     setMode('guided');
@@ -1054,7 +1222,7 @@ const DeckPrep = () => {
   };
 
   const handleMeaningfulExtract = async () => {
-    load('AI is structuring content…');
+    load('AI is structuring content...');
     try {
       const r = await axios.post(`${API}/api/documents/extract`, {
         documentId: docId,
@@ -1067,7 +1235,7 @@ const DeckPrep = () => {
   };
 
   const handleGeneratePPT = async () => {
-    load('AI is building your slides…');
+    load('AI is building your slides...');
     try {
       const r = await axios.post(`${API}/api/documents/generate-ppt`, {
         documentId: docId,
@@ -1075,11 +1243,17 @@ const DeckPrep = () => {
         slideCount,
         theme,
         audience,
+        additionalContext,
+        runAsync: true,
         fullText,
         sourceText: extractedText.trim() || fullText.trim() || undefined,
       }, { headers: headers() });
-      setPptJson(r.data.pptJson); setActiveSlide(0); setMode('editor'); fetchHistory();
-      toast.success(`${r.data.pptJson.slides.length} slides created!`);
+      if (r.data?.queued || !r.data?.pptJson) {
+        await handleQueuedGeneration(r.data, 'history');
+      } else {
+        setPptJson(r.data.pptJson); setActiveSlide(0); setMode('editor'); fetchHistory();
+        toast.success(`${r.data.pptJson.slides.length} slides created!`);
+      }
     } catch (e) { setError(e.response?.data?.message || 'Failed'); }
     finally { done(); }
   };
@@ -1114,16 +1288,22 @@ const DeckPrep = () => {
   const loadFromHistory = (h) => {
     setFile(null);
     setDocId(h._id); setFullText(h.fullText || ''); setExtractedText(h.extractedText || '');
-    if (h.pptJson) { setPptJson(h.pptJson); setMode('editor'); setActiveSlide(0); }
-    else if (h.extractedText) { setMode('guided'); setStep(5); }
-    else if (h.fullText) { setMode('reader'); }
-    else { setMode('guided'); setStep(2); }
+    if (isGenerationPending(h)) {
+      setMode('history');
+      persistDeckSession({ documentId: h._id, mode: 'history' });
+      toast.success('This presentation is still generating in the background.');
+    }
+    else if (h.pptJson) { setPptJson(h.pptJson); setMode('editor'); setActiveSlide(0); persistDeckSession({ documentId: h._id, mode: 'editor', activeSlide: 0 }); }
+    else if (isGenerationFailed(h)) { setMode('guided'); setStep(5); setError(h.generationError || 'Presentation generation failed'); persistDeckSession({ documentId: h._id, mode: 'guided', step: 5 }); }
+    else if (h.extractedText) { setMode('guided'); setStep(5); persistDeckSession({ documentId: h._id, mode: 'guided', step: 5 }); }
+    else if (h.fullText) { setMode('reader'); persistDeckSession({ documentId: h._id, mode: 'reader' }); }
+    else { setMode('guided'); setStep(2); persistDeckSession({ documentId: h._id, mode: 'guided', step: 2 }); }
     toast.success('Loaded!');
   };
 
   const handleExport = async () => {
     if (!pptJson?.slides?.length) return toast.error('No presentation to export');
-    load('Building PPTX file…');
+    load('Building PPTX file...');
     try { await exportToPPTX(pptJson, theme); toast.success('PPTX downloaded!'); }
     catch (e) { toast.error('Export failed: ' + e.message); }
     finally { done(); }
@@ -1148,7 +1328,7 @@ const DeckPrep = () => {
         <Loader2 className="w-12 h-12 animate-spin" style={{ color: 'var(--brand-primary)' }} />
       </div>
       <div className="text-center">
-        <p className="font-bold" style={{ color: 'var(--text-primary)' }}>{loadingMsg || 'Processing…'}</p>
+        <p className="font-bold" style={{ color: 'var(--text-primary)' }}>{loadingMsg || 'Processing...'}</p>
         <p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>AI is working on your presentation</p>
       </div>
     </div>
@@ -1183,9 +1363,9 @@ const DeckPrep = () => {
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
         {[
-          { key: 'reader-start', icon: AlignLeft, title: 'PDF to Text', desc: 'Convert a PDF to clean, full text — every paragraph, heading, list and table preserved. Edit, copy, or send straight to the deck builder.', tags: ['Full Text', 'No Summary', 'Editable', 'Send Forward'], color: 'var(--brand-primary)', bg: 'var(--brand-light)' },
+          { key: 'reader-start', icon: AlignLeft, title: 'PDF to Text', desc: 'Convert a PDF to clean, full text - every paragraph, heading, list and table preserved. Edit, copy, or send straight to the deck builder.', tags: ['Full Text', 'No Summary', 'Editable', 'Send Forward'], color: 'var(--brand-primary)', bg: 'var(--brand-light)' },
           { key: 'quick', icon: Zap, title: 'Quick Convert', desc: 'Upload a PDF and get a polished presentation in one click. AI reads, structures, and designs everything.', tags: ['One-Click', 'AI Slides', 'Auto Theme', 'PPTX Export'], color: '#36a9e1', bg: 'rgba(54,169,225,.1)' },
-          { key: 'guided', icon: Wand2, title: 'AI-Guided Builder', desc: 'Full control at every step — extract raw text, structure content with your prompt, then generate and fine-tune slides.', tags: ['Step-by-Step', 'Custom Prompts', 'Edit Everything'], color: '#0f9f6e', bg: 'rgba(15,159,110,.1)' },
+          { key: 'guided', icon: Wand2, title: 'AI-Guided Builder', desc: 'Full control at every step - extract raw text, structure content with your prompt, then generate and fine-tune slides.', tags: ['Step-by-Step', 'Custom Prompts', 'Edit Everything'], color: '#0f9f6e', bg: 'rgba(15,159,110,.1)' },
         ].map(card => (
           <motion.div key={card.key} whileHover={{ y: -2 }}
             className="rounded-2xl border p-6 cursor-pointer transition-all"
@@ -1211,7 +1391,7 @@ const DeckPrep = () => {
         ))}
       </div>
 
-      {/* Recent Presentations – now with hover delete button */}
+      {/* Recent Presentations - now with hover delete button */}
       {history.length > 0 && <>
         <SectionLabel>Recent Presentations</SectionLabel>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -1232,7 +1412,7 @@ const DeckPrep = () => {
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{getDocumentFileName(h)}</p>
                 <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                  {h.pptJson ? `${h.pptJson.slides?.length || 0} slides` : 'No slides'} · {new Date(h.createdAt).toLocaleDateString()}
+                  {h.pptJson ? `${h.pptJson.slides?.length || 0} slides` : 'No slides'}  -  {new Date(h.createdAt).toLocaleDateString()}
                 </p>
               </div>
 
@@ -1260,7 +1440,7 @@ const DeckPrep = () => {
       <Toaster position="top-right" />
       <button onClick={() => setMode('home')} className="flex items-center gap-2 text-sm font-semibold" style={{ color: 'var(--text-secondary)' }}><ChevronLeft className="w-4 h-4" /> Back</button>
       <div><h1 className="text-2xl font-black" style={{ color: 'var(--text-primary)' }}>Quick Convert</h1>
-        <p className="text-sm mt-0.5" style={{ color: 'var(--text-secondary)' }}>Upload PDF → Get PPTX in seconds</p></div>
+        <p className="text-sm mt-0.5" style={{ color: 'var(--text-secondary)' }}>Upload PDF to get PPTX in seconds</p></div>
       <div onClick={() => fileRef.current?.click()}
         className="rounded-2xl border-2 border-dashed p-10 text-center cursor-pointer transition-all"
         style={{ borderColor: file ? 'var(--brand-primary)' : 'var(--border-color)', backgroundColor: file ? 'var(--brand-light)' : 'var(--bg-surface)' }}
@@ -1316,6 +1496,22 @@ const DeckPrep = () => {
             ))}
           </div>
         </div>
+        <div>
+          <label className="block text-xs font-bold uppercase tracking-wide mb-1.5" style={{ color: 'var(--text-muted)' }}>Additional Context</label>
+          <textarea
+            value={additionalContext}
+            onChange={e => setAdditionalContext(e.target.value)}
+            rows={4}
+            className="w-full rounded-xl border px-4 py-3 text-sm focus:outline-none resize-y"
+            style={inp}
+            onFocus={inpFocus}
+            onBlur={inpBlur}
+            placeholder="Add audience context, the decision this deck should support, what to emphasize, or what to avoid."
+          />
+          <p className="mt-2 text-xs" style={{ color: 'var(--text-muted)' }}>
+            This helps the deck speak to the real meeting, committee, investor, client, or leadership audience.
+          </p>
+        </div>
       </div>
       <ErrorBox msg={error} />
       <button onClick={handleQuickConvert} disabled={!file && !docId}
@@ -1335,7 +1531,7 @@ const DeckPrep = () => {
       </button>
       <div>
         <h1 className="text-2xl font-black" style={{ color: 'var(--text-primary)' }}>PDF to Text</h1>
-        <p className="text-sm mt-0.5" style={{ color: 'var(--text-secondary)' }}>Get the full, structured text from any searchable PDF — no summaries, no scattered output.</p>
+        <p className="text-sm mt-0.5" style={{ color: 'var(--text-secondary)' }}>Get the full, structured text from any searchable PDF - no summaries, no scattered output.</p>
       </div>
       <div onClick={() => fileRef.current?.click()}
         className="rounded-2xl border-2 border-dashed p-10 text-center cursor-pointer transition-all"
@@ -1351,7 +1547,7 @@ const DeckPrep = () => {
         </> : <>
           <Upload className="w-10 h-10 mx-auto mb-3" style={{ color: 'var(--text-muted)' }} />
           <p className="font-bold" style={{ color: 'var(--text-primary)' }}>Drop PDF here or click to browse</p>
-          <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>Searchable PDFs only — scanned/image PDFs need OCR first.</p>
+          <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>Searchable PDFs only - scanned/image PDFs need OCR first.</p>
         </>}
       </div>
       {history.filter(h => h.originalFileId).length > 0 && <div>
@@ -1391,7 +1587,7 @@ const DeckPrep = () => {
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div>
             <h1 className="text-2xl font-black" style={{ color: 'var(--text-primary)' }}>Extracted Text</h1>
-            <p className="text-sm mt-0.5" style={{ color: 'var(--text-secondary)' }}>{wordCount.toLocaleString()} words · {charCount.toLocaleString()} characters</p>
+            <p className="text-sm mt-0.5" style={{ color: 'var(--text-secondary)' }}>{wordCount.toLocaleString()} words  -  {charCount.toLocaleString()} characters</p>
           </div>
           <div className="flex items-center gap-2">
             <button
@@ -1492,7 +1688,7 @@ const DeckPrep = () => {
                 style={step === s.n ? { backgroundColor: 'var(--brand-primary)', color: '#fff' } : step > s.n ? { backgroundColor: 'var(--brand-light)', color: 'var(--brand-primary)' } : { backgroundColor: 'var(--bg-subtle)', color: 'var(--text-muted)' }}>
                 <span className="w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-black"
                   style={{ backgroundColor: step === s.n ? 'rgba(255,255,255,.25)' : step > s.n ? 'var(--brand-primary)' : 'var(--bg-hover)', color: step > s.n ? '#fff' : 'inherit' }}>
-                  {step > s.n ? '✓' : s.n}
+                  {step > s.n ? 'Done' : s.n}
                 </span>{s.label}
               </button>
               {i < steps.length - 1 && <ChevronRight className="w-3.5 h-3.5 flex-shrink-0" style={{ color: 'var(--text-muted)' }} />}
@@ -1509,14 +1705,14 @@ const DeckPrep = () => {
                 onDrop={e => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f?.name.endsWith('.pdf')) setFile(f); }}
                 onDragOver={e => e.preventDefault()}>
                 <input ref={fileRef} type="file" accept=".pdf" className="hidden" onChange={e => e.target.files[0] && setFile(e.target.files[0])} />
-                {file ? <p className="font-semibold" style={{ color: 'var(--text-primary)' }}>📄 {file.name}</p>
+                {file ? <p className="font-semibold" style={{ color: 'var(--text-primary)' }}>File: {file.name}</p>
                   : <><Upload className="w-8 h-8 mx-auto mb-2" style={{ color: 'var(--text-muted)' }} /><p style={{ color: 'var(--text-secondary)' }}>Click or drop PDF</p></>}
               </div>
               <button onClick={async () => { if (!file) return toast.error('Select a PDF'); setUploading(true); const id = await uploadPDF(file); setUploading(false); if (id) setStep(2); }}
                 disabled={!file || uploading}
                 className="w-full py-3 rounded-xl font-bold text-white flex items-center justify-center gap-2 hover:opacity-90 disabled:opacity-50"
                 style={{ backgroundColor: 'var(--brand-primary)' }}>
-                {uploading ? <><Loader2 className="w-4 h-4 animate-spin" />Uploading…</> : 'Upload & Continue'}
+                {uploading ? <><Loader2 className="w-4 h-4 animate-spin" />Uploading...</> : 'Upload & Continue'}
               </button>
               {history.length > 0 && <div>
                 <p className="text-xs font-bold uppercase tracking-wide mb-2" style={{ color: 'var(--text-muted)' }}>Or load existing</p>
@@ -1588,6 +1784,15 @@ const DeckPrep = () => {
                   className="w-full rounded-xl border px-4 py-3 text-sm focus:outline-none resize-y"
                   style={inp} onFocus={inpFocus} onBlur={inpBlur} />
               </div>
+              <div><label className="block text-xs font-bold uppercase tracking-wide mb-1.5" style={{ color: 'var(--text-muted)' }}>Additional Context</label>
+                <textarea value={additionalContext} onChange={e => setAdditionalContext(e.target.value)} rows={4}
+                  className="w-full rounded-xl border px-4 py-3 text-sm focus:outline-none resize-y"
+                  style={inp} onFocus={inpFocus} onBlur={inpBlur}
+                  placeholder="Add real-world context: the audience, decision to drive, tone, topics to emphasize, or missing background the PDF alone may not show." />
+              </div>
+              <div className="rounded-xl border px-4 py-3 text-sm" style={{ backgroundColor: 'var(--bg-subtle)', borderColor: 'var(--border-color)', color: 'var(--text-secondary)' }}>
+                Presentation generation runs in the background. You can leave Deck Prep, return later, and you will receive a notification when the deck is ready.
+              </div>
               <button onClick={handleGeneratePPT} className="w-full py-4 rounded-xl font-black text-white text-base flex items-center justify-center gap-3 hover:opacity-90" style={{ backgroundColor: 'var(--brand-primary)' }}>
                  Generate Presentation
               </button>
@@ -1621,7 +1826,7 @@ const DeckPrep = () => {
               <p className="text-sm font-black truncate" style={{ color: 'var(--text-primary)' }}>{pptJson.title || 'Untitled Presentation'}</p>
               <div className="flex items-center gap-2">
                 <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{pptJson.slides.length} slides</span>
-                {autoSaving && <span className="text-xs flex items-center gap-1" style={{ color: 'var(--text-muted)' }}><Loader2 className="w-3 h-3 animate-spin" /> Saving…</span>}
+                {autoSaving && <span className="text-xs flex items-center gap-1" style={{ color: 'var(--text-muted)' }}><Loader2 className="w-3 h-3 animate-spin" /> Saving...</span>}
               </div>
             </div>
           </div>
@@ -1641,29 +1846,53 @@ const DeckPrep = () => {
         {/* Body */}
         <div className="flex flex-1 overflow-hidden">
           {/* Thumbnail strip */}
-          <div className="w-44 flex-shrink-0 border-r flex flex-col overflow-y-auto"
+          <div className={`${leftPaneCollapsed ? 'w-14' : 'w-44'} flex-shrink-0 border-r flex flex-col overflow-y-auto transition-all duration-200`}
             style={{ backgroundColor: 'var(--bg-subtle)', borderColor: 'var(--border-color)' }}>
             <div className="px-3 py-2.5 border-b flex items-center justify-between" style={{ borderColor: 'var(--border-color)' }}>
-              <span className="text-[10px] font-bold uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>Slides</span>
-              <button onClick={handleAddSlide} className="w-5 h-5 rounded flex items-center justify-center"
-                style={{ backgroundColor: 'var(--brand-light)', color: 'var(--brand-primary)' }}><Plus className="w-3.5 h-3.5" /></button>
+              {!leftPaneCollapsed ? <span className="text-[10px] font-bold uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>Slides</span> : <span className="text-[10px] font-bold uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>Deck</span>}
+              <div className="flex items-center gap-1">
+                {!leftPaneCollapsed ? (
+                  <button onClick={handleAddSlide} className="w-5 h-5 rounded flex items-center justify-center"
+                    style={{ backgroundColor: 'var(--brand-light)', color: 'var(--brand-primary)' }}><Plus className="w-3.5 h-3.5" /></button>
+                ) : null}
+                <button onClick={() => setLeftPaneCollapsed(value => !value)} className="w-5 h-5 rounded flex items-center justify-center"
+                  style={{ backgroundColor: 'var(--bg-hover)', color: 'var(--text-secondary)' }}>
+                  {leftPaneCollapsed ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronLeft className="w-3.5 h-3.5" />}
+                </button>
+              </div>
             </div>
-            <div className="flex flex-col gap-2 p-2">
-              {pptJson.slides.map((s, i) => (
-                <div key={s.id || i} onClick={() => setActiveSlide(i)}
-                  className="relative cursor-pointer rounded-lg overflow-hidden"
-                  style={{ outline: activeSlide === i ? '2px solid var(--brand-primary)' : '2px solid transparent' }}>
-                  <SlidePreview slide={s} theme={theme} scale={0.22} />
-                  <div className="absolute bottom-0 left-0 right-0 px-1.5 py-1 flex items-center gap-1"
-                    style={{ backgroundColor: 'rgba(0,0,0,.55)' }}>
-                    <span className="text-white text-[9px] opacity-80">{i + 1}</span>
+            {!leftPaneCollapsed ? (
+              <div className="flex flex-col gap-2 p-2">
+                {pptJson.slides.map((s, i) => (
+                  <div key={s.id || i} onClick={() => setActiveSlide(i)}
+                    className="relative cursor-pointer rounded-lg overflow-hidden"
+                    style={{ outline: activeSlide === i ? '2px solid var(--brand-primary)' : '2px solid transparent' }}>
+                    <SlidePreview slide={s} theme={theme} scale={0.22} />
+                    <div className="absolute bottom-0 left-0 right-0 px-1.5 py-1 flex items-center gap-1"
+                      style={{ backgroundColor: 'rgba(0,0,0,.55)' }}>
+                      <span className="text-white text-[9px] opacity-80">{i + 1}</span>
+                    </div>
+                    {regenIdx === i && <div className="absolute inset-0 flex items-center justify-center" style={{ backgroundColor: 'rgba(0,0,0,.6)' }}>
+                      <Loader2 className="w-4 h-4 text-white animate-spin" />
+                    </div>}
                   </div>
-                  {regenIdx === i && <div className="absolute inset-0 flex items-center justify-center" style={{ backgroundColor: 'rgba(0,0,0,.6)' }}>
-                    <Loader2 className="w-4 h-4 text-white animate-spin" />
-                  </div>}
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            ) : (
+              <div className="flex flex-1 flex-col items-center gap-2 px-2 py-3">
+                {pptJson.slides.map((s, i) => (
+                  <button
+                    key={s.id || i}
+                    type="button"
+                    onClick={() => setActiveSlide(i)}
+                    className="flex h-9 w-9 items-center justify-center rounded-lg text-[0.7rem] font-black"
+                    style={{ backgroundColor: activeSlide === i ? 'var(--brand-primary)' : 'var(--bg-surface)', color: activeSlide === i ? '#fff' : 'var(--text-secondary)' }}
+                  >
+                    {i + 1}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
           {/* Main preview */}
           <div className="flex-1 flex flex-col overflow-hidden" style={{ backgroundColor: 'var(--bg-app)' }}>
@@ -1696,20 +1925,33 @@ const DeckPrep = () => {
             </div>
             {pptJson.slides[activeSlide]?.note && <div className="mx-6 mb-4 px-4 py-3 rounded-xl border text-xs"
               style={{ backgroundColor: 'rgba(245,158,11,.06)', borderColor: 'rgba(245,158,11,.3)', color: 'var(--text-secondary)' }}>
-              📝 {pptJson.slides[activeSlide].note}
+              Note: {pptJson.slides[activeSlide].note}
             </div>}
           </div>
           {/* Edit panel */}
-          <div className="w-72 flex-shrink-0 border-l overflow-y-auto"
+          <div className={`${rightPaneCollapsed ? 'w-14' : 'w-72'} flex-shrink-0 border-l overflow-y-auto transition-all duration-200`}
             style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border-color)' }}>
-            <div className="px-5 py-3 border-b flex items-center gap-2 sticky top-0 z-10"
+            <div className="px-3 py-3 border-b flex items-center justify-between gap-2 sticky top-0 z-10"
               style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border-color)' }}>
-              <SlideIcon className="w-4 h-4" style={{ color: 'var(--brand-primary)' }} />
-              <span className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>Edit Slide</span>
+              <div className="flex items-center gap-2 overflow-hidden">
+                <SlideIcon className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--brand-primary)' }} />
+                {!rightPaneCollapsed ? <span className="text-sm font-bold truncate" style={{ color: 'var(--text-primary)' }}>Edit Slide</span> : null}
+              </div>
+              <button onClick={() => setRightPaneCollapsed(value => !value)} className="w-6 h-6 rounded flex items-center justify-center"
+                style={{ backgroundColor: 'var(--bg-hover)', color: 'var(--text-secondary)' }}>
+                {rightPaneCollapsed ? <ChevronLeft className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+              </button>
             </div>
-            <SlideEditor slide={pptJson.slides[activeSlide]} onUpdate={handleSlideUpdate}
-              onRegenerate={handleRegenSlide} onDelete={handleDeleteSlide}
-              onAddSlide={handleAddSlide} isRegenerating={regenIdx === activeSlide} />
+            {!rightPaneCollapsed ? (
+              <SlideEditor slide={pptJson.slides[activeSlide]} onUpdate={handleSlideUpdate}
+                onRegenerate={handleRegenSlide} onDelete={handleDeleteSlide}
+                onAddSlide={handleAddSlide} isRegenerating={regenIdx === activeSlide} />
+            ) : (
+              <div className="flex flex-col items-center gap-3 px-2 py-4 text-center text-[0.68rem] font-semibold" style={{ color: 'var(--text-muted)' }}>
+                <span>Editor</span>
+                <span>{activeSlide + 1}/{pptJson.slides.length}</span>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -1741,12 +1983,20 @@ const DeckPrep = () => {
               <div className="flex-1 min-w-0">
                 <p className="font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{getDocumentFileName(h)}</p>
                 <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
-                  {h.pptJson ? `${h.pptJson.slides?.length || 0} slides` : 'No slides'} · {new Date(h.createdAt).toLocaleDateString()}
-                  {h.pptJson?.title ? ` · "${h.pptJson.title}"` : ''}
+                  {h.pptJson ? `${h.pptJson.slides?.length || 0} slides` : 'No slides'}  -  {new Date(h.createdAt).toLocaleDateString()}
+                  {h.pptJson?.title ? `  -  "${h.pptJson.title}"` : ''}
                 </p>
+                <div className="mt-1">
+                  <span className="inline-flex rounded-full px-2 py-1 text-[0.65rem] font-black uppercase tracking-[0.08em]" style={{
+                    backgroundColor: isGenerationFailed(h) ? 'rgba(220,38,38,.12)' : isGenerationPending(h) ? 'rgba(54,169,225,.12)' : 'rgba(22,163,74,.12)',
+                    color: isGenerationFailed(h) ? '#dc2626' : isGenerationPending(h) ? 'var(--brand-primary)' : '#16a34a',
+                  }}>
+                    {getGenerationLabel(h)}
+                  </span>
+                </div>
               </div>
 
-              {/* Hover-only delete button – appears exactly when mouse hovers the card */}
+              {/* Hover-only delete button - appears exactly when mouse hovers the card */}
               <button
                 onClick={(e) => {
                   e.stopPropagation();
@@ -1769,3 +2019,5 @@ const DeckPrep = () => {
 };
 
 export default DeckPrep;
+
+

@@ -32,6 +32,8 @@ router.delete('/messages/:messageId/pin', authMiddleware, chatController.unpinMe
 
 // Forward
 router.post('/messages/:messageId/forward', authMiddleware, chatController.forwardMessage);
+router.post('/messages/:messageId/reactions', authMiddleware, chatController.addReaction);
+router.delete('/messages/:messageId/reactions', authMiddleware, chatController.removeReaction);
 
 router.post('/upload', authMiddleware, chatController.uploadChatFile);
 router.get('/timestamps', authMiddleware, chatController.getChatTimestamps);

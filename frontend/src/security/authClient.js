@@ -4,6 +4,9 @@ const API_BASE = String(import.meta.env.VITE_API_URL || 'http://localhost:4001')
 const TOKEN_KEY = 'token';
 const USER_ID_KEY = 'userId';
 const USER_KEY = 'currentUser';
+const ACCESS_EXPIRES_AT_KEY = 'fundcoUserAccessExpiresAt';
+const REFRESH_EXPIRES_AT_KEY = 'fundcoUserRefreshExpiresAt';
+const REMEMBER_ME_KEY = 'fundcoUserRememberMe';
 
 let installed = false;
 let refreshPromise = null;
@@ -53,10 +56,38 @@ export const readStoredUser = () => {
 
 export const getAccessToken = () => localStorage.getItem(TOKEN_KEY);
 
-export const storeUserSession = ({ token, user }) => {
+const readStoredSessionMeta = () => ({
+  accessTokenExpiresAt: Number(localStorage.getItem(ACCESS_EXPIRES_AT_KEY) || 0),
+  refreshSessionExpiresAt: localStorage.getItem(REFRESH_EXPIRES_AT_KEY) || '',
+  rememberMe: localStorage.getItem(REMEMBER_ME_KEY) === 'true',
+});
+
+const isAccessTokenStale = () => {
+  const { accessTokenExpiresAt } = readStoredSessionMeta();
+  if (!accessTokenExpiresAt) return false;
+  return accessTokenExpiresAt <= Date.now() + (5 * 60 * 1000);
+};
+
+const isRefreshSessionExpired = () => {
+  const { refreshSessionExpiresAt } = readStoredSessionMeta();
+  if (!refreshSessionExpiresAt) return false;
+  const expiresAt = new Date(refreshSessionExpiresAt).getTime();
+  return Number.isFinite(expiresAt) && expiresAt <= Date.now();
+};
+
+export const storeUserSession = ({ token, user, accessTokenExpiresInSeconds, refreshSessionExpiresAt, rememberMe }) => {
   if (token) localStorage.setItem(TOKEN_KEY, token);
   if (user?.id) localStorage.setItem(USER_ID_KEY, user.id);
   if (user) localStorage.setItem(USER_KEY, JSON.stringify(user));
+  if (Number.isFinite(accessTokenExpiresInSeconds) && accessTokenExpiresInSeconds > 0) {
+    localStorage.setItem(ACCESS_EXPIRES_AT_KEY, String(Date.now() + (accessTokenExpiresInSeconds * 1000)));
+  }
+  if (typeof refreshSessionExpiresAt === 'string' && refreshSessionExpiresAt.trim()) {
+    localStorage.setItem(REFRESH_EXPIRES_AT_KEY, refreshSessionExpiresAt.trim());
+  }
+  if (typeof rememberMe === 'boolean') {
+    localStorage.setItem(REMEMBER_ME_KEY, rememberMe ? 'true' : 'false');
+  }
   emitAuthChange();
 };
 
@@ -64,6 +95,9 @@ export const clearUserSession = () => {
   localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(USER_ID_KEY);
   localStorage.removeItem(USER_KEY);
+  localStorage.removeItem(ACCESS_EXPIRES_AT_KEY);
+  localStorage.removeItem(REFRESH_EXPIRES_AT_KEY);
+  localStorage.removeItem(REMEMBER_ME_KEY);
   emitAuthChange();
 };
 
@@ -82,7 +116,13 @@ export const refreshUserAccessToken = async () => {
     if (!data?.success || !data?.token || !data?.user) {
       throw new Error(data?.message || 'Unable to refresh session');
     }
-    storeUserSession({ token: data.token, user: data.user });
+    storeUserSession({
+      token: data.token,
+      user: data.user,
+      accessTokenExpiresInSeconds: data.accessTokenExpiresInSeconds,
+      refreshSessionExpiresAt: data.refreshSessionExpiresAt,
+      rememberMe: typeof data.rememberMe === 'boolean' ? data.rememberMe : readStoredSessionMeta().rememberMe,
+    });
     return data;
   }).catch((error) => {
     clearUserSession();
@@ -95,7 +135,19 @@ export const refreshUserAccessToken = async () => {
 };
 
 export const bootstrapUserSession = async () => {
-  if (getAccessToken() && readStoredUser()) return true;
+  if (isRefreshSessionExpired()) {
+    clearUserSession();
+    return false;
+  }
+  if (getAccessToken() && readStoredUser()) {
+    if (!isAccessTokenStale()) return true;
+    try {
+      await refreshUserAccessToken();
+      return true;
+    } catch {
+      return false;
+    }
+  }
   try {
     await refreshUserAccessToken();
     return true;

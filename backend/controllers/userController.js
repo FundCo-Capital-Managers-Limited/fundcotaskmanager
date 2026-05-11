@@ -20,7 +20,7 @@ export async function registerUser(req, res) {
 
 // Login user
 export async function loginUser(req, res) {
-    const { email, password } = req.body;
+    const { email, password, rememberMe } = req.body;
     if (!email || !password) {
         return res.status(400).json({ success: false, message: 'Email and password required' });
     }
@@ -39,12 +39,13 @@ export async function loginUser(req, res) {
         user.activityLogs.push({ action: 'login', details: `User logged in from IP ${req.ip}` });
         await user.save();
 
-        const session = await issueUserSession({ user, req, res });
+        const session = await issueUserSession({ user, req, res, rememberMe: Boolean(rememberMe) });
         res.json({
             success: true,
             token: session.token,
             accessTokenExpiresInSeconds: session.accessTokenExpiresInSeconds,
             refreshSessionExpiresAt: session.refreshSessionExpiresAt,
+            rememberMe: session.rememberMe,
             user: {
                 id: user._id, firstName: user.firstName, lastName: user.lastName,
                 otherName: user.otherName, fullName: user.fullName,
@@ -148,6 +149,7 @@ export async function refreshUserSession(req, res) {
             token: session.token,
             accessTokenExpiresInSeconds: session.accessTokenExpiresInSeconds,
             refreshSessionExpiresAt: session.refreshSessionExpiresAt,
+            rememberMe: session.rememberMe,
             user: session.user,
         });
     } catch (err) {

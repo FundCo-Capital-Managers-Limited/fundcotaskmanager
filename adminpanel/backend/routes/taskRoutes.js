@@ -4,11 +4,17 @@ import { teamFilter } from '../middleware/teamFilter.js';
 import {
   getAllTasks, getTaskById, createTaskForUser, updateTask, deleteTask,
   reviewTask, addTaskComment, bulkAction, getTaskStats,
+  getTasksAssignedByMe, getTasksAssignedByMeOverview, getTasksAssignedByMeStats,
 } from '../controllers/taskController.js';
 
 const router = express.Router();
 router.use(authMiddleware, adminOnly, teamFilter);
 
+router.get('/views/assigned-by-me/overview', getTasksAssignedByMeOverview);
+router.get('/views/assigned-by-me', getTasksAssignedByMe);
+router.get('/views/assigned-by-me/stats', getTasksAssignedByMeStats);
+router.get('/assigned-by-me', getTasksAssignedByMe);
+router.get('/assigned-by-me/stats', getTasksAssignedByMeStats);
 router.get('/', getAllTasks);
 router.get('/stats', getTaskStats);
 router.get('/:id', getTaskById);

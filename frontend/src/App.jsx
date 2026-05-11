@@ -30,11 +30,13 @@ import Feedback from './pages/Feedback';
 import DeckPrep from './pages/DeckPrep';
 import MeetingLobby from './pages/MeetingLobby';
 import VideoRoom from './pages/VideoRoom';
+import MeetingReports from './pages/MeetingReports.jsx';
 import { ThemeProvider } from './context/ThemeContext';
 import { NotificationProvider } from './context/NotificationContext.jsx';
 import {
   bootstrapUserSession,
   logoutUserSession,
+  refreshUserAccessToken,
   readStoredUser,
   userAuthEvents,
 } from './security/authClient.js';
@@ -67,6 +69,32 @@ const App = () => {
       window.removeEventListener(userAuthEvents.AUTH_CHANGE_EVENT, handleAuthChange);
     };
   }, []);
+
+  useEffect(() => {
+    if (!currentUser) return undefined;
+
+    const refreshSession = async () => {
+      try {
+        await refreshUserAccessToken();
+        setCurrentUser(readStoredUser());
+      } catch {
+        setCurrentUser(readStoredUser());
+      }
+    };
+
+    const intervalId = window.setInterval(refreshSession, 4 * 60 * 1000);
+    const handleVisible = () => {
+      if (document.visibilityState === 'visible') {
+        refreshSession();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisible);
+    return () => {
+      window.clearInterval(intervalId);
+      document.removeEventListener('visibilitychange', handleVisible);
+    };
+  }, [currentUser]);
 
   useEffect(() => {
     if (currentUser) {
@@ -146,6 +174,7 @@ const App = () => {
           <Route path="/meeting" element={<Meeting />} />
           <Route path="/training" element={<Training />} />
           <Route path="/feedback" element={<Feedback />} />
+          <Route path="/meeting-reports" element={<MeetingReports />} />
           <Route path="/deck-prep" element={<DeckPrep />} />
           <Route path="/document-converter" element={<Navigate to="/deck-prep" replace />} />
 

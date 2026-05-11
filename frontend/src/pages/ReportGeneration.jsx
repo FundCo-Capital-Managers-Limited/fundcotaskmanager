@@ -1,7 +1,7 @@
 // src/pages/ReportGeneration.jsx
-// Complete rebuild — Manual editor + AI generator + History in one page
+// Complete rebuild - Manual editor + AI generator + History in one page
 // No sub-component files needed. CSS variables throughout.
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import axios from 'axios';
@@ -19,6 +19,160 @@ const headers = () => ({ Authorization: `Bearer ${localStorage.getItem('token')}
 
 // ── Shared helpers ────────────────────────────────────────────────────────────
 const REPORT_TYPES = ['daily', 'weekly', 'monthly', 'quarterly', 'yearly', 'custom'];
+const MANUAL_DRAFT_KEY = 'fundco-report-manual-draft-v1';
+const AI_DRAFT_KEY = 'fundco-report-ai-draft-v1';
+const REPORT_MEMORY_KEY = 'fundco-report-writing-memory-v1';
+const REPORT_TAB_KEY = 'fundco-report-active-tab-v1';
+const REPORT_AI_JOB_KEY = 'fundco-report-ai-job-v1';
+
+const readJson = (key, fallback) => {
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : fallback;
+  } catch {
+    return fallback;
+  }
+};
+
+const writeJson = (key, value) => {
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    // ignore local persistence failures
+  }
+};
+
+const clearStored = (key) => {
+  try {
+    localStorage.removeItem(key);
+  } catch {
+    // ignore local persistence failures
+  }
+};
+
+const createDefaultAiJobState = () => ({
+  status: 'idle',
+  result: '',
+  error: '',
+  requestId: null,
+  startedAt: null,
+  completedAt: null,
+  meta: null,
+});
+
+const createAiJobStore = (storageKey) => {
+  let snapshot = readJson(storageKey, createDefaultAiJobState());
+  let pendingPromise = null;
+  const listeners = new Set();
+
+  const emit = () => {
+    listeners.forEach((listener) => {
+      try {
+        listener(snapshot);
+      } catch {
+        // ignore subscriber failures
+      }
+    });
+  };
+
+  const persist = () => writeJson(storageKey, snapshot);
+
+  const setSnapshot = (patch) => {
+    snapshot = { ...snapshot, ...patch };
+    persist();
+    emit();
+    return snapshot;
+  };
+
+  return {
+    get: () => snapshot,
+    subscribe(listener) {
+      listeners.add(listener);
+      listener(snapshot);
+      return () => listeners.delete(listener);
+    },
+    clear() {
+      pendingPromise = null;
+      snapshot = createDefaultAiJobState();
+      clearStored(storageKey);
+      emit();
+    },
+    async start({ meta, request }) {
+      if (pendingPromise) return pendingPromise;
+      const requestId = `${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
+      setSnapshot({
+        status: 'running',
+        result: '',
+        error: '',
+        requestId,
+        startedAt: Date.now(),
+        completedAt: null,
+        meta: meta || null,
+      });
+
+      pendingPromise = Promise.resolve()
+        .then(request)
+        .then((response) => {
+          const content = String(response?.data?.content || '').trim();
+          if (!content) {
+            throw new Error('AI returned empty content');
+          }
+          setSnapshot({
+            status: 'ready',
+            result: content,
+            error: '',
+            completedAt: Date.now(),
+          });
+          return content;
+        })
+        .catch((error) => {
+          const message =
+            error?.response?.data?.message ||
+            error?.message ||
+            'Generation failed';
+          setSnapshot({
+            status: 'failed',
+            error: message,
+            completedAt: Date.now(),
+          });
+          throw error;
+        })
+        .finally(() => {
+          pendingPromise = null;
+        });
+
+      emit();
+      return pendingPromise;
+    },
+  };
+};
+
+const reportAiJobStore = createAiJobStore(REPORT_AI_JOB_KEY);
+
+const collectSentenceSuggestions = (text = '', max = 8) => {
+  const seen = new Set();
+  return String(text || '')
+    .split(/(?<=[.!?])\s+/)
+    .map((entry) => entry.trim())
+    .filter((entry) => entry.length >= 28 && entry.length <= 180)
+    .filter((entry) => {
+      const key = entry.toLowerCase();
+      if (!key || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .slice(0, max);
+};
+
+const buildTaskSuggestions = (tasks = []) =>
+  (tasks || [])
+    .filter(Boolean)
+    .slice(0, 6)
+    .map((task) => {
+      const title = task?.title || 'task';
+      const due = task?.dueDate ? new Date(task.dueDate).toLocaleDateString() : 'the planned timeline';
+      return `Completed progress on ${title} and aligned next steps toward ${due}.`;
+    });
 
 const STATUS_STYLES = {
   draft:     { bg: 'rgba(245,158,11,.12)', color: '#d97706'  },
@@ -43,7 +197,7 @@ const cleanMarkdown = (text) =>
     .replace(/^#{1,6}\s*/gm, '')
     .replace(/\*\*(.*?)\*\*/g, '$1')
     .replace(/\*(.*?)\*/g, '$1')
-    .replace(/^\s*[-*+]\s+/gm, '• ')
+    .replace(/^\s*[-*+]\s+/gm, '- ')
     .replace(/^\s*\d+\.\s+/gm, '')
     .replace(/`([^`]+)`/g, '$1')
     .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
@@ -70,7 +224,7 @@ const exportPDF = async (title, reportType, content) => {
 
   write(title || 'Progress Report', 20, true, 1.5);
   y += 0.3;
-  write(`${reportType?.toUpperCase()} · ${new Date().toLocaleDateString('en-US', { year:'numeric', month:'long', day:'numeric' })}`, 12, false, 1.2);
+  write(`${reportType?.toUpperCase()}  -  ${new Date().toLocaleDateString('en-US', { year:'numeric', month:'long', day:'numeric' })}`, 12, false, 1.2);
   y += 0.5;
 
   cleanMarkdown(content).split('\n\n').filter(p => p.trim()).forEach(p => {
@@ -132,6 +286,28 @@ const FocusTextarea = ({ rows = 6, ...props }) => {
   );
 };
 
+const SuggestionChips = ({ label = 'Suggestions', items = [], onPick }) => {
+  if (!items.length) return null;
+  return (
+    <div className="space-y-2">
+      <p className="text-[0.7rem] font-bold uppercase tracking-[0.12em]" style={{ color: 'var(--text-muted)' }}>{label}</p>
+      <div className="flex flex-wrap gap-2">
+        {items.map((item, index) => (
+          <button
+            key={`${item}-${index}`}
+            type="button"
+            onClick={() => onPick?.(item)}
+            className="rounded-full px-3 py-1.5 text-xs font-semibold transition-colors"
+            style={{ backgroundColor: 'var(--bg-hover)', color: 'var(--text-secondary)' }}
+          >
+            {item}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+};
+
 // ════════════════════════════════════════════════════════════════════════════
 // ── MANUAL EDITOR ────────────────────────────────────────────────────────────
 // ════════════════════════════════════════════════════════════════════════════
@@ -144,6 +320,40 @@ const ManualEditor = ({ user, tasks, editReport = null, onSaved, onCancel }) => 
   const [saving,     setSaving]     = useState(false);
   const [exporting,  setExporting]  = useState(false);
   const isEdit = !!editReport;
+  const suggestions = useMemo(() => {
+    const memory = readJson(REPORT_MEMORY_KEY, []);
+    return [...new Set([
+      ...collectSentenceSuggestions(content, 4),
+      ...memory.slice(0, 4),
+      ...buildTaskSuggestions(tasks),
+    ])].slice(0, 8);
+  }, [content, tasks]);
+
+  useEffect(() => {
+    if (isEdit) return;
+    const cached = readJson(MANUAL_DRAFT_KEY, null);
+    if (!cached) return;
+    setTitle(cached.title || '');
+    setType(cached.type || 'weekly');
+    setStart(cached.start || '');
+    setEnd(cached.end || '');
+    setContent(cached.content || '');
+  }, [isEdit]);
+
+  useEffect(() => {
+    if (isEdit) return;
+    writeJson(MANUAL_DRAFT_KEY, { title, type, start, end, content, updatedAt: Date.now() });
+  }, [content, end, isEdit, start, title, type]);
+
+  const insertSuggestion = (text) => {
+    const suggestion = String(text || '').trim();
+    if (!suggestion) return;
+    setContent((current) => {
+      const next = current.trim();
+      if (!next) return suggestion;
+      return `${next}${/[.!?]$/.test(next) ? '' : '.'}\n\n${suggestion}`;
+    });
+  };
 
   const save = async () => {
     if (!title.trim() || !content.trim()) return toast.error('Title and content are required');
@@ -163,6 +373,12 @@ const ManualEditor = ({ user, tasks, editReport = null, onSaved, onCancel }) => 
         toast.success('Saved as draft!');
         setTitle(''); setContent('');
       }
+      const nextMemory = [...new Set([
+        ...collectSentenceSuggestions(content, 8),
+        ...readJson(REPORT_MEMORY_KEY, []),
+      ])].slice(0, 16);
+      writeJson(REPORT_MEMORY_KEY, nextMemory);
+      if (!isEdit) clearStored(MANUAL_DRAFT_KEY);
       onSaved?.();
     } catch (e) {
       toast.error(e.response?.data?.message || 'Save failed');
@@ -186,7 +402,7 @@ const ManualEditor = ({ user, tasks, editReport = null, onSaved, onCancel }) => 
 
         <Field label="Report Title">
           <FocusInput value={title} onChange={e => setTitle(e.target.value)}
-            placeholder="e.g. Weekly Progress Report — Week 24" />
+            placeholder="e.g. Weekly Progress Report - Week 24" />
         </Field>
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -208,6 +424,8 @@ const ManualEditor = ({ user, tasks, editReport = null, onSaved, onCancel }) => 
             placeholder="Write your report here. Include what you completed, what is pending, and any blockers." />
         </Field>
 
+        <SuggestionChips label="Smart suggestions" items={suggestions} onPick={insertSuggestion} />
+
         {/* Live preview toggle */}
         {content.trim() && <MarkdownPreview content={content} />}
 
@@ -216,13 +434,13 @@ const ManualEditor = ({ user, tasks, editReport = null, onSaved, onCancel }) => 
             className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-white hover:opacity-90 transition-opacity disabled:opacity-50"
             style={{ backgroundColor: 'var(--brand-primary)' }}>
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-            {saving ? 'Saving…' : isEdit ? 'Save Changes' : 'Save as Draft'}
+            {saving ? 'Saving...' : isEdit ? 'Save Changes' : 'Save as Draft'}
           </button>
           <button onClick={doExport} disabled={exporting || !content.trim()}
             className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-white hover:opacity-90 transition-opacity disabled:opacity-50"
             style={{ backgroundColor: '#16a34a' }}>
             {exporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-            {exporting ? 'Exporting…' : 'Export PDF'}
+            {exporting ? 'Exporting...' : 'Export PDF'}
           </button>
           {isEdit && (
             <button onClick={onCancel}
@@ -280,11 +498,47 @@ const AIGenerator = ({ user, tasks, onSaved }) => {
   const [prompt,     setPrompt]     = useState('');
   const [selected,   setSelected]   = useState(new Set());
   const [search,     setSearch]     = useState('');
-  const [generating, setGenerating] = useState(false);
   const [saving,     setSaving]     = useState(false);
   const [exporting,  setExporting]  = useState(false);
-  const [result,     setResult]     = useState('');
-  const [error,      setError]      = useState('');
+  const [jobState,   setJobState]   = useState(() => reportAiJobStore.get());
+  const aiSuggestions = useMemo(() => {
+    const memory = readJson(REPORT_MEMORY_KEY, []);
+    return [...new Set([
+      ...memory.slice(0, 4),
+      ...buildTaskSuggestions(tasks),
+      'Call out blockers, dependencies, and decisions needed from management.',
+      'End with the next actions, owners, and timeline implications.',
+    ])].slice(0, 8);
+  }, [tasks]);
+
+  useEffect(() => {
+    const cached = readJson(AI_DRAFT_KEY, null);
+    if (!cached) return;
+    setType(cached.type || 'weekly');
+    setStart(cached.start || '');
+    setEnd(cached.end || '');
+    setPrompt(cached.prompt || '');
+    setSelected(new Set(Array.isArray(cached.selectedTaskIds) ? cached.selectedTaskIds : []));
+  }, []);
+
+  useEffect(() => reportAiJobStore.subscribe(setJobState), []);
+
+  const generating = jobState.status === 'running';
+  const result = jobState.result || '';
+  const error = jobState.status === 'failed' ? jobState.error : '';
+
+  useEffect(() => {
+    writeJson(AI_DRAFT_KEY, {
+      type,
+      start,
+      end,
+      prompt,
+      result,
+      selectedTaskIds: [...selected],
+      aiJob: jobState,
+      updatedAt: Date.now(),
+    });
+  }, [end, jobState, prompt, result, selected, start, type]);
 
   // Filter tasks by date range + search
   const filtered = (tasks || []).filter(t => {
@@ -307,18 +561,34 @@ const AIGenerator = ({ user, tasks, onSaved }) => {
 
   const generate = async () => {
     if (!selected.size) return toast.error('Select at least one task');
-    setGenerating(true); setResult(''); setError('');
+    if (generating) {
+      toast('AI is already generating this report. You can leave this page and come back.');
+      return;
+    }
+    toast.success('AI report generation started. You can leave this page and return later.');
     try {
-      const r = await axios.post(`${API}/api/reports/ai-generate`, {
-        reportType: type, periodStart: start, periodEnd: end,
-        selectedTaskIds: [...selected], customPrompt: prompt,
-      }, { headers: headers() });
-      setResult(r.data.content || '');
+      await reportAiJobStore.start({
+        meta: {
+          reportType: type,
+          periodStart: start,
+          periodEnd: end,
+          selectedTaskIds: [...selected],
+          customPrompt: prompt,
+        },
+        request: () =>
+          axios.post(`${API}/api/reports/ai-generate`, {
+            reportType: type,
+            periodStart: start,
+            periodEnd: end,
+            selectedTaskIds: [...selected],
+            customPrompt: prompt,
+          }, { headers: headers() }),
+      });
       toast.success('Report generated!');
     } catch (e) {
       const msg = e.response?.data?.message || 'Generation failed';
-      setError(msg); toast.error(msg);
-    } finally { setGenerating(false); }
+      toast.error(msg);
+    }
   };
 
   const save = async () => {
@@ -331,9 +601,21 @@ const AIGenerator = ({ user, tasks, onSaved }) => {
         title: `${type.charAt(0).toUpperCase() + type.slice(1)} AI Report`,
       }, { headers: headers() });
       toast.success('Saved to history!');
+      reportAiJobStore.clear();
+      clearStored(AI_DRAFT_KEY);
       onSaved?.();
     } catch { toast.error('Save failed'); }
     finally { setSaving(false); }
+  };
+
+  const applyPromptSuggestion = (text) => {
+    const suggestion = String(text || '').trim();
+    if (!suggestion) return;
+    setPrompt((current) => {
+      const next = current.trim();
+      if (!next) return suggestion;
+      return `${next}${/[.!?]$/.test(next) ? '' : '.'} ${suggestion}`;
+    });
   };
 
   const doExport = async () => {
@@ -371,6 +653,8 @@ const AIGenerator = ({ user, tasks, onSaved }) => {
           <FocusTextarea rows={3} value={prompt} onChange={e => setPrompt(e.target.value)}
             placeholder="e.g. Focus on blockers. Use formal tone. Include a summary table." />
         </Field>
+
+        <SuggestionChips label="Prompt helpers" items={aiSuggestions} onPick={applyPromptSuggestion} />
       </div>
 
       {/* Task selector */}
@@ -404,7 +688,7 @@ const AIGenerator = ({ user, tasks, onSaved }) => {
             style={{ borderColor: 'var(--border-color)', backgroundColor: 'var(--bg-subtle)' }}>
             <Search className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--text-muted)' }} />
             <input value={search} onChange={e => setSearch(e.target.value)}
-              placeholder="Search tasks…"
+              placeholder="Search tasks..."
               className="flex-1 bg-transparent text-sm focus:outline-none"
               style={{ color: 'var(--text-primary)' }} />
           </div>
@@ -449,9 +733,23 @@ const AIGenerator = ({ user, tasks, onSaved }) => {
         className="w-full flex items-center justify-center gap-3 py-4 rounded-xl font-black text-white text-base hover:opacity-90 transition-opacity disabled:opacity-40"
         style={{ backgroundColor: 'var(--brand-primary)' }}>
         {generating
-          ? <><Loader2 className="w-5 h-5 animate-spin" /> Generating with AI…</>
-          : <> Generate Report with AI</>}
+          ? <><Loader2 className="w-5 h-5 animate-spin" /> Generating with AI...</>
+          : <>Generate Report with AI</>}
       </button>
+
+      {generating && (
+        <div className="rounded-xl border p-4" style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border-color)' }}>
+          <div className="flex items-start gap-3">
+            <Loader2 className="mt-0.5 h-4 w-4 animate-spin" style={{ color: 'var(--brand-primary)' }} />
+            <div>
+              <p className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>Generation in progress</p>
+              <p className="mt-1 text-sm" style={{ color: 'var(--text-secondary)' }}>
+                This report keeps generating even if you leave this page. Come back here anytime to resume from the same point.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Error */}
       {error && (
@@ -477,13 +775,13 @@ const AIGenerator = ({ user, tasks, onSaved }) => {
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-white hover:opacity-90 disabled:opacity-50"
                 style={{ backgroundColor: 'var(--brand-primary)' }}>
                 {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
-                {saving ? 'Saving…' : 'Save to History'}
+                {saving ? 'Saving...' : 'Save to History'}
               </button>
               <button onClick={doExport} disabled={exporting}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-white hover:opacity-90 disabled:opacity-50"
                 style={{ backgroundColor: '#16a34a' }}>
                 {exporting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
-                {exporting ? 'Exporting…' : 'Export PDF'}
+                {exporting ? 'Exporting...' : 'Export PDF'}
               </button>
             </div>
           </div>
@@ -566,7 +864,7 @@ const ReportHistory = ({ user, onEditReport }) => {
           style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border-color)' }}>
           <Search className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--text-muted)' }} />
           <input value={search} onChange={e => setSearch(e.target.value)}
-            placeholder="Search reports…"
+            placeholder="Search reports..."
             className="flex-1 bg-transparent text-sm focus:outline-none"
             style={{ color: 'var(--text-primary)' }} />
         </div>
@@ -641,14 +939,14 @@ const ReportHistory = ({ user, onEditReport }) => {
                     {/* NEW: Show feedback indicator */}
                     {report.feedback && (
                       <p className="text-xs mt-1 italic" style={{ color: '#d97706' }}>
-                        💬 Admin feedback available
+                        Admin feedback available
                       </p>
                     )}
 
                     {/* NEW: Show admin notes count */}
                     {hasAdminNotes && (
                       <p className="text-xs mt-1" style={{ color: '#7c3aed' }}>
-                        📝 {report.adminNotes.length} admin note{report.adminNotes.length !== 1 ? 's' : ''}
+                        {report.adminNotes.length} admin note{report.adminNotes.length !== 1 ? 's' : ''}
                       </p>
                     )}
                   </div>
@@ -697,7 +995,7 @@ const ReportHistory = ({ user, onEditReport }) => {
         </div>
       )}
 
-      {/* View modal — UPDATED: shows admin notes and feedback */}
+      {/* View modal - UPDATED: shows admin notes and feedback */}
       <AnimatePresence>
         {viewing && (
           <>
@@ -714,9 +1012,9 @@ const ReportHistory = ({ user, onEditReport }) => {
                 <div className="min-w-0">
                   <h3 className="font-black truncate" style={{ color:'var(--text-primary)' }}>{viewing.title}</h3>
                   <p className="text-xs mt-0.5" style={{ color:'var(--text-muted)' }}>
-                    {viewing.reportType} · {new Date(viewing.createdAt).toLocaleDateString()}
+                    {viewing.reportType}  -  {new Date(viewing.createdAt).toLocaleDateString()}
                     {viewing.reviewedBy && (
-                      <span> · Reviewed by {viewing.reviewedBy.firstName} {viewing.reviewedBy.lastName}</span>
+                      <span>  -  Reviewed by {viewing.reviewedBy.firstName} {viewing.reviewedBy.lastName}</span>
                     )}
                   </p>
                 </div>
@@ -744,7 +1042,7 @@ const ReportHistory = ({ user, onEditReport }) => {
                     }}>
                     <span className="text-sm font-bold capitalize"
                       style={{ color: viewing.status === 'approved' ? '#16a34a' : viewing.status === 'rejected' ? '#dc2626' : '#d97706' }}>
-                      {viewing.status === 'approved' ? '✅ Approved' : viewing.status === 'rejected' ? '❌ Rejected' : '⏳ ' + viewing.status}
+                      {viewing.status === 'approved' ? 'Approved' : viewing.status === 'rejected' ? 'Rejected' : viewing.status}
                     </span>
                   </div>
                 )}
@@ -757,7 +1055,7 @@ const ReportHistory = ({ user, onEditReport }) => {
                 {viewing.feedback && (
                   <div className="mt-6 p-4 rounded-xl border"
                     style={{ backgroundColor:'rgba(245,158,11,.06)', borderColor:'rgba(245,158,11,.3)' }}>
-                    <p className="text-sm font-bold mb-2" style={{ color:'#b45309' }}>💬 Admin Feedback</p>
+                    <p className="text-sm font-bold mb-2" style={{ color:'#b45309' }}>Admin Feedback</p>
                     <p className="text-sm whitespace-pre-wrap" style={{ color:'var(--text-secondary)' }}>{viewing.feedback}</p>
                   </div>
                 )}
@@ -767,7 +1065,7 @@ const ReportHistory = ({ user, onEditReport }) => {
                   <div className="mt-6">
                     <p className="text-xs font-bold uppercase tracking-wide mb-3 flex items-center gap-1.5"
                       style={{ color: '#7c3aed' }}>
-                      📝 Admin Notes ({viewing.adminNotes.length})
+                      Admin Notes ({viewing.adminNotes.length})
                     </p>
                     <div className="space-y-3">
                       {viewing.adminNotes.map((note, i) => (
@@ -842,10 +1140,14 @@ const TABS = [
 
 const ReportGeneration = () => {
   const { user, tasks = [], fetchTasks } = useOutletContext();
-  const [tab,        setTab]        = useState('manual');
+  const [tab,        setTab]        = useState(() => readJson(REPORT_TAB_KEY, 'manual'));
   const [editReport, setEditReport] = useState(null);   // report being edited (from history)
   const [refreshing, setRefreshing] = useState(false);
   const historyKey = useRef(0); // force history re-mount on save
+
+  useEffect(() => {
+    writeJson(REPORT_TAB_KEY, tab);
+  }, [tab]);
 
   const refresh = async () => {
     setRefreshing(true);

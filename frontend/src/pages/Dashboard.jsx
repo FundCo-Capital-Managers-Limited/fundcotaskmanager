@@ -178,6 +178,7 @@ const Dashboard = () => {
   useEffect(() => setLocalTasks(tasks), [tasks]);
   useEffect(() => { const t = setInterval(() => setCurrentTime(new Date()), 1000); return () => clearInterval(t); }, []);
 
+
   const isComp = (t) => t.completed === true || t.completed === 1 || (typeof t.completed === 'string' && t.completed.toLowerCase() === 'yes');
 
   const stats = useMemo(() => ({

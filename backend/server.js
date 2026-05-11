@@ -35,6 +35,8 @@ import grokRouter from './routes/grokRoutes.js';
 import reportRouter from './routes/reportRoutes.js';
 import roomRouter from './routes/roomRoutes.js';
 import notificationRouter from './routes/notificationRoutes.js';
+import meetingReportRouter from './routes/meetingReportRoutes.js';
+import linkPreviewRouter from './routes/linkPreviewRoutes.js';
 
 import { startReminderScheduler } from './utils/reminderScheduler.js';
 import Meeting from './models/meetingModel.js';
@@ -54,6 +56,8 @@ import './models/feedbackModel.js';
 import './models/notificationModel.js';
 import './models/refreshTokenModel.js';
 import './models/projectModel.js';
+import './models/adminTeamModel.js';
+import './models/meetingReportModel.js';
 import Room from './models/roomModel.js';
 
 import { setupRoomSignaling } from './socket/roomSignaling.js';
@@ -155,6 +159,7 @@ const sharedUploadOptions = {
 app.use('/api/chats', fileUpload(sharedUploadOptions));
 app.use('/api/bot', fileUpload(sharedUploadOptions));
 app.use('/api/posts', fileUpload(sharedUploadOptions));
+app.use('/api/meeting-reports', fileUpload(sharedUploadOptions));
 
 // Routes
 app.use('/api/user',        userRouter);
@@ -175,8 +180,10 @@ app.use('/api/learning',    learningRouter);
 app.use('/api/documents',   documentRoutes);
 app.use('/api/reports',     reportRouter);
 app.use('/api/feedback',    feedbackRouter);
+app.use('/api/meeting-reports', meetingReportRouter);
 app.use('/api/rooms',       roomRouter);
 app.use('/api/notifications', notificationRouter);
+app.use('/api/link-preview', linkPreviewRouter);
 
 // Socket.IO Auth
 io.use(async (socket, next) => {

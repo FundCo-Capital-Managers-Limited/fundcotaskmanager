@@ -16,9 +16,38 @@ import {
   Megaphone, Shield,
 } from 'lucide-react';
 import { useNotifications } from '../context/NotificationContext.jsx';
+import LinkPreviewCard from '../components/LinkPreviewCard.jsx';
 
 const API = import.meta.env.VITE_API_URL || 'http://127.0.0.1:4001';
 const headers = () => ({ Authorization: `Bearer ${localStorage.getItem('token')}` });
+const URL_RE = /(https?:\/\/[^\s<]+[^\s<.,:;"')\]])/gi;
+
+const renderTextWithLinks = (text) => {
+  const value = String(text || '');
+  const parts = value.split(URL_RE);
+  return parts.map((part, index) => {
+    if (!part) return null;
+    URL_RE.lastIndex = 0;
+    if (!URL_RE.test(part)) return <React.Fragment key={index}>{part}</React.Fragment>;
+    return (
+      <a
+        key={index}
+        href={part}
+        target="_blank"
+        rel="noreferrer"
+        className="font-semibold underline underline-offset-2"
+        style={{ color: 'inherit' }}
+      >
+        {part}
+      </a>
+    );
+  });
+};
+
+const extractFirstUrl = (text) => {
+  URL_RE.lastIndex = 0;
+  return String(text || '').match(URL_RE)?.[0] || '';
+};
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const getFullName = (u) => {
@@ -157,7 +186,9 @@ const CommentSection = ({ post, currentUser, onAddComment, onDeleteComment }) =>
               <p className="text-xs font-bold mb-0.5" style={{ color: 'var(--text-primary)' }}>
                 {getFullName(c.user)}
               </p>
-              <p className="text-sm break-words" style={{ color: 'var(--text-primary)' }}>{c.content}</p>
+              <p className="text-sm break-words whitespace-pre-wrap" style={{ color: 'var(--text-primary)' }}>
+                {renderTextWithLinks(c.content)}
+              </p>
             </div>
             <p className="text-[10px] mt-1 ml-1" style={{ color: 'var(--text-muted)' }}>
               {moment(c.createdAt).fromNow()}
@@ -300,9 +331,11 @@ const PostCard = ({ post, currentUser, onReact, onEdit, onDelete, onBookmark, on
       {post.content && (
         <p className="px-5 pb-4 text-sm leading-relaxed whitespace-pre-wrap"
           style={{ color: 'var(--text-primary)', fontWeight: isAnnouncement ? 500 : 400 }}>
-          {post.content}
+          {renderTextWithLinks(post.content)}
         </p>
       )}
+
+      {post.content ? <div className="px-5 pb-4 pt-0"><LinkPreviewCard url={extractFirstUrl(post.content)} /></div> : null}
 
       {/* Media */}
       {post.fileUrl && (

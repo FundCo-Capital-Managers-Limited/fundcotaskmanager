@@ -17,6 +17,7 @@ import {
   Reply,
   Search,
   Send,
+  SmilePlus,
   Trash2,
   X,
 } from 'lucide-react';
@@ -24,7 +25,11 @@ import userApi, { USER_API_BASE } from '../utils/userApi.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useNotifications } from '../context/NotificationContext.jsx';
 import { EmptyState, FilterChip, LoadingScreen, Modal, PageHeader, SearchInput, StatusPill } from '../components/ui.jsx';
+import LinkPreviewCard from '../components/LinkPreviewCard.jsx';
+import StickerPicker, { getStickerByKey } from '../components/StickerPicker.jsx';
 import { formatPersonName, getInitials } from '../utils/adminFormat.js';
+
+const URL_RE = /(https?:\/\/[^\s<]+[^\s<.,:;"')\]])/gi;
 
 const formatTime = (value) => {
   if (!value) return '';
@@ -41,6 +46,7 @@ const formatLastSeen = (value) => {
 };
 
 const EMPTY_MENTION_STATE = { query: '', start: -1, end: -1, activeIndex: 0 };
+const COMMON_REACTIONS = ['👍', '❤️', '😂', '🎉', '🔥', '✅'];
 
 const escapeMentionPattern = (value) => String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
@@ -75,7 +81,7 @@ const renderMentionContent = (message, own) => {
   const text = String(message?.content || '');
   const mentions = Array.isArray(message?.mentions) ? message.mentions.filter((item) => item?.label) : [];
   if (!mentions.length) {
-    return <p className="whitespace-pre-wrap text-sm leading-6">{text}</p>;
+    return <p className="whitespace-pre-wrap text-sm leading-6">{renderTextWithLinks(text)}</p>;
   }
 
   const tokens = [...new Set(mentions.map((item) => `@${item.label}`))]
@@ -93,7 +99,7 @@ const renderMentionContent = (message, own) => {
     <p className="whitespace-pre-wrap text-sm leading-6">
       {parts.map((part, index) => {
         const matched = mentions.find((item) => part.toLowerCase() === `@${String(item.label).toLowerCase()}`);
-        if (!matched) return <React.Fragment key={index}>{part}</React.Fragment>;
+        if (!matched) return <React.Fragment key={index}>{renderTextWithLinks(part)}</React.Fragment>;
         return (
           <span
             key={index}
@@ -111,6 +117,33 @@ const renderMentionContent = (message, own) => {
   );
 };
 
+const renderTextWithLinks = (text) => {
+  const value = String(text || '');
+  const parts = value.split(URL_RE);
+  return parts.map((part, index) => {
+    if (!part) return null;
+    URL_RE.lastIndex = 0;
+    if (!URL_RE.test(part)) return <React.Fragment key={index}>{part}</React.Fragment>;
+    return (
+      <a
+        key={index}
+        href={part}
+        target="_blank"
+        rel="noreferrer"
+        className="font-semibold underline underline-offset-2"
+        style={{ color: 'inherit' }}
+      >
+        {part}
+      </a>
+    );
+  });
+};
+
+const extractFirstUrl = (text) => {
+  URL_RE.lastIndex = 0;
+  return String(text || '').match(URL_RE)?.[0] || '';
+};
+
 const getPresenceLabel = (person) => {
   if (!person) return 'Direct message';
   if (person.online) return 'Online';
@@ -120,9 +153,28 @@ const getPresenceLabel = (person) => {
 const getMessageText = (message) => {
   if (!message) return 'No messages yet';
   if (message.isDeleted) return 'This message was deleted';
+  if (message.stickerLabel) return `Sticker: ${message.stickerLabel}`;
   if (message.content) return message.content;
   if (message.fileUrl) return message.fileName || 'Attachment';
   return 'Message';
+};
+
+const getReactionUserId = (reaction) => String(reaction?.userId?._id || reaction?.userId || '');
+
+const groupReactions = (message, currentUserId) => {
+  const grouped = new Map();
+  const reactions = Array.isArray(message?.reactions) ? message.reactions : [];
+  reactions.forEach((reaction) => {
+    const emoji = String(reaction?.emoji || '').trim();
+    if (!emoji) return;
+    if (!grouped.has(emoji)) {
+      grouped.set(emoji, { emoji, count: 0, mine: false });
+    }
+    const entry = grouped.get(emoji);
+    entry.count += 1;
+    if (getReactionUserId(reaction) === String(currentUserId)) entry.mine = true;
+  });
+  return [...grouped.values()];
 };
 
 const Avatar = ({ user, tone = 'var(--brand-primary)' }) => (
@@ -156,6 +208,7 @@ const TeamChat = () => {
   const [editing, setEditing] = useState(null);
   const [draftMentions, setDraftMentions] = useState([]);
   const [mentionState, setMentionState] = useState(EMPTY_MENTION_STATE);
+  const [showStickerPicker, setShowStickerPicker] = useState(false);
   const [groupModal, setGroupModal] = useState(null);
   const [forwardMessage, setForwardMessage] = useState(null);
   const fileRef = useRef(null);
@@ -372,6 +425,7 @@ const TeamChat = () => {
       setDraft('');
       setDraftMentions([]);
       setMentionState(EMPTY_MENTION_STATE);
+      setShowStickerPicker(false);
       setFile(null);
       if (fileRef.current) fileRef.current.value = '';
       await fetchMessages(selectedChat._id);
@@ -379,6 +433,46 @@ const TeamChat = () => {
       toast.error(error.response?.data?.message || 'Failed to send message');
     }
   };
+
+  const sendSticker = async (sticker) => {
+    if (!selectedChat?._id || !sticker) return;
+    try {
+      await userApi.post(`/api/chats/${selectedChat._id}/messages`, {
+        content: '',
+        stickerKey: sticker.key,
+        stickerLabel: sticker.label,
+      });
+      setShowStickerPicker(false);
+      await fetchMessages(selectedChat._id);
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to send sticker');
+    }
+  };
+
+  const updateMessageInState = useCallback((nextMessage) => {
+    if (!nextMessage?._id) return;
+    setMessages((current) => current.map((item) => (item._id === nextMessage._id ? { ...item, ...nextMessage } : item)));
+  }, []);
+
+  const reactToMessage = useCallback(async (message, emoji) => {
+    if (!message?._id || !emoji) return;
+    try {
+      const { data } = await userApi.post(`/api/chats/messages/${message._id}/reactions`, { emoji });
+      if (data?.message) updateMessageInState(data.message);
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to add reaction');
+    }
+  }, [updateMessageInState]);
+
+  const removeReaction = useCallback(async (message) => {
+    if (!message?._id) return;
+    try {
+      const { data } = await userApi.delete(`/api/chats/messages/${message._id}/reactions`);
+      if (data?.message) updateMessageInState(data.message);
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to remove reaction');
+    }
+  }, [updateMessageInState]);
 
   const createGroup = async ({ name, members }) => {
     if (!members.length) return toast.error('Select at least one member');
@@ -552,10 +646,10 @@ const TeamChat = () => {
             </div>
           </aside>
 
-          <main className="flex min-h-[38rem] flex-col">
+          <main className="flex h-[calc(100vh-11.5rem)] min-h-[38rem] flex-col overflow-hidden">
             {selectedChat ? (
               <>
-                <div className="flex flex-col gap-4 border-b p-4 xl:flex-row xl:items-center xl:justify-between" style={{ borderColor: 'var(--c-border)', background: 'var(--c-panel-muted)' }}>
+                <div className="sticky top-0 z-20 flex flex-col gap-4 border-b p-4 xl:flex-row xl:items-center xl:justify-between" style={{ borderColor: 'var(--c-border)', background: 'var(--c-panel-muted)' }}>
                   <div className="flex min-w-0 items-center gap-3">
                     <Avatar user={selectedChat.type === 'group' ? { firstName: selectedChat.name || 'G' } : selectedChat.recipient} tone={selectedChat.type === 'group' ? 'var(--brand-secondary)' : 'var(--brand-primary)'} />
                     <div className="min-w-0">
@@ -592,7 +686,7 @@ const TeamChat = () => {
                   </div>
                 ) : null}
 
-                <div className="flex-1 overflow-y-auto p-4" style={{ background: 'var(--c-bg)' }}>
+                <div className="min-h-0 flex-1 overflow-y-auto p-4" style={{ background: 'var(--c-bg)' }}>
                   {messageLoading && messages.length === 0 ? (
                     <LoadingScreen height="20rem" />
                   ) : filteredMessages.length === 0 ? (
@@ -604,7 +698,10 @@ const TeamChat = () => {
                           key={message._id}
                           message={message}
                           own={String(message.sender?._id || message.sender) === String(currentUserId)}
+                          currentUserId={currentUserId}
                           isPinned={pinnedMessages.some((item) => item._id === message._id)}
+                          onReact={reactToMessage}
+                          onRemoveReaction={removeReaction}
                           onReply={() => { setReplyTo(message); setEditing(null); setMentionState(EMPTY_MENTION_STATE); }}
                           onEdit={() => { setEditing(message); setDraft(message.content || ''); setDraftMentions((message.mentions || []).map((item) => ({ userId: item.user?._id || item.userId || item._id, label: item.label || formatPersonName(item.user) }))); setReplyTo(null); setMentionState(EMPTY_MENTION_STATE); }}
                           onDelete={() => deleteMessage(message)}
@@ -617,13 +714,16 @@ const TeamChat = () => {
                   )}
                 </div>
 
-                <div className="border-t p-4" style={{ borderColor: 'var(--c-border)' }}>
+                <div className="sticky bottom-0 z-20 border-t p-4" style={{ borderColor: 'var(--c-border)', background: 'var(--c-panel)' }}>
                   {replyTo ? <ComposerNotice label={`Replying to ${formatPersonName(replyTo.sender)}`} text={getMessageText(replyTo)} onClear={() => setReplyTo(null)} /> : null}
                   {editing ? <ComposerNotice label="Editing message" text={editing.content} onClear={() => { setEditing(null); setDraft(''); setDraftMentions([]); setMentionState(EMPTY_MENTION_STATE); }} /> : null}
                   {file ? <ComposerNotice label="Attachment ready" text={`${file.name} (${Math.round(file.size / 1024)} KB)`} onClear={() => { setFile(null); if (fileRef.current) fileRef.current.value = ''; }} /> : null}
                   <div className="relative flex items-end gap-2">
                     <button className="btn-secondary h-12 w-12 rounded-full p-0" onClick={() => fileRef.current?.click()} aria-label="Attach file">
                       <Paperclip className="h-4 w-4" />
+                    </button>
+                    <button className="btn-secondary h-12 w-12 rounded-full p-0" onClick={() => setShowStickerPicker((current) => !current)} aria-label="Open stickers">
+                      <SmilePlus className="h-4 w-4" />
                     </button>
                     <input ref={fileRef} type="file" className="hidden" onChange={(event) => setFile(event.target.files?.[0] || null)} />
                     <textarea
@@ -687,6 +787,7 @@ const TeamChat = () => {
                         ))}
                       </div>
                     ) : null}
+                    {showStickerPicker ? <StickerPicker onPick={sendSticker} onClose={() => setShowStickerPicker(false)} /> : null}
                     <button className="btn-primary h-12 w-12 rounded-full p-0" onClick={sendMessage} disabled={uploading || (!draft.trim() && !file)}>
                       {uploading ? '...' : <Send className="h-4 w-4" />}
                     </button>
@@ -750,9 +851,46 @@ const ChatListItem = ({ title, subtitle, time, unread, active, avatar, onClick, 
   </button>
 );
 
-const MessageRow = ({ message, own, isPinned, onReply, onEdit, onDelete, onPin, onForward }) => (
-  <div className={`flex ${own ? 'justify-end' : 'justify-start'}`}>
-    <div className={`max-w-[78%] rounded-[1.25rem] border p-3 shadow-sm ${own ? 'rounded-tr-sm' : 'rounded-tl-sm'}`} style={{ borderColor: 'var(--c-border)', background: own ? 'var(--brand-primary)' : 'var(--c-panel)', color: own ? '#fff' : 'var(--c-text)' }}>
+const MessageRow = ({ message, own, currentUserId, isPinned, onReply, onEdit, onDelete, onPin, onForward, onReact, onRemoveReaction }) => {
+  const myReaction = (Array.isArray(message?.reactions) ? message.reactions : []).find((reaction) => getReactionUserId(reaction) === String(currentUserId));
+  const groupedReactions = groupReactions(message, currentUserId);
+  const toggleReaction = (emoji) => {
+    if (!emoji) return;
+    if (myReaction?.emoji === emoji) {
+      onRemoveReaction?.(message);
+      return;
+    }
+    onReact?.(message, emoji);
+  };
+
+  return (
+  <div className={`group flex ${own ? 'justify-end' : 'justify-start'}`}>
+    <div className={`relative max-w-[78%] rounded-[1.25rem] border p-3 shadow-sm ${own ? 'rounded-tr-sm' : 'rounded-tl-sm'}`} style={{ borderColor: 'var(--c-border)', background: own ? 'var(--brand-primary)' : 'var(--c-panel)', color: own ? '#fff' : 'var(--c-text)' }}>
+      {!message.isDeleted ? (
+        <div className={`absolute ${own ? 'left-3' : 'right-3'} -top-4 z-10 flex items-center gap-1 rounded-full border px-2 py-1 opacity-0 shadow-sm transition-opacity group-hover:opacity-100`} style={{ borderColor: 'var(--c-border)', background: 'var(--c-panel)' }}>
+          {COMMON_REACTIONS.map((emoji) => (
+            <button
+              key={emoji}
+              type="button"
+              className="text-sm transition-transform hover:scale-110"
+              onClick={() => toggleReaction(emoji)}
+            >
+              {emoji}
+            </button>
+          ))}
+          <button
+            type="button"
+            className="flex h-6 w-6 items-center justify-center rounded-full transition-colors hover:bg-[var(--c-panel-subtle)]"
+            onClick={() => {
+              const emoji = window.prompt('Enter an emoji reaction');
+              if (emoji) toggleReaction(String(emoji).trim());
+            }}
+            title="Choose any emoji"
+          >
+            <SmilePlus className="h-3.5 w-3.5" style={{ color: 'var(--c-text-soft)' }} />
+          </button>
+        </div>
+      ) : null}
       {!own ? <p className="mb-1 text-xs font-black" style={{ color: 'var(--brand-secondary)' }}>{formatPersonName(message.sender)}</p> : null}
       {message.replyTo ? (
         <div className="mb-2 rounded-[0.9rem] border-l-4 px-3 py-2 text-xs" style={{ borderColor: 'var(--brand-secondary)', background: own ? 'rgba(255,255,255,0.12)' : 'var(--c-panel-subtle)' }}>
@@ -764,10 +902,32 @@ const MessageRow = ({ message, own, isPinned, onReply, onEdit, onDelete, onPin, 
         <p className="text-sm italic opacity-70">This message was deleted</p>
       ) : (
         <>
-          {message.content ? renderMentionContent(message, own) : null}
+          {message.contentType === 'sticker' ? <StickerMessage message={message} own={own} /> : null}
+          {message.content && message.contentType !== 'sticker' ? renderMentionContent(message, own) : null}
+          {message.content && message.contentType !== 'sticker' && !message.fileUrl ? <LinkPreviewCard url={extractFirstUrl(message.content)} compact /> : null}
           {message.fileUrl ? <AttachmentPreview message={message} own={own} /> : null}
         </>
       )}
+      {groupedReactions.length ? (
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          {groupedReactions.map((reaction) => (
+            <button
+              key={reaction.emoji}
+              type="button"
+              onClick={() => toggleReaction(reaction.emoji)}
+              className="inline-flex items-center gap-1 rounded-full border px-2 py-1 text-[11px] font-semibold transition-colors"
+              style={{
+                borderColor: reaction.mine ? 'var(--brand-primary)' : own ? 'rgba(255,255,255,0.3)' : 'var(--c-border)',
+                background: reaction.mine ? 'var(--brand-primary-soft)' : own ? 'rgba(255,255,255,0.12)' : 'var(--c-panel-subtle)',
+                color: own ? '#fff' : 'var(--c-text)',
+              }}
+            >
+              <span>{reaction.emoji}</span>
+              <span>{reaction.count}</span>
+            </button>
+          ))}
+        </div>
+      ) : null}
       <div className="mt-2 flex flex-wrap items-center justify-end gap-2 text-[11px]" style={{ color: own ? 'rgba(255,255,255,0.72)' : 'var(--c-text-faint)' }}>
         {message.isEdited ? <span>edited</span> : null}
         <span>{formatTime(message.createdAt)}</span>
@@ -785,7 +945,21 @@ const MessageRow = ({ message, own, isPinned, onReply, onEdit, onDelete, onPin, 
       ) : null}
     </div>
   </div>
-);
+  );
+};
+
+const StickerMessage = ({ message, own }) => {
+  const sticker = getStickerByKey(message.stickerKey) || { emoji: '✨', label: message.stickerLabel || 'Sticker', background: own ? 'rgba(255,255,255,0.16)' : 'var(--brand-primary-soft)' };
+  return (
+    <div
+      className="mt-1 flex w-32 flex-col items-center justify-center gap-2 rounded-[1.2rem] px-3 py-4 text-center"
+      style={{ background: own ? 'rgba(255,255,255,0.16)' : sticker.background }}
+    >
+      <span className="text-4xl leading-none">{sticker.emoji}</span>
+      <span className="text-xs font-black text-white">{sticker.label}</span>
+    </div>
+  );
+};
 
 const AttachmentPreview = ({ message, own }) => {
   const label = message.fileName || 'Attachment';

@@ -12,6 +12,7 @@ import {
 const getActorName = (user) => user?.fullName || user?.email || 'Admin';
 const getTaskId = (task) => String(task?._id || task?.id || '');
 const getUserId = (value) => String(value?._id || value || '');
+const getCurrentAdminId = (req) => String(req.user?._id || req.user?.id || '');
 const isSelfAssignedTask = (task) => {
   const ownerId = getUserId(task?.owner);
   const assignerId = getUserId(task?.assignedBy);
@@ -197,11 +198,92 @@ const getTaskChangeList = (existingTask, nextTask, rawData = {}) => {
   return changes;
 };
 
+const applyAssignedByFilter = (req, query) => {
+  const assignerId = req.query?.assignedByMe === 'true'
+    ? getCurrentAdminId(req)
+    : String(req.query?.assignedById || '').trim();
+
+  if (assignerId) {
+    query.assignedBy = assignerId;
+  }
+};
+
+const buildAssignedByMeTaskQuery = async (req) => {
+  const query = {};
+  const currentAdminId = getCurrentAdminId(req);
+  const visibleOwnerIds = Array.isArray(req.teamMemberIds)
+    ? req.teamMemberIds.map((id) => String(id))
+    : null;
+  const { status, priority, search, ownerId } = req.query || {};
+
+  query.assignedBy = currentAdminId;
+
+  if (visibleOwnerIds) {
+    query.owner = { $in: visibleOwnerIds };
+  }
+
+  if (ownerId) {
+    const ownerKey = String(ownerId);
+    if (visibleOwnerIds && !visibleOwnerIds.includes(ownerKey)) {
+      return { query: null, blocked: true };
+    }
+    query.owner = ownerKey;
+  }
+
+  if (status === 'completed' || status === 'done') query.completed = true;
+  else if (status === 'pending') query.completed = false;
+  else if (status === 'overdue') {
+    query.completed = false;
+    query.dueDate = { $lt: new Date() };
+  } else if (status === 'submitted') query.submissionStatus = 'submitted';
+  else if (status === 'approved') query.submissionStatus = 'approved';
+  else if (status === 'rejected') query.submissionStatus = 'rejected';
+
+  if (priority) query.priority = priority;
+
+  if (search) {
+    const ownerSearchQuery = {
+      ...(visibleOwnerIds ? { _id: { $in: visibleOwnerIds } } : {}),
+      $or: [
+        { firstName: { $regex: search, $options: 'i' } },
+        { lastName: { $regex: search, $options: 'i' } },
+        { otherName: { $regex: search, $options: 'i' } },
+        { email: { $regex: search, $options: 'i' } },
+      ],
+    };
+    const matchedUsers = await User.find(ownerSearchQuery).select('_id').lean();
+    const matchedOwnerIds = matchedUsers.map((user) => user._id);
+
+    query.$or = [
+      { title: { $regex: search, $options: 'i' } },
+      { description: { $regex: search, $options: 'i' } },
+      ...(matchedOwnerIds.length ? [{ owner: { $in: matchedOwnerIds } }] : []),
+    ];
+  }
+
+  return { query, blocked: false };
+};
+
+const computeTaskStats = (tasks = []) => {
+  const now = new Date();
+  return {
+    total: tasks.length,
+    completed: tasks.filter((task) => task.completed).length,
+    pending: tasks.filter((task) => !task.completed).length,
+    overdue: tasks.filter((task) => !task.completed && task.dueDate && new Date(task.dueDate) < now).length,
+    submitted: tasks.filter((task) => task.submissionStatus === 'submitted').length,
+    approved: tasks.filter((task) => task.submissionStatus === 'approved').length,
+    rejected: tasks.filter((task) => task.submissionStatus === 'rejected').length,
+    highPri: tasks.filter((task) => task.priority === 'High' && !task.completed).length,
+  };
+};
+
 // ── Get all tasks (team-filtered) ─────────────────────────────────────────────
 export const getAllTasks = async (req, res) => {
   try {
     const query = buildTeamQuery(req.teamMemberIds, 'owner');
     const { status, priority, search, ownerId, page = 1, limit = 50 } = req.query;
+    applyAssignedByFilter(req, query);
 
     if (status === 'completed') query.completed = true;
     else if (status === 'pending') query.completed = false;
@@ -728,6 +810,7 @@ export const getTaskStats = async (req, res) => {
     const query = buildTeamQuery(req.teamMemberIds, 'owner');
     const { ownerId } = req.query;
     const now = new Date();
+    applyAssignedByFilter(req, query);
 
     if (ownerId) {
       const ownerKey = String(ownerId);
@@ -757,5 +840,47 @@ export const getTaskStats = async (req, res) => {
     });
   } catch (err) {
     res.status(500).json({ success: false, message: 'Failed to fetch stats' });
+  }
+};
+
+export const getTasksAssignedByMe = async (req, res) => {
+  req.query = { ...req.query, assignedByMe: 'true' };
+  return getAllTasks(req, res);
+};
+
+export const getTasksAssignedByMeStats = async (req, res) => {
+  req.query = { ...req.query, assignedByMe: 'true' };
+  return getTaskStats(req, res);
+};
+
+export const getTasksAssignedByMeOverview = async (req, res) => {
+  try {
+    const { query, blocked } = await buildAssignedByMeTaskQuery(req);
+    if (blocked || !query) {
+      return res.json({
+        success: true,
+        tasks: [],
+        total: 0,
+        stats: computeTaskStats([]),
+      });
+    }
+
+    const tasks = await Task.find(query)
+      .populate('owner', 'firstName lastName otherName email position unitSector avatar')
+      .populate('assignedBy', 'firstName lastName email')
+      .populate('reviewedBy', 'firstName lastName fullName email')
+      .populate('adminComments.user', 'firstName lastName avatar')
+      .sort({ createdAt: -1 })
+      .lean();
+
+    res.json({
+      success: true,
+      tasks,
+      total: tasks.length,
+      stats: computeTaskStats(tasks),
+    });
+  } catch (err) {
+    console.error('getTasksAssignedByMeOverview error:', err.message);
+    res.status(500).json({ success: false, message: 'Failed to fetch assigned tasks' });
   }
 };

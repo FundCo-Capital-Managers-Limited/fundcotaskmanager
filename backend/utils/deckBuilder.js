@@ -1,4 +1,5 @@
 import {
+  buildPresentationDigest,
   buildOutlineFromBlocks,
   extractNumericHighlights,
   sectionizeText,
@@ -20,6 +21,8 @@ const VALID_SLIDE_TYPES = new Set([
   'closing',
 ]);
 
+const LOW_SIGNAL_HEADING_RE = /^(disclaimer|table of contents|contents|copyright notice)$/i;
+
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 
 const cleanPhrase = (value) =>
@@ -28,7 +31,7 @@ const cleanPhrase = (value) =>
     .replace(/[.;:!?]+$/g, '')
     .trim();
 
-const clipWords = (value, maxWords = 10) => {
+const clipWords = (value, maxWords = 18) => {
   const words = cleanPhrase(value).split(' ').filter(Boolean);
   return words.slice(0, maxWords).join(' ');
 };
@@ -91,11 +94,20 @@ const pickTitle = ({ titleHint, sections, rawText }) => {
   return clipWords(firstSentence || 'Document Presentation', 8) || 'Document Presentation';
 };
 
-const buildSectionBullets = (section, max = 6) => {
+const buildSectionBullets = (section, max = 7) => {
+  const heading = cleanPhrase(section.heading || '');
+  const stripHeadingPrefix = (value) => {
+    const phrase = cleanPhrase(value);
+    if (!heading) return phrase;
+    const escaped = heading.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return cleanPhrase(phrase.replace(new RegExp(`^${escaped}\\s*[:\\-]?\\s*`, 'i'), ''));
+  };
   const bulletCandidates = uniqueList([
     ...section.bullets,
     ...section.paragraphs.flatMap((paragraph) => splitSentences(paragraph).slice(0, 3)),
-  ]).map((item) => clipWords(item, 11));
+  ])
+    .map(stripHeadingPrefix)
+    .map((item) => clipWords(item, 18));
   return bulletCandidates.filter(Boolean).slice(0, max);
 };
 
@@ -110,19 +122,19 @@ const splitBulletsToColumns = (bullets) => {
 const buildCardsFromBullets = (bullets) =>
   bullets.slice(0, 4).map((bullet, index) => {
     const parts = splitSentences(bullet);
-    const title = clipWords(parts[0] || bullet, 4) || `Point ${index + 1}`;
-    const body = clipWords(parts.slice(1).join(' ') || bullet, 14) || bullet;
+    const title = clipWords(parts[0] || bullet, 6) || `Point ${index + 1}`;
+    const body = clipWords(parts.slice(1).join(' ') || bullet, 26) || bullet;
     return { title, body, metric: '' };
   });
 
 const buildTimelineFromBullets = (bullets) =>
   bullets.slice(0, 5).map((bullet, index) => ({
     label: `Phase ${index + 1}`,
-    detail: clipWords(bullet, 10) || `Step ${index + 1}`,
+    detail: clipWords(bullet, 14) || `Step ${index + 1}`,
   }));
 
 const buildProcessSteps = (bullets) =>
-  bullets.slice(0, 5).map((bullet) => clipWords(bullet, 7)).filter(Boolean);
+  bullets.slice(0, 5).map((bullet) => clipWords(bullet, 12)).filter(Boolean);
 
 const buildComparisonColumns = (bullets) => {
   const midpoint = Math.ceil(Math.max(bullets.length, 2) / 2);
@@ -166,7 +178,19 @@ const buildClosingBullets = (sections) =>
     sections.flatMap((section) => buildSectionBullets(section).slice(0, 2))
   )
     .slice(0, 5)
-    .map((item) => clipWords(item, 10));
+    .map((item) => clipWords(item, 14));
+
+const isLowSignalSection = (section) => {
+  const heading = cleanPhrase(section?.heading || '');
+  const sample = [
+    ...(section?.paragraphs || []).slice(0, 2),
+    ...(section?.bullets || []).slice(0, 4),
+  ].join(' ');
+
+  if (LOW_SIGNAL_HEADING_RE.test(heading)) return true;
+  if (!heading && /disclaimer|provided as is|all reasonable precautions/i.test(sample)) return true;
+  return false;
+};
 
 const chooseLayout = (section, index, stats, bullets) => {
   const heading = cleanPhrase(section.heading || '').toLowerCase();
@@ -197,7 +221,7 @@ const normalizeSlide = (slide, id) => ({
   subtitle: cleanPhrase(slide.subtitle || ''),
   objective: cleanPhrase(slide.objective || ''),
   keyMessage: cleanPhrase(slide.keyMessage || ''),
-  bullets: Array.isArray(slide.bullets) ? uniqueList(slide.bullets).map((item) => clipWords(item, 11)).slice(0, 6) : [],
+  bullets: Array.isArray(slide.bullets) ? uniqueList(slide.bullets).map((item) => clipWords(item, 18)).slice(0, 7) : [],
   leftTitle: cleanPhrase(slide.leftTitle || ''),
   leftContent: String(slide.leftContent || '').trim(),
   rightTitle: cleanPhrase(slide.rightTitle || ''),
@@ -233,7 +257,7 @@ const normalizeSlide = (slide, id) => ({
         }))
     : [],
   processSteps: Array.isArray(slide.processSteps)
-    ? slide.processSteps.map((item) => cleanPhrase(item)).filter(Boolean).slice(0, 5)
+    ? slide.processSteps.map((item) => clipWords(item, 12)).filter(Boolean).slice(0, 5)
     : [],
   visualElements: Array.isArray(slide.visualElements)
     ? slide.visualElements.map((item) => cleanPhrase(item)).filter(Boolean).slice(0, 6)
@@ -266,10 +290,15 @@ export const buildFallbackDeck = ({
   audience = 'business',
   titleHint = '',
 }) => {
-  const { text } = structurePdfText(sourceText);
-  const sections = sectionizeText(text).filter(
+  const normalizedSourceText = structurePdfText(sourceText).text || String(sourceText || '');
+  const presentationDigest = buildPresentationDigest(normalizedSourceText, 14000);
+  const { text } = structurePdfText(normalizedSourceText);
+  const rawSections = sectionizeText(normalizedSourceText).filter(
     (section) => section.heading || section.paragraphs.length || section.bullets.length
   );
+  const sections = rawSections.some((section) => !isLowSignalSection(section))
+    ? rawSections.filter((section) => !isLowSignalSection(section))
+    : rawSections;
   const purpose = inferPurpose(text);
   const effectiveAudience = inferAudience(audience, purpose);
   const storyArc = buildStoryArc(purpose);
@@ -288,7 +317,7 @@ export const buildFallbackDeck = ({
     );
     const layout = chooseLayout(section, index, stats, bullets);
     const visualElements = visualElementsForType(layout, layout === 'data');
-    const keyMessage = clipWords(section.paragraphs[0] || bullets[0] || heading, 16);
+    const keyMessage = clipWords(section.paragraphs[0] || bullets[0] || heading, 22);
 
     if (layout === 'data') {
       candidates.push({
@@ -301,7 +330,7 @@ export const buildFallbackDeck = ({
         stats,
         chart: buildChartFromStats(stats),
         visualElements,
-        note: 'Use a clean consulting-style data panel with one clear takeaway.',
+        note: 'Use a clean consulting-style data panel with one clear takeaway and supporting commentary.',
       });
       return;
     }
@@ -315,7 +344,7 @@ export const buildFallbackDeck = ({
         keyMessage,
         cards: buildCardsFromBullets(bullets.length ? bullets : [keyMessage]),
         visualElements,
-        note: 'Use three to four cards with strong spacing and one clear idea per card.',
+        note: 'Use three to four cards with strong spacing and enough body copy to make each idea useful in a real meeting.',
       });
       return;
     }
@@ -329,7 +358,7 @@ export const buildFallbackDeck = ({
         keyMessage,
         timeline: buildTimelineFromBullets(bullets.length ? bullets : [keyMessage]),
         visualElements,
-        note: 'Use a horizontal timeline with clear milestones and short labels.',
+        note: 'Use a horizontal timeline with clear milestones, dates or phases, and concise supporting detail.',
       });
       return;
     }
@@ -343,7 +372,7 @@ export const buildFallbackDeck = ({
         keyMessage,
         processSteps: buildProcessSteps(bullets.length ? bullets : [keyMessage]),
         visualElements,
-        note: 'Use connected steps with directional flow and one outcome callout.',
+        note: 'Use connected steps with directional flow, short supporting text, and one outcome callout.',
       });
       return;
     }
@@ -389,7 +418,7 @@ export const buildFallbackDeck = ({
       keyMessage,
       bullets: bullets.length ? bullets : [keyMessage, 'Supporting evidence', 'Recommended next step'],
       visualElements,
-      note: 'Use an insight headline, short bullets, and one highlight callout.',
+      note: 'Use an insight headline, substantial bullets with enough detail to stand on their own, and one highlight callout.',
     });
   });
 
@@ -410,12 +439,12 @@ export const buildFallbackDeck = ({
       keyMessage: 'Capture the highest-value insights in a consulting-ready structure',
       cards: buildCardsFromBullets(fallbackBullets.length ? fallbackBullets : ['Main point', 'Supporting evidence', 'Next action']),
       visualElements: visualElementsForType('cards'),
-      note: 'Use concise cards with one idea per block.',
+      note: 'Use concise cards with enough explanation to stand on their own.',
     });
   }
 
   const summaryBullets = uniqueList(
-    sections.flatMap((section) => buildSectionBullets(section).slice(0, 1))
+    sections.flatMap((section) => buildSectionBullets(section).slice(0, 2))
   ).slice(0, 4);
 
   const slides = [
@@ -437,7 +466,7 @@ export const buildFallbackDeck = ({
       keyMessage: 'Surface the most important insights before the deeper analysis',
       cards: buildCardsFromBullets(summaryBullets.length ? summaryBullets : ['Main point', 'Supporting evidence', 'Recommendation']),
       visualElements: visualElementsForType('cards'),
-      note: 'Use three or four summary cards with short, high-signal messages.',
+      note: 'Use three or four summary cards with high-signal messages and short supporting detail.',
     }] : []),
     ...contentSlides,
     {
@@ -471,7 +500,7 @@ export const buildFallbackDeck = ({
 export const buildFallbackSlide = ({ currentSlide, sourceText, instruction = '' }) => {
   const baseType = currentSlide?.type || 'bullets';
   const { text } = structurePdfText(sourceText);
-  const sections = sectionizeText(text);
+  const sections = sectionizeText(sourceText);
   const primary = sections[0] || { heading: '', paragraphs: [text], bullets: [] };
   const bullets = buildSectionBullets(primary);
   const stats = extractNumericHighlights(text, 4);

@@ -18,6 +18,9 @@ const resolveAdminApiBase = () => {
 const API_BASE = normalizeBase(resolveAdminApiBase());
 const TOKEN_KEY = 'adminToken';
 const USER_KEY = 'adminUser';
+const ACCESS_EXPIRES_AT_KEY = 'fundcoAdminAccessExpiresAt';
+const REFRESH_EXPIRES_AT_KEY = 'fundcoAdminRefreshExpiresAt';
+const REMEMBER_ME_KEY = 'fundcoAdminRememberMe';
 const AUTH_CHANGE_EVENT = 'fundco-admin-auth:changed';
 const AUTH_FAILURE_MESSAGES = [
   'token expired',
@@ -63,15 +66,46 @@ export const readStoredAdminUser = () => {
   }
 };
 
-export const storeAdminSession = ({ token, user }) => {
+const readStoredSessionMeta = () => ({
+  accessTokenExpiresAt: Number(localStorage.getItem(ACCESS_EXPIRES_AT_KEY) || 0),
+  refreshSessionExpiresAt: localStorage.getItem(REFRESH_EXPIRES_AT_KEY) || '',
+  rememberMe: localStorage.getItem(REMEMBER_ME_KEY) === 'true',
+});
+
+const isAccessTokenStale = () => {
+  const { accessTokenExpiresAt } = readStoredSessionMeta();
+  if (!accessTokenExpiresAt) return false;
+  return accessTokenExpiresAt <= Date.now() + (5 * 60 * 1000);
+};
+
+const isRefreshSessionExpired = () => {
+  const { refreshSessionExpiresAt } = readStoredSessionMeta();
+  if (!refreshSessionExpiresAt) return false;
+  const expiresAt = new Date(refreshSessionExpiresAt).getTime();
+  return Number.isFinite(expiresAt) && expiresAt <= Date.now();
+};
+
+export const storeAdminSession = ({ token, user, accessTokenExpiresInSeconds, refreshSessionExpiresAt, rememberMe }) => {
   if (token) localStorage.setItem(TOKEN_KEY, token);
   if (user) localStorage.setItem(USER_KEY, JSON.stringify(user));
+  if (Number.isFinite(accessTokenExpiresInSeconds) && accessTokenExpiresInSeconds > 0) {
+    localStorage.setItem(ACCESS_EXPIRES_AT_KEY, String(Date.now() + (accessTokenExpiresInSeconds * 1000)));
+  }
+  if (typeof refreshSessionExpiresAt === 'string' && refreshSessionExpiresAt.trim()) {
+    localStorage.setItem(REFRESH_EXPIRES_AT_KEY, refreshSessionExpiresAt.trim());
+  }
+  if (typeof rememberMe === 'boolean') {
+    localStorage.setItem(REMEMBER_ME_KEY, rememberMe ? 'true' : 'false');
+  }
   emitAuthChange();
 };
 
 export const clearAdminSession = () => {
   localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(USER_KEY);
+  localStorage.removeItem(ACCESS_EXPIRES_AT_KEY);
+  localStorage.removeItem(REFRESH_EXPIRES_AT_KEY);
+  localStorage.removeItem(REMEMBER_ME_KEY);
   emitAuthChange();
 };
 
@@ -90,7 +124,13 @@ export const refreshAdminAccessToken = async () => {
     if (!data?.success || !data?.token || !data?.user) {
       throw new Error(data?.message || 'Unable to refresh session');
     }
-    storeAdminSession({ token: data.token, user: data.user });
+    storeAdminSession({
+      token: data.token,
+      user: data.user,
+      accessTokenExpiresInSeconds: data.accessTokenExpiresInSeconds,
+      refreshSessionExpiresAt: data.refreshSessionExpiresAt,
+      rememberMe: typeof data.rememberMe === 'boolean' ? data.rememberMe : readStoredSessionMeta().rememberMe,
+    });
     return data;
   }).catch((error) => {
     clearAdminSession();
@@ -103,7 +143,19 @@ export const refreshAdminAccessToken = async () => {
 };
 
 export const bootstrapAdminSession = async () => {
-  if (getAdminAccessToken() && readStoredAdminUser()) return true;
+  if (isRefreshSessionExpired()) {
+    clearAdminSession();
+    return false;
+  }
+  if (getAdminAccessToken() && readStoredAdminUser()) {
+    if (!isAccessTokenStale()) return true;
+    try {
+      await refreshAdminAccessToken();
+      return true;
+    } catch {
+      return false;
+    }
+  }
   try {
     await refreshAdminAccessToken();
     return true;

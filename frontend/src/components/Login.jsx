@@ -54,7 +54,13 @@ const Login = ({ onSubmit, onSwitchMode }) => {
         { withCredentials: true }
       );
       if (!data.success || !data.token) throw new Error(data.message || 'Login failed');
-      storeUserSession({ token: data.token, user: data.user });
+      storeUserSession({
+        token: data.token,
+        user: data.user,
+        accessTokenExpiresInSeconds: data.accessTokenExpiresInSeconds,
+        refreshSessionExpiresAt: data.refreshSessionExpiresAt,
+        rememberMe,
+      });
       onSubmit?.({ token: data.token, user: data.user });
       toast.success('Login successful!');
       setFormData(INIT_FORM);

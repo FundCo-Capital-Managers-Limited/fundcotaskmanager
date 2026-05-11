@@ -25,6 +25,28 @@ const LVL = {
   expert:       { label: 'Expert',       color: '#7c3aed', bg: 'rgba(124,58,237,.12)',  border: 'rgba(124,58,237,.3)'  },
 };
 
+const normalizeTrainingText = (value) => {
+  if (Array.isArray(value)) {
+    if (value.every((item) => Number.isFinite(Number(item)))) {
+      return String.fromCharCode(...value.map((item) => Number(item)).filter((item) => Number.isFinite(item)));
+    }
+    return value.map((item) => normalizeTrainingText(item)).filter(Boolean).join(' ');
+  }
+  if (value && typeof value === 'object') {
+    return normalizeTrainingText(value.text || value.value || value.label || value.question || value.option || '');
+  }
+  return String(value ?? '').replace(/\s+/g, ' ').trim();
+};
+
+const normalizeExamQuestion = (question, index = 0) => ({
+  ...question,
+  index,
+  question: normalizeTrainingText(question?.question),
+  options: Array.isArray(question?.options) ? question.options.map((item) => normalizeTrainingText(item)).filter(Boolean) : [],
+  answer: normalizeTrainingText(question?.answer),
+  explanation: normalizeTrainingText(question?.explanation),
+});
+
 // ─── content renderer ─────────────────────────────────────────────────────────
 function renderContent(raw) {
   const text = (raw != null ? String(raw) : '').trim();
@@ -938,7 +960,13 @@ function ExamView({ course, onBack, onComplete }) {
 
   useEffect(() => {
     axios.get(`${API}/api/learning/exam/${course._id}`, hdrs())
-      .then(r => { const q = r.data.questions || []; setQs(q); setAnswers(new Array(q.length).fill(null)); setPassing(r.data.passingScore || 70); setPhase('intro'); })
+      .then(r => {
+        const q = (r.data.questions || []).map((item, index) => normalizeExamQuestion(item, index));
+        setQs(q);
+        setAnswers(new Array(q.length).fill(null));
+        setPassing(r.data.passingScore || 70);
+        setPhase('intro');
+      })
       .catch(() => { toast.error('Failed to load exam'); onBack(); });
   }, []);
 
@@ -950,7 +978,17 @@ function ExamView({ course, onBack, onComplete }) {
     stopTimer(); setPhase('grading');
     try {
       const r = await axios.post(`${API}/api/learning/exam/submit`, { courseId: course._id, answers: answers.map(a => a || ''), timeSpent: elapsed }, hdrs());
-      setResult(r.data); setPhase('result');
+      setResult({
+        ...r.data,
+        questions: (r.data.questions || []).map((item, index) => normalizeExamQuestion(item, index)),
+        answers: (r.data.answers || []).map((item) => ({
+          ...item,
+          selectedAnswer: normalizeTrainingText(item?.selectedAnswer),
+          correctAnswer: normalizeTrainingText(item?.correctAnswer),
+          explanation: normalizeTrainingText(item?.explanation),
+        })),
+      });
+      setPhase('result');
     } catch { toast.error('Submission failed'); setPhase('taking'); startTimer(); }
   };
 

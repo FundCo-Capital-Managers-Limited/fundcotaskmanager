@@ -53,6 +53,40 @@ const documentSchema = new mongoose.Schema({
     type: Object,
     default: null,
   },
+  generationStatus: {
+    type: String,
+    enum: ['idle', 'queued', 'processing', 'ready', 'failed'],
+    default: 'idle',
+    index: true,
+  },
+  generationPhase: {
+    type: String,
+    default: '',
+  },
+  generationPercent: {
+    type: Number,
+    default: 0,
+  },
+  generationRequestedAt: {
+    type: Date,
+    default: null,
+  },
+  generationStartedAt: {
+    type: Date,
+    default: null,
+  },
+  generationCompletedAt: {
+    type: Date,
+    default: null,
+  },
+  generationError: {
+    type: String,
+    default: '',
+  },
+  generationMeta: {
+    type: Object,
+    default: null,
+  },
   templateFileId: { // Reference to selected template file
     type: mongoose.Schema.Types.ObjectId,
     ref: 'File',

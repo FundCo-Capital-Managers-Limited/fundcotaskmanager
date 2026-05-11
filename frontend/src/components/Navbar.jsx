@@ -132,7 +132,7 @@ const Navbar = ({ user = {}, onLogout, onMenu }) => {
   };
 
   const handleSelectNotification = async (item) => {
-    if (item?._id) await markRead(item._id);
+    if (item?.id) await markRead(item.id);
     setNotificationOpen(false);
     navigate(item?.to || '/');
   };

@@ -4,8 +4,11 @@ import toast from 'react-hot-toast';
 import { useNavigate, useParams } from 'react-router-dom';
 import { io } from 'socket.io-client';
 import {
+  AlertTriangle,
   ArrowLeft,
   Calendar,
+  CircleDollarSign,
+  Flag,
   Edit2,
   FolderKanban,
   Link2,
@@ -18,6 +21,7 @@ import {
   UserPlus,
   Users,
   X,
+  ShieldAlert,
 } from 'lucide-react';
 import api, { API_BASE } from '../utils/api.js';
 import { useNotifications } from '../context/NotificationContext.jsx';
@@ -65,11 +69,52 @@ const taskLaneMeta = {
   done: { label: 'Done', tone: 'success' },
 };
 
+const milestoneStatusMeta = {
+  planned: { label: 'Planned', tone: 'info' },
+  active: { label: 'Active', tone: 'brand' },
+  blocked: { label: 'Blocked', tone: 'danger' },
+  completed: { label: 'Completed', tone: 'success' },
+};
+
+const severityMeta = {
+  low: { label: 'Low', tone: 'neutral' },
+  medium: { label: 'Medium', tone: 'info' },
+  high: { label: 'High', tone: 'warning' },
+  critical: { label: 'Critical', tone: 'danger' },
+};
+
+const riskStatusMeta = {
+  open: { label: 'Open', tone: 'danger' },
+  mitigating: { label: 'Mitigating', tone: 'warning' },
+  watching: { label: 'Watching', tone: 'info' },
+  closed: { label: 'Closed', tone: 'success' },
+};
+
+const issueStatusMeta = {
+  open: { label: 'Open', tone: 'warning' },
+  'in-progress': { label: 'In Progress', tone: 'info' },
+  escalated: { label: 'Escalated', tone: 'danger' },
+  resolved: { label: 'Resolved', tone: 'success' },
+};
+
 const formatShortDate = (value) => {
   if (!value) return 'No date';
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return 'No date';
   return format(date, 'MMM d, yyyy');
+};
+const formatCurrency = (value, currency = 'NGN') => {
+  const amount = Number(value || 0);
+  if (!Number.isFinite(amount)) return '-';
+  try {
+    return new Intl.NumberFormat('en-NG', {
+      style: 'currency',
+      currency,
+      maximumFractionDigits: 0,
+    }).format(amount);
+  } catch {
+    return `${currency} ${amount.toLocaleString()}`;
+  }
 };
 const formatTaskMoment = (value) => {
   if (!value) return '';
@@ -121,6 +166,133 @@ const buildTaskLanes = (tasks = []) => tasks.reduce((accumulator, task) => {
 }, { planned: [], review: [], blocked: [], done: [] });
 
 const MemberIdentity = (member) => member.fullName || `${member.firstName || ''} ${member.lastName || ''}`.trim() || member.email || 'Team member';
+
+const ProjectControlModal = ({
+  open,
+  title,
+  subtitle,
+  config,
+  members,
+  value,
+  onSave,
+  onClose,
+}) => {
+  const [form, setForm] = useState({
+    title: '',
+    description: '',
+    status: config.statusOptions[0]?.value || '',
+    severity: config.severityOptions?.[0]?.value || 'medium',
+    owner: '',
+    dueDate: '',
+    notes: '',
+    impact: '',
+    mitigation: '',
+    resolution: '',
+  });
+
+  useEffect(() => {
+    setForm({
+      title: value?.title || '',
+      description: value?.description || '',
+      status: value?.status || config.statusOptions[0]?.value || '',
+      severity: value?.severity || config.severityOptions?.[0]?.value || 'medium',
+      owner: value?.owner?._id || value?.owner || '',
+      dueDate: value?.dueDate ? new Date(value.dueDate).toISOString().split('T')[0] : '',
+      notes: value?.notes || '',
+      impact: value?.impact || '',
+      mitigation: value?.mitigation || '',
+      resolution: value?.resolution || '',
+    });
+  }, [value, open, config]);
+
+  const submit = () => {
+    if (!form.title.trim()) {
+      toast.error(`${config.label} title required`);
+      return;
+    }
+    onSave({
+      title: form.title,
+      description: form.description,
+      status: form.status,
+      severity: config.severityOptions ? form.severity : undefined,
+      owner: form.owner || undefined,
+      dueDate: form.dueDate || undefined,
+      notes: config.type === 'milestone' ? form.notes : undefined,
+      impact: config.type === 'risk' ? form.impact : undefined,
+      mitigation: config.type === 'risk' ? form.mitigation : undefined,
+      resolution: config.type === 'issue' ? form.resolution : undefined,
+    });
+  };
+
+  return (
+    <Modal open={open} onClose={onClose} title={title} subtitle={subtitle} width="max-w-2xl">
+      <div className="space-y-4">
+        <div>
+          <label className="label">{config.label} Title</label>
+          <input className="input-base" value={form.title} onChange={(event) => setForm((prev) => ({ ...prev, title: event.target.value }))} />
+        </div>
+        <div>
+          <label className="label">Description</label>
+          <textarea className="input-base min-h-24" value={form.description} onChange={(event) => setForm((prev) => ({ ...prev, description: event.target.value }))} />
+        </div>
+        <div className={`grid gap-4 ${config.severityOptions ? 'md:grid-cols-3' : 'md:grid-cols-2'}`}>
+          <div>
+            <label className="label">Status</label>
+            <select className="input-base" value={form.status} onChange={(event) => setForm((prev) => ({ ...prev, status: event.target.value }))}>
+              {config.statusOptions.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
+            </select>
+          </div>
+          {config.severityOptions ? (
+            <div>
+              <label className="label">Severity</label>
+              <select className="input-base" value={form.severity} onChange={(event) => setForm((prev) => ({ ...prev, severity: event.target.value }))}>
+                {config.severityOptions.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
+              </select>
+            </div>
+          ) : null}
+          <div>
+            <label className="label">Owner</label>
+            <select className="input-base" value={form.owner} onChange={(event) => setForm((prev) => ({ ...prev, owner: event.target.value }))}>
+              <option value="">Unassigned</option>
+              {members.map((member) => <option key={member._id} value={member._id}>{MemberIdentity(member)}</option>)}
+            </select>
+          </div>
+        </div>
+        <div>
+          <label className="label">Due Date</label>
+          <input type="date" className="input-base" value={form.dueDate} onChange={(event) => setForm((prev) => ({ ...prev, dueDate: event.target.value }))} />
+        </div>
+        {config.type === 'milestone' ? (
+          <div>
+            <label className="label">Notes</label>
+            <textarea className="input-base min-h-24" value={form.notes} onChange={(event) => setForm((prev) => ({ ...prev, notes: event.target.value }))} />
+          </div>
+        ) : null}
+        {config.type === 'risk' ? (
+          <>
+            <div>
+              <label className="label">Impact</label>
+              <textarea className="input-base min-h-24" value={form.impact} onChange={(event) => setForm((prev) => ({ ...prev, impact: event.target.value }))} />
+            </div>
+            <div>
+              <label className="label">Mitigation</label>
+              <textarea className="input-base min-h-24" value={form.mitigation} onChange={(event) => setForm((prev) => ({ ...prev, mitigation: event.target.value }))} />
+            </div>
+          </>
+        ) : null}
+        {config.type === 'issue' ? (
+          <div>
+            <label className="label">Resolution Plan</label>
+            <textarea className="input-base min-h-24" value={form.resolution} onChange={(event) => setForm((prev) => ({ ...prev, resolution: event.target.value }))} />
+          </div>
+        ) : null}
+        <button type="button" className="btn-primary w-full" onClick={submit}>
+          {value ? `Save ${config.label}` : `Create ${config.label}`}
+        </button>
+      </div>
+    </Modal>
+  );
+};
 
 const ProjectCard = ({ project, onOpen, onEdit, onDelete }) => {
   const status = statusMeta[project.status] || statusMeta.planning;
@@ -178,6 +350,11 @@ const ProjectCard = ({ project, onOpen, onEdit, onDelete }) => {
       <p className="mt-3 text-sm leading-6 line-clamp-3" style={{ color: 'var(--c-text-muted)' }}>
         {project.description || 'No description yet.'}
       </p>
+      {(project.client?.name || project.client?.account) ? (
+        <p className="mt-2 text-xs font-bold uppercase tracking-[0.08em]" style={{ color: 'var(--c-text-faint)' }}>
+          {(project.client?.name || 'Internal project')}{project.client?.account ? ` · ${project.client.account}` : ''}
+        </p>
+      ) : null}
 
       <div className="mt-4">
         <div className="mb-2 flex items-center justify-between text-xs font-bold uppercase tracking-[0.08em]" style={{ color: 'var(--c-text-faint)' }}>
@@ -190,6 +367,8 @@ const ProjectCard = ({ project, onOpen, onEdit, onDelete }) => {
       <div className="mt-4 grid grid-cols-2 gap-3">
         <MiniStat label="Open" value={project.metrics?.openTasks || 0} tone="var(--c-warning)" />
         <MiniStat label="Overdue" value={project.metrics?.overdueTasks || 0} tone="var(--c-danger)" />
+        <MiniStat label="Risks" value={project.metrics?.openRisks || 0} tone="var(--brand-secondary)" />
+        <MiniStat label="Milestones" value={project.metrics?.milestones || 0} tone="var(--c-info)" />
       </div>
 
       <div className="mt-4 flex flex-wrap items-center gap-4 text-xs font-bold uppercase tracking-[0.08em]" style={{ color: 'var(--c-text-faint)' }}>
@@ -667,7 +846,24 @@ const ProjectTaskModal = ({ open, users, onSave, onClose }) => {
 };
 
 const ProjectModal = ({ open, project, users, onSave, onClose }) => {
-  const [form, setForm] = useState({ name: '', description: '', status: 'planning', priority: 'Medium', startDate: '', endDate: '', members: [], tagsText: '' });
+  const [form, setForm] = useState({
+    name: '',
+    description: '',
+    status: 'planning',
+    priority: 'Medium',
+    startDate: '',
+    endDate: '',
+    members: [],
+    tagsText: '',
+    clientName: '',
+    clientAccount: '',
+    clientContactName: '',
+    clientContactEmail: '',
+    budgetPlanned: '',
+    budgetActual: '',
+    budgetRevenueTarget: '',
+    budgetCurrency: 'NGN',
+  });
 
   useEffect(() => {
     setForm({
@@ -679,6 +875,14 @@ const ProjectModal = ({ open, project, users, onSave, onClose }) => {
       endDate: project?.endDate ? new Date(project.endDate).toISOString().split('T')[0] : '',
       members: project?.members?.map((member) => member._id || member) || [],
       tagsText: Array.isArray(project?.tags) ? project.tags.join(', ') : '',
+      clientName: project?.client?.name || '',
+      clientAccount: project?.client?.account || '',
+      clientContactName: project?.client?.contactName || '',
+      clientContactEmail: project?.client?.contactEmail || '',
+      budgetPlanned: project?.budget?.planned ?? '',
+      budgetActual: project?.budget?.actual ?? '',
+      budgetRevenueTarget: project?.budget?.revenueTarget ?? '',
+      budgetCurrency: project?.budget?.currency || 'NGN',
     });
   }, [project, open]);
 
@@ -728,6 +932,44 @@ const ProjectModal = ({ open, project, users, onSave, onClose }) => {
           <label className="label">Tags</label>
           <input className="input-base" value={form.tagsText} onChange={(event) => setForm((prev) => ({ ...prev, tagsText: event.target.value }))} placeholder="e.g. capital-project, due-diligence, treasury" />
         </div>
+        <div className="grid gap-4 md:grid-cols-2">
+          <div>
+            <label className="label">Client / Entity</label>
+            <input className="input-base" value={form.clientName} onChange={(event) => setForm((prev) => ({ ...prev, clientName: event.target.value }))} placeholder="e.g. FundCo AssetCo" />
+          </div>
+          <div>
+            <label className="label">Account / Workstream</label>
+            <input className="input-base" value={form.clientAccount} onChange={(event) => setForm((prev) => ({ ...prev, clientAccount: event.target.value }))} placeholder="e.g. Treasury transformation" />
+          </div>
+        </div>
+        <div className="grid gap-4 md:grid-cols-2">
+          <div>
+            <label className="label">Primary Contact</label>
+            <input className="input-base" value={form.clientContactName} onChange={(event) => setForm((prev) => ({ ...prev, clientContactName: event.target.value }))} />
+          </div>
+          <div>
+            <label className="label">Contact Email</label>
+            <input className="input-base" value={form.clientContactEmail} onChange={(event) => setForm((prev) => ({ ...prev, clientContactEmail: event.target.value }))} />
+          </div>
+        </div>
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <div>
+            <label className="label">Planned Budget</label>
+            <input type="number" min="0" className="input-base" value={form.budgetPlanned} onChange={(event) => setForm((prev) => ({ ...prev, budgetPlanned: event.target.value }))} />
+          </div>
+          <div>
+            <label className="label">Actual Spend</label>
+            <input type="number" min="0" className="input-base" value={form.budgetActual} onChange={(event) => setForm((prev) => ({ ...prev, budgetActual: event.target.value }))} />
+          </div>
+          <div>
+            <label className="label">Revenue Target</label>
+            <input type="number" min="0" className="input-base" value={form.budgetRevenueTarget} onChange={(event) => setForm((prev) => ({ ...prev, budgetRevenueTarget: event.target.value }))} />
+          </div>
+          <div>
+            <label className="label">Currency</label>
+            <input className="input-base" value={form.budgetCurrency} onChange={(event) => setForm((prev) => ({ ...prev, budgetCurrency: event.target.value.toUpperCase() }))} />
+          </div>
+        </div>
         <div>
           <label className="label">Members ({form.members.length} selected)</label>
           <div className="max-h-56 space-y-2 overflow-y-auto">
@@ -748,6 +990,18 @@ const ProjectModal = ({ open, project, users, onSave, onClose }) => {
             onSave({
               ...form,
               tags: form.tagsText.split(',').map((item) => item.trim()).filter(Boolean),
+              client: {
+                name: form.clientName,
+                account: form.clientAccount,
+                contactName: form.clientContactName,
+                contactEmail: form.clientContactEmail,
+              },
+              budget: {
+                planned: form.budgetPlanned,
+                actual: form.budgetActual,
+                revenueTarget: form.budgetRevenueTarget,
+                currency: form.budgetCurrency,
+              },
             });
           }}
         >
@@ -767,6 +1021,12 @@ const ProjectDashboard = ({ projectId, seedProject, users, onBack, onRefresh, on
   const [showMembers, setShowMembers] = useState(false);
   const [showGoalLink, setShowGoalLink] = useState(false);
   const [showGoalCreate, setShowGoalCreate] = useState(false);
+  const [showMilestoneModal, setShowMilestoneModal] = useState(false);
+  const [showRiskModal, setShowRiskModal] = useState(false);
+  const [showIssueModal, setShowIssueModal] = useState(false);
+  const [editingMilestone, setEditingMilestone] = useState(null);
+  const [editingRisk, setEditingRisk] = useState(null);
+  const [editingIssue, setEditingIssue] = useState(null);
   const [goalOptions, setGoalOptions] = useState([]);
   const [taskOptions, setTaskOptions] = useState([]);
   const [tab, setTab] = useState('overview');
@@ -803,6 +1063,10 @@ const ProjectDashboard = ({ projectId, seedProject, users, onBack, onRefresh, on
   const members = project.members || [];
   const tasks = project.tasks || [];
   const goals = project.goals || [];
+  const milestones = project.milestones || [];
+  const risks = project.risks || [];
+  const issues = project.issues || [];
+  const activity = project.activity || [];
   const linkedTaskIds = uniqueIds(tasks.map((task) => task._id));
   const linkedGoalIds = uniqueIds(goals.map((goal) => goal._id));
   const lanes = buildTaskLanes(tasks);
@@ -819,6 +1083,11 @@ const ProjectDashboard = ({ projectId, seedProject, users, onBack, onRefresh, on
 
   const timelineRows = [
     ...(project.startDate ? [{ label: 'Project start', date: project.startDate, tone: 'var(--brand-primary)' }] : []),
+    ...milestones.filter((milestone) => milestone.dueDate).map((milestone) => ({
+      label: `${milestone.status === 'completed' ? 'Milestone complete' : 'Milestone due'} · ${milestone.title}`,
+      date: milestone.dueDate,
+      tone: milestone.status === 'completed' ? 'var(--c-success)' : milestone.status === 'blocked' ? 'var(--c-danger)' : 'var(--brand-secondary)',
+    })),
     ...tasks.filter((task) => task.dueDate).map((task) => ({
       label: `${task.completed || task.submissionStatus === 'approved' ? 'Completed' : 'Due'} · ${task.title}`,
       date: task.dueDate,
@@ -826,6 +1095,9 @@ const ProjectDashboard = ({ projectId, seedProject, users, onBack, onRefresh, on
     })),
     ...(project.endDate ? [{ label: 'Project end', date: project.endDate, tone: 'var(--c-danger)' }] : []),
   ].sort((left, right) => new Date(left.date) - new Date(right.date));
+
+  const budget = project.budget || {};
+  const client = project.client || {};
 
   const createTaskForProject = async (taskForm) => {
     try {
@@ -912,11 +1184,103 @@ const ProjectDashboard = ({ projectId, seedProject, users, onBack, onRefresh, on
     }
   };
 
+  const saveMilestone = async (payload) => {
+    try {
+      if (editingMilestone?._id) {
+        await api.put(`/projects/${projectId}/milestones/${editingMilestone._id}`, payload);
+        toast.success('Milestone updated');
+      } else {
+        await api.post(`/projects/${projectId}/milestones`, payload);
+        toast.success('Milestone added');
+      }
+      setShowMilestoneModal(false);
+      setEditingMilestone(null);
+      fetchProject();
+      onRefresh?.();
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to save milestone');
+    }
+  };
+
+  const removeMilestone = async (milestone) => {
+    if (!confirm(`Remove milestone "${milestone.title}"?`)) return;
+    try {
+      await api.delete(`/projects/${projectId}/milestones/${milestone._id}`);
+      toast.success('Milestone removed');
+      fetchProject();
+      onRefresh?.();
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to remove milestone');
+    }
+  };
+
+  const saveRisk = async (payload) => {
+    try {
+      if (editingRisk?._id) {
+        await api.put(`/projects/${projectId}/risks/${editingRisk._id}`, payload);
+        toast.success('Risk updated');
+      } else {
+        await api.post(`/projects/${projectId}/risks`, payload);
+        toast.success('Risk logged');
+      }
+      setShowRiskModal(false);
+      setEditingRisk(null);
+      fetchProject();
+      onRefresh?.();
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to save risk');
+    }
+  };
+
+  const removeRisk = async (risk) => {
+    if (!confirm(`Remove risk "${risk.title}"?`)) return;
+    try {
+      await api.delete(`/projects/${projectId}/risks/${risk._id}`);
+      toast.success('Risk removed');
+      fetchProject();
+      onRefresh?.();
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to remove risk');
+    }
+  };
+
+  const saveIssue = async (payload) => {
+    try {
+      if (editingIssue?._id) {
+        await api.put(`/projects/${projectId}/issues/${editingIssue._id}`, payload);
+        toast.success('Issue updated');
+      } else {
+        await api.post(`/projects/${projectId}/issues`, payload);
+        toast.success('Issue logged');
+      }
+      setShowIssueModal(false);
+      setEditingIssue(null);
+      fetchProject();
+      onRefresh?.();
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to save issue');
+    }
+  };
+
+  const removeIssue = async (issue) => {
+    if (!confirm(`Remove issue "${issue.title}"?`)) return;
+    try {
+      await api.delete(`/projects/${projectId}/issues/${issue._id}`);
+      toast.success('Issue removed');
+      fetchProject();
+      onRefresh?.();
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to remove issue');
+    }
+  };
+
   const tabs = [
     { value: 'overview', label: 'Overview' },
     { value: 'workboard', label: 'Workboard' },
     { value: 'members', label: 'Members' },
     { value: 'goals', label: 'Goals' },
+    { value: 'controls', label: 'Controls' },
+    { value: 'activity', label: 'Activity' },
     { value: 'timeline', label: 'Timeline' },
   ];
 
@@ -945,17 +1309,18 @@ const ProjectDashboard = ({ projectId, seedProject, users, onBack, onRefresh, on
         }
       />
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
         <MiniStat label="Completion" value={`${project.metrics?.completion || 0}%`} tone="var(--brand-primary)" />
         <MiniStat label="Open Tasks" value={project.metrics?.openTasks || 0} tone="var(--c-warning)" />
         <MiniStat label="In Review" value={lanes.review.length} tone="var(--c-info)" />
         <MiniStat label="Goals" value={goals.length} tone="var(--c-success)" />
+        <MiniStat label="Milestones" value={project.metrics?.milestones || 0} tone="var(--brand-secondary)" />
         <MiniStat label="Members" value={project.metrics?.members || 0} tone="var(--c-info)" />
       </div>
 
       <InfoStrip
         title={`Health: ${(healthMeta[project.health] || healthMeta['on-track']).label}`}
-        description={`Lead owner: ${MemberIdentity(project.createdBy || {})} · Deadline ${formatShortDate(project.metrics?.endDate || project.endDate)} · ${project.metrics?.overdueTasks || 0} overdue tasks`}
+        description={`Lead owner: ${MemberIdentity(project.createdBy || {})} · Deadline ${formatShortDate(project.metrics?.endDate || project.endDate)} · ${project.metrics?.overdueTasks || 0} overdue tasks · ${project.metrics?.openRisks || 0} open risks · ${project.metrics?.openIssues || 0} open issues`}
         tone={projectTone(project)}
         actions={
           <>
@@ -967,6 +1332,9 @@ const ProjectDashboard = ({ projectId, seedProject, users, onBack, onRefresh, on
             </button>
             <button type="button" className="btn-primary" onClick={() => setShowGoalCreate(true)}>
               <Plus className="h-4 w-4" /> New Goal
+            </button>
+            <button type="button" className="btn-secondary" onClick={() => { setEditingMilestone(null); setShowMilestoneModal(true); }}>
+              <Flag className="h-4 w-4" /> Add Milestone
             </button>
           </>
         }
@@ -1022,11 +1390,24 @@ const ProjectDashboard = ({ projectId, seedProject, users, onBack, onRefresh, on
                   )}
                 </div>
               </Panel>
-              <Panel title="Project goals" subtitle={`${goals.length} linked goal${goals.length === 1 ? '' : 's'}`}>
+              <Panel title="Commercial context" subtitle="Client and budget position">
                 <div className="space-y-3">
-                  {goals.length ? goals.slice(0, 4).map((goal) => <GoalCard key={goal._id} goal={goal} />) : (
-                    <EmptyState icon={Target} title="No goals linked" description="Create or link goals to align the project with measurable outcomes." />
-                  )}
+                  <div className="rounded-[0.85rem] border p-4" style={{ borderColor: 'var(--c-border)', background: 'var(--c-panel-subtle)' }}>
+                    <p className="section-title">Client / Entity</p>
+                    <p className="mt-2 font-black" style={{ color: 'var(--c-text)' }}>{client.name || 'Internal project'}</p>
+                    <p className="mt-1 text-sm" style={{ color: 'var(--c-text-muted)' }}>{client.account || 'No account stream set'}</p>
+                    {(client.contactName || client.contactEmail) ? (
+                      <p className="mt-2 text-sm" style={{ color: 'var(--c-text-soft)' }}>
+                        {client.contactName || 'No contact'} {client.contactEmail ? `· ${client.contactEmail}` : ''}
+                      </p>
+                    ) : null}
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <MiniStat label="Planned" value={formatCurrency(budget.planned, budget.currency)} tone="var(--brand-primary)" />
+                    <MiniStat label="Actual" value={formatCurrency(budget.actual, budget.currency)} tone="var(--c-warning)" />
+                    <MiniStat label="Revenue" value={formatCurrency(budget.revenueTarget, budget.currency)} tone="var(--c-success)" />
+                    <MiniStat label="Variance" value={formatCurrency((Number(budget.actual || 0) - Number(budget.planned || 0)), budget.currency)} tone={Number(budget.actual || 0) > Number(budget.planned || 0) ? 'var(--c-danger)' : 'var(--brand-secondary)'} />
+                  </div>
                 </div>
               </Panel>
             </div>
@@ -1081,6 +1462,120 @@ const ProjectDashboard = ({ projectId, seedProject, users, onBack, onRefresh, on
           </div>
         ) : null}
 
+        {!loading && !loadError && tab === 'controls' ? (
+          <div className="space-y-4">
+            <div className="grid gap-4 xl:grid-cols-[1.1fr,0.9fr]">
+              <Panel title="Milestones" subtitle={`${milestones.length} tracked milestone${milestones.length === 1 ? '' : 's'}`} action={<button type="button" className="btn-secondary" onClick={() => { setEditingMilestone(null); setShowMilestoneModal(true); }}><Plus className="h-4 w-4" /> Add Milestone</button>}>
+                <div className="space-y-3">
+                  {milestones.length ? milestones.map((milestone) => (
+                    <div key={milestone._id} className="rounded-[0.85rem] border p-4" style={{ borderColor: 'var(--c-border)', background: 'var(--c-panel-subtle)' }}>
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <StatusPill tone={(milestoneStatusMeta[milestone.status] || milestoneStatusMeta.planned).tone}>
+                              {(milestoneStatusMeta[milestone.status] || milestoneStatusMeta.planned).label}
+                            </StatusPill>
+                            {milestone.dueDate ? <StatusPill tone={new Date(milestone.dueDate) < new Date() && milestone.status !== 'completed' ? 'danger' : 'neutral'}>{formatShortDate(milestone.dueDate)}</StatusPill> : null}
+                          </div>
+                          <p className="mt-2 font-black" style={{ color: 'var(--c-text)' }}>{milestone.title}</p>
+                          <p className="mt-1 text-sm" style={{ color: 'var(--c-text-muted)' }}>{milestone.description || 'No description provided.'}</p>
+                          <p className="mt-2 text-xs" style={{ color: 'var(--c-text-faint)' }}>{MemberIdentity(milestone.owner || {})}</p>
+                          {milestone.notes ? <p className="mt-2 text-sm" style={{ color: 'var(--c-text-soft)' }}>{milestone.notes}</p> : null}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button type="button" className="btn-ghost h-9 w-9 rounded-[0.7rem] p-0" onClick={() => { setEditingMilestone(milestone); setShowMilestoneModal(true); }}><Edit2 className="h-4 w-4" /></button>
+                          <button type="button" className="btn-danger h-9 w-9 rounded-[0.7rem] p-0" onClick={() => removeMilestone(milestone)}><Trash2 className="h-4 w-4" /></button>
+                        </div>
+                      </div>
+                    </div>
+                  )) : <EmptyState icon={Flag} title="No milestones" description="Add delivery checkpoints so progress can be reviewed at the right level." />}
+                </div>
+              </Panel>
+
+              <Panel title="Project goals" subtitle={`${goals.length} linked goal${goals.length === 1 ? '' : 's'}`} action={<button type="button" className="btn-secondary" onClick={() => setShowGoalLink(true)}><Link2 className="h-4 w-4" /> Manage Goals</button>}>
+                <div className="space-y-3">
+                  {goals.length ? goals.map((goal) => <GoalCard key={goal._id} goal={goal} onUnlink={unlinkGoal} />) : (
+                    <EmptyState icon={Target} title="No goals linked" description="Link goals so the project can be measured against clear outcomes." />
+                  )}
+                </div>
+              </Panel>
+            </div>
+
+            <div className="grid gap-4 xl:grid-cols-2">
+              <Panel title="Risk register" subtitle={`${risks.filter((item) => item.status !== 'closed').length} open risk${risks.filter((item) => item.status !== 'closed').length === 1 ? '' : 's'}`} action={<button type="button" className="btn-secondary" onClick={() => { setEditingRisk(null); setShowRiskModal(true); }}><Plus className="h-4 w-4" /> Add Risk</button>}>
+                <div className="space-y-3">
+                  {risks.length ? risks.map((risk) => (
+                    <div key={risk._id} className="rounded-[0.85rem] border p-4" style={{ borderColor: 'var(--c-border)', background: 'var(--c-panel-subtle)' }}>
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <StatusPill tone={(severityMeta[risk.severity] || severityMeta.medium).tone}>{(severityMeta[risk.severity] || severityMeta.medium).label}</StatusPill>
+                            <StatusPill tone={(riskStatusMeta[risk.status] || riskStatusMeta.open).tone}>{(riskStatusMeta[risk.status] || riskStatusMeta.open).label}</StatusPill>
+                          </div>
+                          <p className="mt-2 font-black" style={{ color: 'var(--c-text)' }}>{risk.title}</p>
+                          <p className="mt-1 text-sm" style={{ color: 'var(--c-text-muted)' }}>{risk.description || 'No description provided.'}</p>
+                          <p className="mt-2 text-xs" style={{ color: 'var(--c-text-faint)' }}>{MemberIdentity(risk.owner || {})} {risk.dueDate ? `· due ${formatShortDate(risk.dueDate)}` : ''}</p>
+                          {risk.impact ? <p className="mt-2 text-sm" style={{ color: 'var(--c-text-soft)' }}><strong>Impact:</strong> {risk.impact}</p> : null}
+                          {risk.mitigation ? <p className="mt-1 text-sm" style={{ color: 'var(--c-text-soft)' }}><strong>Mitigation:</strong> {risk.mitigation}</p> : null}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button type="button" className="btn-ghost h-9 w-9 rounded-[0.7rem] p-0" onClick={() => { setEditingRisk(risk); setShowRiskModal(true); }}><Edit2 className="h-4 w-4" /></button>
+                          <button type="button" className="btn-danger h-9 w-9 rounded-[0.7rem] p-0" onClick={() => removeRisk(risk)}><Trash2 className="h-4 w-4" /></button>
+                        </div>
+                      </div>
+                    </div>
+                  )) : <EmptyState icon={ShieldAlert} title="No risks logged" description="Track risks formally so delivery pressure is visible before it becomes failure." />}
+                </div>
+              </Panel>
+
+              <Panel title="Issue tracker" subtitle={`${issues.filter((item) => item.status !== 'resolved').length} open issue${issues.filter((item) => item.status !== 'resolved').length === 1 ? '' : 's'}`} action={<button type="button" className="btn-secondary" onClick={() => { setEditingIssue(null); setShowIssueModal(true); }}><Plus className="h-4 w-4" /> Add Issue</button>}>
+                <div className="space-y-3">
+                  {issues.length ? issues.map((issue) => (
+                    <div key={issue._id} className="rounded-[0.85rem] border p-4" style={{ borderColor: 'var(--c-border)', background: 'var(--c-panel-subtle)' }}>
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <StatusPill tone={(severityMeta[issue.severity] || severityMeta.medium).tone}>{(severityMeta[issue.severity] || severityMeta.medium).label}</StatusPill>
+                            <StatusPill tone={(issueStatusMeta[issue.status] || issueStatusMeta.open).tone}>{(issueStatusMeta[issue.status] || issueStatusMeta.open).label}</StatusPill>
+                          </div>
+                          <p className="mt-2 font-black" style={{ color: 'var(--c-text)' }}>{issue.title}</p>
+                          <p className="mt-1 text-sm" style={{ color: 'var(--c-text-muted)' }}>{issue.description || 'No description provided.'}</p>
+                          <p className="mt-2 text-xs" style={{ color: 'var(--c-text-faint)' }}>{MemberIdentity(issue.owner || {})} {issue.dueDate ? `· due ${formatShortDate(issue.dueDate)}` : ''}</p>
+                          {issue.resolution ? <p className="mt-2 text-sm" style={{ color: 'var(--c-text-soft)' }}><strong>Resolution:</strong> {issue.resolution}</p> : null}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button type="button" className="btn-ghost h-9 w-9 rounded-[0.7rem] p-0" onClick={() => { setEditingIssue(issue); setShowIssueModal(true); }}><Edit2 className="h-4 w-4" /></button>
+                          <button type="button" className="btn-danger h-9 w-9 rounded-[0.7rem] p-0" onClick={() => removeIssue(issue)}><Trash2 className="h-4 w-4" /></button>
+                        </div>
+                      </div>
+                    </div>
+                  )) : <EmptyState icon={AlertTriangle} title="No issues logged" description="Track blockers formally so the escalation path is visible and owned." />}
+                </div>
+              </Panel>
+            </div>
+          </div>
+        ) : null}
+
+        {!loading && !loadError && tab === 'activity' ? (
+          <div className="space-y-3">
+            {activity.length ? activity.map((item) => (
+              <div key={item._id} className="flex items-start gap-3 rounded-[0.85rem] border p-4" style={{ borderColor: 'var(--c-border)', background: 'var(--c-panel-subtle)' }}>
+                <div className="mt-1 flex h-8 w-8 items-center justify-center rounded-full" style={{ background: 'var(--brand-primary-soft)', color: 'var(--brand-primary)' }}>
+                  <Calendar className="h-4 w-4" />
+                </div>
+                <div className="min-w-0">
+                  <p className="font-black" style={{ color: 'var(--c-text)' }}>{item.message}</p>
+                  <p className="mt-1 text-sm" style={{ color: 'var(--c-text-muted)' }}>
+                    {item.actorName || MemberIdentity(item.actor || {})} · {formatTaskMoment(item.createdAt)}
+                  </p>
+                </div>
+              </div>
+            )) : (
+              <EmptyState icon={Calendar} title="No activity recorded yet" description="Project decisions, control updates, and delivery changes will appear here." />
+            )}
+          </div>
+        ) : null}
+
         {!loading && !loadError && tab === 'timeline' ? (
           <div className="space-y-3">
             {timelineRows.length ? timelineRows.map((row, index) => (
@@ -1103,6 +1598,46 @@ const ProjectDashboard = ({ projectId, seedProject, users, onBack, onRefresh, on
       <ProjectMembersModal open={showMembers} users={users} value={members.map((member) => member._id)} onSave={saveMembers} onClose={() => setShowMembers(false)} />
       <GoalLinkModal open={showGoalLink} goals={goalOptions} linkedGoalIds={linkedGoalIds} onSave={saveLinkedGoals} onClose={() => setShowGoalLink(false)} />
       <ProjectGoalCreateModal open={showGoalCreate} members={members.length ? members : users} tasks={tasks} onSave={createGoalForProject} onClose={() => setShowGoalCreate(false)} />
+      <ProjectControlModal
+        open={showMilestoneModal}
+        title={editingMilestone ? 'Edit Milestone' : 'Add Milestone'}
+        subtitle="Track delivery checkpoints that leadership can review directly."
+        config={{ type: 'milestone', label: 'Milestone', statusOptions: Object.entries(milestoneStatusMeta).map(([value, meta]) => ({ value, label: meta.label })) }}
+        members={members.length ? members : users}
+        value={editingMilestone}
+        onSave={saveMilestone}
+        onClose={() => { setShowMilestoneModal(false); setEditingMilestone(null); }}
+      />
+      <ProjectControlModal
+        open={showRiskModal}
+        title={editingRisk ? 'Edit Risk' : 'Add Risk'}
+        subtitle="Track delivery threats before they become operational failures."
+        config={{
+          type: 'risk',
+          label: 'Risk',
+          statusOptions: Object.entries(riskStatusMeta).map(([value, meta]) => ({ value, label: meta.label })),
+          severityOptions: Object.entries(severityMeta).map(([value, meta]) => ({ value, label: meta.label })),
+        }}
+        members={members.length ? members : users}
+        value={editingRisk}
+        onSave={saveRisk}
+        onClose={() => { setShowRiskModal(false); setEditingRisk(null); }}
+      />
+      <ProjectControlModal
+        open={showIssueModal}
+        title={editingIssue ? 'Edit Issue' : 'Add Issue'}
+        subtitle="Track blockers, ownership, and resolution paths in one place."
+        config={{
+          type: 'issue',
+          label: 'Issue',
+          statusOptions: Object.entries(issueStatusMeta).map(([value, meta]) => ({ value, label: meta.label })),
+          severityOptions: Object.entries(severityMeta).map(([value, meta]) => ({ value, label: meta.label })),
+        }}
+        members={members.length ? members : users}
+        value={editingIssue}
+        onSave={saveIssue}
+        onClose={() => { setShowIssueModal(false); setEditingIssue(null); }}
+      />
     </div>
   );
 };
@@ -1112,7 +1647,7 @@ const Projects = () => {
   const { projectId = '' } = useParams();
   const { markTypeRead } = useNotifications();
   const [projects, setProjects] = useState([]);
-  const [summary, setSummary] = useState({ total: 0, active: 0, atRisk: 0, overdueTasks: 0, members: 0 });
+  const [summary, setSummary] = useState({ total: 0, active: 0, atRisk: 0, overdueTasks: 0, members: 0, openRisks: 0, overdueMilestones: 0 });
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -1137,7 +1672,7 @@ const Projects = () => {
       ]);
 
       setProjects(projectRes.data.projects || []);
-      setSummary(projectRes.data.summary || { total: 0, active: 0, atRisk: 0, overdueTasks: 0, members: 0 });
+      setSummary(projectRes.data.summary || { total: 0, active: 0, atRisk: 0, overdueTasks: 0, members: 0, openRisks: 0, overdueMilestones: 0 });
       setUsers(userRes.data.users || []);
     } catch (error) {
       toast.error(error.response?.data?.message || 'Failed to load projects');
@@ -1190,6 +1725,8 @@ const Projects = () => {
         endDate: form.endDate || undefined,
         members: form.members,
         tags: form.tags || [],
+        client: form.client,
+        budget: form.budget,
       };
       if (editProject) {
         await api.put(`/projects/${editProject._id}`, payload);
@@ -1276,11 +1813,12 @@ const Projects = () => {
         }
       />
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
         <MiniStat label="Projects" value={summary.total || 0} tone="var(--brand-primary)" />
         <MiniStat label="Active" value={summary.active || 0} tone="var(--c-success)" />
         <MiniStat label="At Risk" value={summary.atRisk || 0} tone="var(--c-danger)" />
         <MiniStat label="Overdue Tasks" value={summary.overdueTasks || 0} tone="var(--c-warning)" />
+        <MiniStat label="Open Risks" value={summary.openRisks || 0} tone="var(--brand-secondary)" />
         <MiniStat label="Members Engaged" value={summary.members || 0} tone="var(--c-info)" />
       </div>
 

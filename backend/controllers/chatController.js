@@ -19,8 +19,9 @@ const getFullName = (user) => {
     return user.name?.trim() || 'Unknown User';
 };
 
-const getMessagePreview = ({ content, fileName, fileUrl }) => {
+const getMessagePreview = ({ content, fileName, fileUrl, stickerLabel }) => {
     if (content) return String(content).trim().slice(0, 140);
+    if (stickerLabel) return `Sent a sticker: ${String(stickerLabel).trim().slice(0, 60)}`;
     if (fileName) return `Sent ${fileName}`;
     if (fileUrl) return 'Sent an attachment';
     return 'Sent a message';
@@ -261,7 +262,7 @@ export const getChatMessages = async (req, res) => {
         const [chat, messages, totalMessages] = await Promise.all([
             Chat.findOne({ _id: chatId, members: req.user._id }).select('_id').lean(),
             Message.find(msgQuery)
-                .select('_id chatId sender content fileUrl fileName contentType createdAt isDeleted isEdited reactions replyTo readBy mentions')
+                .select('_id chatId sender content fileUrl fileName contentType stickerKey stickerLabel createdAt isDeleted isEdited reactions replyTo readBy mentions')
                 .populate('sender', 'firstName lastName otherName avatar')
                 .populate('mentions.user', 'firstName lastName otherName avatar')
                 .sort({ createdAt: -1 })
@@ -294,13 +295,15 @@ export const getChatMessages = async (req, res) => {
 // Send message (real-time fixed)
 export const sendMessage = async (req, res) => {
     const { chatId } = req.params;
-    const { content, fileUrl, contentType, fileName, replyTo, mentions = [] } = req.body;
+    const { content, fileUrl, contentType, fileName, replyTo, mentions = [], stickerKey = '', stickerLabel = '' } = req.body;
     if (!mongoose.isValidObjectId(chatId)) {
         return res.status(400).json({ success: false, message: 'Invalid chat ID' });
     }
-    if (!content && !fileUrl) {
+    if (!content && !fileUrl && !stickerKey) {
         return res.status(400).json({ success: false, message: 'Message content or file required' });
     }
+    const sanitizedStickerKey = sanitizeHtml(String(stickerKey || ''), { allowedTags: [], allowedAttributes: {} }).trim();
+    const sanitizedStickerLabel = sanitizeHtml(String(stickerLabel || ''), { allowedTags: [], allowedAttributes: {} }).trim();
     const sanitizedContent = content ? sanitizeHtml(content, { allowedTags: [], allowedAttributes: {} }) : '';
     if (sanitizedContent && !validator.isLength(sanitizedContent, { min: 1, max: 1000 })) {
         return res.status(400).json({ success: false, message: 'Message content must be between 1 and 1000 characters' });
@@ -328,8 +331,10 @@ export const sendMessage = async (req, res) => {
                 sender: req.user._id,
                 content: sanitizedContent,
                 fileUrl,
-                contentType,
+                contentType: sanitizedStickerKey ? 'sticker' : contentType,
                 fileName,
+                stickerKey: sanitizedStickerKey,
+                stickerLabel: sanitizedStickerLabel,
                 mentions: resolvedMentions,
                 replyTo: replyTo ? await (async () => {
                     if (!mongoose.isValidObjectId(replyTo)) return null;
@@ -344,6 +349,7 @@ export const sendMessage = async (req, res) => {
                         sender: original.sender?._id,
                         contentType: original.contentType,
                         fileUrl: original.fileUrl,
+                        stickerLabel: original.stickerLabel,
                     };
                 })() : null,
             }),
@@ -372,9 +378,13 @@ export const sendMessage = async (req, res) => {
             fileUrl: message.fileUrl,
             fileName: message.fileName,
             contentType: message.contentType,
+            stickerKey: message.stickerKey,
+            stickerLabel: message.stickerLabel,
             mentions: populatedMentions,
             isDeleted: false,
             isEdited: false,
+            reactions: message.reactions || [],
+            readBy: message.readBy || [],
             createdAt: message.createdAt,
             updatedAt: message.updatedAt,
             replyTo: message.replyTo,
@@ -401,7 +411,7 @@ export const sendMessage = async (req, res) => {
             $set: { updatedAt: now, ...unreadIncrements },
         }).catch((error) => console.error('Chat update error:', error.message));
 
-        const preview = getMessagePreview({ content: sanitizedContent, fileName, fileUrl });
+        const preview = getMessagePreview({ content: sanitizedContent, fileName, fileUrl, stickerLabel: sanitizedStickerLabel });
         if (chat.type === 'individual') {
             const recipientId = chat.members.find((memberId) => String(memberId) !== String(req.user._id));
             if (recipientId) {
@@ -557,6 +567,8 @@ export const deleteMessage = async (req, res) => {
         message.fileUrl = null;
         message.fileName = null;
         message.contentType = '';
+        message.stickerKey = '';
+        message.stickerLabel = '';
         message.reactions = [];
         await message.save();
 
@@ -854,6 +866,8 @@ export const getInitialData = async (req, res) => {
                     messageId: { $first: '$_id' },
                     content: { $first: '$content' },
                     contentType: { $first: '$contentType' },
+                    stickerKey: { $first: '$stickerKey' },
+                    stickerLabel: { $first: '$stickerLabel' },
                     fileUrl: { $first: '$fileUrl' },
                     isDeleted: { $first: '$isDeleted' },
                     createdAt: { $first: '$createdAt' },
@@ -884,6 +898,8 @@ export const getInitialData = async (req, res) => {
                 chatId: doc._id,
                 content: doc.content,
                 contentType: doc.contentType,
+                stickerKey: doc.stickerKey,
+                stickerLabel: doc.stickerLabel,
                 fileUrl: doc.fileUrl,
                 isDeleted: doc.isDeleted,
                 createdAt: doc.createdAt,
@@ -1060,6 +1076,8 @@ export const forwardMessage = async (req, res) => {
                     fileUrl: original.fileUrl,
                     fileName: original.fileName,
                     contentType: original.contentType,
+                    stickerKey: original.stickerKey,
+                    stickerLabel: original.stickerLabel,
                     forwardedFrom: {
                         messageId: original._id,
                         senderName,
