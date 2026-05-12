@@ -92,6 +92,27 @@ const isRefreshSessionExpired = () => {
   return Number.isFinite(expiresAt) && expiresAt <= Date.now();
 };
 
+const isTerminalRefreshError = (error) => {
+  const status = Number(error?.response?.status || 0);
+  if (status === 401 || status === 403) return true;
+
+  const message = String(
+    error?.response?.data?.message
+    || error?.message
+    || ''
+  ).toLowerCase();
+
+  return [
+    'refresh token missing',
+    'refresh token invalid',
+    'refresh token expired',
+    'refresh token reuse detected',
+    'unable to refresh session',
+    'account inactive',
+    'admin access denied',
+  ].some((fragment) => message.includes(fragment));
+};
+
 export const storeUserSession = ({ token, user, accessTokenExpiresInSeconds, refreshSessionExpiresAt, rememberMe }) => {
   if (token) localStorage.setItem(TOKEN_KEY, token);
   if (user?.id) localStorage.setItem(USER_ID_KEY, user.id);
@@ -142,7 +163,9 @@ export const refreshUserAccessToken = async () => {
     });
     return data;
   }).catch((error) => {
-    clearUserSession();
+    if (isTerminalRefreshError(error)) {
+      clearUserSession();
+    }
     throw error;
   }).finally(() => {
     refreshPromise = null;
@@ -152,19 +175,23 @@ export const refreshUserAccessToken = async () => {
 };
 
 export const bootstrapUserSession = async () => {
+  const hasLocalSession = Boolean(getAccessToken() && readStoredUser());
+
   if (isRefreshSessionExpired()) {
     clearUserSession();
     return false;
   }
-  if (getAccessToken() && readStoredUser()) {
+
+  if (hasLocalSession) {
     if (!isAccessTokenStale()) return true;
     try {
       await refreshUserAccessToken();
       return true;
-    } catch {
-      return false;
+    } catch (error) {
+      return !isTerminalRefreshError(error);
     }
   }
+
   try {
     await refreshUserAccessToken();
     return true;
@@ -233,8 +260,7 @@ export const installUserAxiosAuth = () => {
         originalRequest.withCredentials = true;
         return axios(originalRequest);
       } catch (refreshError) {
-        clearUserSession();
-        throw refreshError;
+        throw isTerminalRefreshError(refreshError) ? refreshError : error;
       }
     }
   );

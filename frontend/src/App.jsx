@@ -36,7 +36,6 @@ import { NotificationProvider } from './context/NotificationContext.jsx';
 import {
   bootstrapUserSession,
   logoutUserSession,
-  refreshUserAccessToken,
   readStoredUser,
   userAuthEvents,
 } from './security/authClient.js';
@@ -91,13 +90,9 @@ const App = () => {
       if (!currentUser && !hasKnownUserSession()) return;
 
       try {
-        await refreshUserAccessToken();
+        await bootstrapUserSession();
       } catch {
-        try {
-          await bootstrapUserSession();
-        } catch {
-          // bootstrapUserSession already normalizes local state when recovery fails
-        }
+        // bootstrapUserSession already normalizes local state when recovery fails
       } finally {
         syncFromStorage();
       }
@@ -109,7 +104,7 @@ const App = () => {
       resumeTimeoutId = window.setTimeout(refreshSession, 180);
     };
 
-    const intervalId = window.setInterval(refreshSession, 4 * 60 * 1000);
+    const intervalId = window.setInterval(refreshSession, 10 * 60 * 1000);
     const handleVisible = () => {
       if (document.visibilityState === 'visible') {
         scheduleRefresh();

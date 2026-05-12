@@ -1,5 +1,5 @@
-// src/pages/AiTools.jsx
-// FundCo AI — Complete rebuild: clean layout, working streaming, task context, history
+﻿// src/pages/AiTools.jsx
+// FundCo AI â€” Complete rebuild: clean layout, working streaming, task context, history
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -18,10 +18,11 @@ import {
 } from 'lucide-react';
 import { format } from 'date-fns';
 
-const API = import.meta.env.VITE_API_URL;
+const API = import.meta.env.VITE_API_URL || 'http://127.0.0.1:4001';
 const authHeaders = () => ({ Authorization: `Bearer ${localStorage.getItem('token')}` });
+const WORKSPACE_SCOPE = 'user';
 
-// ── Tool catalog ──────────────────────────────────────────────────────────────
+// â”€â”€ Tool catalog â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const CATEGORIES = [
   {
     id: 'general', label: 'General', icon: Brain, color: '#312783',
@@ -43,7 +44,7 @@ const CATEGORIES = [
       { id:'mini-grid-planner',       name:'Mini-Grid Planner',       icon:Zap,        desc:'Plan solar mini-grids' },
       { id:'lcoe-calculator',         name:'LCOE Calculator',         icon:Calculator, desc:'Calculate energy costs' },
       { id:'ppa-drafter',             name:'PPA Drafter',             icon:FileText,   desc:'Draft power agreements' },
-      { id:'carbon-credit-estimator', name:'Carbon Credits',          icon:Leaf,       desc:'Estimate CO₂ credits' },
+      { id:'carbon-credit-estimator', name:'Carbon Credits',          icon:Leaf,       desc:'Estimate CO2 credits' },
       { id:'procurement-advisor',     name:'Procurement Advisor',     icon:Globe,      desc:'Supplier & RFQ guidance' },
       { id:'boq-generator',           name:'BoQ Generator',           icon:List,       desc:'Bill of Quantities' },
     ],
@@ -82,7 +83,7 @@ const CATEGORIES = [
   },
 ];
 
-// Flat tool lookup — legacy aliases keep old history entries readable
+// Flat tool lookup â€” legacy aliases keep old history entries readable
 const ALL_TOOLS   = CATEGORIES.flatMap(c => c.tools.map(t => ({ ...t, categoryId: c.id, categoryColor: c.color })));
 const TOOL_MAP    = Object.fromEntries(ALL_TOOLS.map(t => [t.id, t]));
 // Legacy aliases: old routes set toolId differently (e.g. 'general-ai' not 'general')
@@ -112,7 +113,7 @@ const LEGACY_NAMES = {
 Object.entries(LEGACY_NAMES).forEach(([id, name]) => {
   if (!TOOL_MAP[id]) TOOL_MAP[id] = { id, name };
 });
-// All tool IDs belonging to this section — scopes history queries.
+// All tool IDs belonging to this section â€” scopes history queries.
 // Also includes legacy IDs from the old route system (toolId was set
 // differently before the rebuild) so existing history is not lost.
 const LEGACY_TOOL_IDS = ['general-ai', 'general', 'report-generator', 'task-prioritizer',
@@ -135,8 +136,160 @@ const LEGACY_TOOL_IDS = ['general-ai', 'general', 'report-generator', 'task-prio
   'training-simulator', 'oem-selector',
 ];
 const AI_TOOL_IDS = [...new Set([...ALL_TOOLS.map(t => t.id), ...LEGACY_TOOL_IDS])];
+const AI_TOOLS_SESSION_KEY = 'fundco-ai-tools-session-v1';
 
-// ── Helper: stream SSE ────────────────────────────────────────────────────────
+const readAiToolsSession = () => {
+  try {
+    const raw = localStorage.getItem(AI_TOOLS_SESSION_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+};
+
+const writeAiToolsSession = (value) => {
+  try {
+    localStorage.setItem(AI_TOOLS_SESSION_KEY, JSON.stringify(value));
+  } catch {
+    // ignore local persistence failures
+  }
+};
+
+const buildConversationCacheKey = (workspace, userId) =>
+  `fundco-ai-history-${workspace}-${userId || 'anonymous'}`;
+
+const readConversationCache = (cacheKey) => {
+  if (!cacheKey) return [];
+  try {
+    const raw = localStorage.getItem(cacheKey);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+};
+
+const writeConversationCache = (cacheKey, records) => {
+  if (!cacheKey) return;
+  try {
+    localStorage.setItem(cacheKey, JSON.stringify(records));
+  } catch {
+    // ignore local persistence failures
+  }
+};
+
+const LOCAL_CHAT_PREFIX = 'local-';
+
+const createLocalConversationId = () =>
+  `${LOCAL_CHAT_PREFIX}${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+const isLocalConversationId = (value) =>
+  typeof value === 'string' && value.startsWith(LOCAL_CHAT_PREFIX);
+
+const getServerConversationId = (chat) => {
+  const candidates = [chat?.serverId, chat?.chatId, chat?._id];
+  return candidates.find((value) => value && !isLocalConversationId(value)) || null;
+};
+
+const getLocalConversationId = (chat) => {
+  const candidates = [chat?.localId, chat?._id, chat?.chatId];
+  return candidates.find((value) => value && isLocalConversationId(value)) || null;
+};
+
+const getConversationId = (chat) =>
+  getServerConversationId(chat) || getLocalConversationId(chat) || null;
+
+const normaliseConversationRecord = (chat) => {
+  if (!chat) return null;
+  const serverId = getServerConversationId(chat);
+  const localId = getLocalConversationId(chat) || chat?.localId || null;
+  const resolvedId = serverId || localId || chat?._id || chat?.chatId || null;
+  if (!resolvedId) return null;
+  return {
+    ...chat,
+    _id: resolvedId,
+    chatId: serverId || null,
+    serverId: serverId || null,
+    localId: localId || (serverId ? null : resolvedId),
+    localOnly: !serverId,
+    updatedAt: chat.updatedAt || new Date().toISOString(),
+    messageCount: Number(chat.messageCount || chat.messages?.length || 0),
+    messages: Array.isArray(chat.messages) ? chat.messages : chat.messages === undefined ? undefined : [],
+  };
+};
+
+const sameConversation = (left, right) => {
+  const a = normaliseConversationRecord(left);
+  const b = normaliseConversationRecord(right);
+  if (!a || !b) return false;
+  if (a.serverId && b.serverId) return a.serverId === b.serverId;
+  if (a.localId && b.localId) return a.localId === b.localId;
+  if (a.serverId && b._id) return a.serverId === b._id;
+  if (b.serverId && a._id) return b.serverId === a._id;
+  return a._id === b._id;
+};
+
+const buildConversationTitle = (input, fallback = 'FundCo AI Chat') => {
+  const cleaned = String(input || '').replace(/\s+/g, ' ').trim();
+  if (!cleaned) return fallback;
+  const firstSentence = cleaned.split(/[.!?]/)[0].trim();
+  const short = (firstSentence || cleaned).slice(0, 52).trim();
+  return short.length < cleaned.length ? `${short}...` : short;
+};
+
+const mergeConversationLists = (serverChats = [], localChats = []) => {
+  const merged = [];
+  [...localChats, ...serverChats].forEach((rawChat) => {
+    const chat = normaliseConversationRecord(rawChat);
+    if (!chat) return;
+    const existingIndex = merged.findIndex((entry) => sameConversation(entry, chat));
+    if (existingIndex === -1) {
+      merged.push(chat);
+      return;
+    }
+    const previous = merged[existingIndex];
+    merged[existingIndex] = normaliseConversationRecord({
+      ...previous,
+      ...chat,
+      _id: chat.serverId || previous.serverId || previous._id || chat._id,
+      serverId: chat.serverId || previous.serverId || null,
+      localId: previous.localId || chat.localId || null,
+      localOnly: !(chat.serverId || previous.serverId),
+      updatedAt: chat.updatedAt || previous.updatedAt || new Date().toISOString(),
+      messages: Array.isArray(chat.messages) ? chat.messages : previous.messages,
+    });
+  });
+  return merged.sort((a, b) => new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0));
+};
+
+const upsertConversationRecord = (records, incoming) => {
+  const normalizedIncoming = normaliseConversationRecord(incoming);
+  if (!normalizedIncoming) return records;
+  return mergeConversationLists([normalizedIncoming], records);
+};
+
+const formatToolLabel = (toolId) => String(toolId || '')
+  .split(/[-_]/)
+  .filter(Boolean)
+  .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+  .join(' ');
+
+const getToolWithCategory = (toolId) => {
+  const matchedTool = ALL_TOOLS.find((tool) => tool.id === toolId) || TOOL_MAP[toolId] || {
+    id: toolId || ALL_TOOLS[0]?.id || 'general',
+    name: LEGACY_NAMES[toolId] || formatToolLabel(toolId) || ALL_TOOLS[0]?.name || 'FundCo AI',
+    icon: Brain,
+    desc: 'AI conversation',
+    categoryColor: CATEGORIES[0]?.color || '#312783',
+  };
+  const matchedCategory = CATEGORIES.find((category) => category.tools.some((tool) => tool.id === matchedTool.id)) || CATEGORIES[0];
+  return {
+    tool: { ...matchedTool, categoryColor: matchedCategory?.color || matchedTool.categoryColor || CATEGORIES[0]?.color },
+    categoryId: matchedCategory?.id || 'general',
+  };
+};
+
+// â”€â”€ Helper: stream SSE â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const streamChat = async ({ messages, toolId, chatId, taskContext, files, onDelta, onDone, onError }) => {
   const token = localStorage.getItem('token');
   let body;
@@ -157,32 +310,59 @@ const streamChat = async ({ messages, toolId, chatId, taskContext, files, onDelt
 
   const resp = await fetch(`${API}/api/grok/chat`, { method: 'POST', headers, body });
   if (!resp.ok) throw new Error('Network error');
+  if (!resp.body) throw new Error('No response stream available');
 
   const reader  = resp.body.getReader();
   const decoder = new TextDecoder();
   let meta = {};
+  let buffer = '';
+
+  const consumeEvent = (eventBlock) => {
+    eventBlock
+      .split('\n')
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .forEach((line) => {
+        if (!line.startsWith('data:')) return;
+        const raw = line.slice(5).trim();
+        if (!raw || raw === '[DONE]') return;
+        try {
+          const parsed = JSON.parse(raw);
+          if (parsed.content) onDelta(parsed.content);
+          if (parsed.error) onError(parsed.error);
+          if (parsed.chatId) {
+            meta = {
+              chatId: parsed.chatId,
+              title: parsed.title,
+              summary: parsed.summary,
+            };
+          }
+        } catch {
+          // ignore malformed partial events
+        }
+      });
+  };
 
   while (true) {
     const { done, value } = await reader.read();
-    if (done) break;
-    const chunk = decoder.decode(value);
-    const lines = chunk.split('\n\n');
-    for (const line of lines) {
-      if (!line.startsWith('data: ')) continue;
-      const raw = line.slice(6).trim();
-      if (raw === '[DONE]') continue;
-      try {
-        const parsed = JSON.parse(raw);
-        if (parsed.content) onDelta(parsed.content);
-        if (parsed.error)   onError(parsed.error);
-        if (parsed.chatId)  meta = { chatId: parsed.chatId, title: parsed.title, summary: parsed.summary };
-      } catch {}
+    buffer += decoder.decode(value || new Uint8Array(), { stream: !done });
+
+    let boundary = buffer.indexOf('\n\n');
+    while (boundary !== -1) {
+      const eventBlock = buffer.slice(0, boundary).trim();
+      buffer = buffer.slice(boundary + 2);
+      if (eventBlock) consumeEvent(eventBlock);
+      boundary = buffer.indexOf('\n\n');
     }
+
+    if (done) break;
   }
+
+  if (buffer.trim()) consumeEvent(buffer.trim());
   onDone(meta);
 };
 
-// ── Small components ──────────────────────────────────────────────────────────
+// â”€â”€ Small components â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const ToolIcon = ({ tool, size = 5, style = {} }) => {
   const Icon = tool?.icon || Brain;
   return <Icon className={`w-${size} h-${size}`} style={style} />;
@@ -207,7 +387,7 @@ const CopyBtn = ({ text }) => {
   );
 };
 
-// ── Task context builder ──────────────────────────────────────────────────────
+// â”€â”€ Task context builder â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const buildTaskContext = (tasks) => (tasks || []).slice(0, 60).map(t => ({
   id:        t._id,
   title:     t.title,
@@ -217,7 +397,7 @@ const buildTaskContext = (tasks) => (tasks || []).slice(0, 60).map(t => ({
   checklist: (t.checklist || []).map(c => ({ item: c.item, done: c.completed })),
 }));
 
-// ── Message bubble ────────────────────────────────────────────────────────────
+// â”€â”€ Message bubble â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const MessageBubble = ({ msg, isStreaming }) => {
   const isUser = msg.role === 'user';
   const text   = typeof msg.content === 'string' ? msg.content
@@ -262,8 +442,8 @@ const MessageBubble = ({ msg, isStreaming }) => {
   );
 };
 
-// ── Chat panel ────────────────────────────────────────────────────────────────
-const ChatPanel = ({ tool, tasks, chatId, onChatCreated }) => {
+// â”€â”€ Chat panel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+const ChatPanel = ({ tool, tasks, chatId, cachedChat, onChatCreated, onHistoryChanged, onResetChat }) => {
   const [messages,   setMessages]   = useState([]);
   const [input,      setInput]      = useState('');
   const [files,      setFiles]      = useState([]);
@@ -276,14 +456,25 @@ const ChatPanel = ({ tool, tasks, chatId, onChatCreated }) => {
 
   // Load existing chat
   useEffect(() => {
-    setMessages([]);
-    setCurrentChatId(chatId || null);
-    if (chatId) {
-      axios.get(`${API}/api/grok/history/${chatId}`, { headers: authHeaders() })
-        .then(r => setMessages(r.data.chat?.messages || []))
+    const serverChatId = getServerConversationId(cachedChat) || (chatId && !isLocalConversationId(chatId) ? chatId : null);
+    const cachedMessages = Array.isArray(cachedChat?.messages) ? cachedChat.messages : [];
+    setMessages(cachedMessages);
+    setCurrentChatId(serverChatId || null);
+    if (serverChatId) {
+      axios.get(`${API}/api/grok/history/${serverChatId}`, { headers: authHeaders() })
+        .then((r) => {
+          const loadedChat = r.data.chat || {};
+          setMessages(loadedChat.messages || []);
+          onHistoryChanged?.({
+            ...cachedChat,
+            ...loadedChat,
+            _id: loadedChat._id || serverChatId,
+            updatedAt: loadedChat.updatedAt || new Date().toISOString(),
+          });
+        })
         .catch(() => {});
     }
-  }, [chatId, tool.id]);
+  }, [chatId, cachedChat, tool.id, onHistoryChanged]);
 
   // Auto-scroll
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
@@ -296,31 +487,72 @@ const ChatPanel = ({ tool, tasks, chatId, onChatCreated }) => {
 
     const userMsg = { role: 'user', content: text };
     const outgoing = [...messages, userMsg];
+    const localConversationId =
+      getLocalConversationId(cachedChat) ||
+      (chatId && isLocalConversationId(chatId) ? chatId : null) ||
+      createLocalConversationId();
+    const serverConversationId = currentChatId || getServerConversationId(cachedChat) || null;
+    const draftRecord = normaliseConversationRecord({
+      _id: serverConversationId || localConversationId,
+      chatId: serverConversationId || null,
+      serverId: serverConversationId || null,
+      localId: localConversationId,
+      toolId: tool.id,
+      title: cachedChat?.title || buildConversationTitle(text, tool.name),
+      summary: cachedChat?.summary || text.slice(0, 160),
+      updatedAt: new Date().toISOString(),
+      messageCount: outgoing.length + 1,
+      messages: [...outgoing, { role: 'assistant', content: '' }],
+      starred: cachedChat?.starred || false,
+    });
     setMessages(outgoing);
     setInput('');
+    onHistoryChanged?.(draftRecord);
 
     const tempId = Date.now();
     setMessages(prev => [...prev, { role: 'assistant', content: '', _tempId: tempId }]);
     setStreaming(true);
+    let assistantContent = '';
 
     try {
       await streamChat({
         messages:    outgoing,
         toolId:      tool.id,
-        chatId:      currentChatId,
+        chatId:      serverConversationId,
         taskContext: taskCtx,
         files,
         onDelta: (delta) => {
+          assistantContent += delta;
           setMessages(prev => prev.map(m =>
             m._tempId === tempId ? { ...m, content: m.content + delta } : m
           ));
         },
         onDone: (meta) => {
-          if (meta.chatId && !currentChatId) {
-            setCurrentChatId(meta.chatId);
-            onChatCreated?.(meta);
+          const persistedChatId = meta.chatId || serverConversationId || null;
+          const completedMessages = [...outgoing, { role: 'assistant', content: assistantContent }];
+          const finalRecord = normaliseConversationRecord({
+            ...draftRecord,
+            _id: persistedChatId || localConversationId,
+            chatId: persistedChatId,
+            serverId: persistedChatId,
+            localId: localConversationId,
+            localOnly: !persistedChatId,
+            toolId: tool.id,
+            title: meta.title || draftRecord?.title || cachedChat?.title || tool.name,
+            summary: meta.summary || draftRecord?.summary || assistantContent.slice(0, 160) || text.slice(0, 160),
+            updatedAt: new Date().toISOString(),
+            messageCount: completedMessages.length,
+            messages: completedMessages,
+            starred: cachedChat?.starred || false,
+          });
+          if (persistedChatId && persistedChatId !== currentChatId) {
+            setCurrentChatId(persistedChatId);
+            onChatCreated?.(finalRecord);
+          } else if (!currentChatId && !persistedChatId) {
+            onChatCreated?.(finalRecord);
           }
-          setMessages(prev => prev.map(m => m._tempId === tempId ? { ...m, _tempId: undefined } : m));
+          setMessages(completedMessages);
+          onHistoryChanged?.(finalRecord);
           setFiles([]);
         },
         onError: (err) => {
@@ -367,6 +599,7 @@ const ChatPanel = ({ tool, tasks, chatId, onChatCreated }) => {
     setMessages([]);
     setCurrentChatId(null);
     setFiles([]);
+    onResetChat?.();
   };
 
   const downloadChat = () => {
@@ -482,7 +715,7 @@ const ChatPanel = ({ tool, tasks, chatId, onChatCreated }) => {
             value={input}
             onChange={e => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder={`Ask ${tool.name}…`}
+            placeholder={`Ask ${tool.name}...`}
             rows={1}
             style={{
               flex: 1, resize: 'none', border: 'none', outline: 'none',
@@ -516,7 +749,7 @@ const ChatPanel = ({ tool, tasks, chatId, onChatCreated }) => {
   );
 };
 
-// ── Starter prompts per tool ─────────────────────────────────────────────────
+// â”€â”€ Starter prompts per tool â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const getStarterPrompts = (toolId) => {
   const MAP = {
     'general':             ['What are FundCo\'s main investment sectors?', 'Summarise my pending tasks', 'What does LCOE mean in FundCo context?'],
@@ -531,7 +764,7 @@ const getStarterPrompts = (toolId) => {
     'mini-grid-planner':   ['Plan a 100kWp mini-grid for a rural community', 'What\'s required for a site survey?', 'Generate a mini-grid BoQ estimate'],
     'lcoe-calculator':     ['Calculate LCOE for a 500kWp solar project', 'Compare solar vs diesel for a mini-grid', 'What CAPEX factors affect LCOE?'],
     'ppa-drafter':         ['Draft a PPA for a 200kWh daily consumption site', 'What should a FundCo PPA include?', 'Draft PPA for GroSolar SaaS customer'],
-    'mortgage-simulator':  ['Simulate a 15-year HSF mortgage at 12% interest', 'What\'s the monthly payment for ₦5M loan?', 'Model a green bond-backed mortgage'],
+    'mortgage-simulator':  ['Simulate a 15-year HSF mortgage at 12% interest', 'What\'s the monthly payment for NGN 5M loan?', 'Model a green bond-backed mortgage'],
     'portfolio-risk-analyzer': ['Analyse FX risk in current portfolio', 'What ESG risks should I flag?', 'Run a stress test on infrastructure assets'],
     'esg-compliance-checker':  ['Check IFC compliance for this project', 'What UN principles apply to mini-grids?', 'ESG checklist for new investment'],
     'sdg-impact-analyzer':     ['Map mini-grid project to SDGs', 'Which SDGs does Agronomie PuE support?', 'Measure SDG 7 impact of our portfolio'],
@@ -539,123 +772,209 @@ const getStarterPrompts = (toolId) => {
   return MAP[toolId] || MAP['general'];
 };
 
-// ── History panel ─────────────────────────────────────────────────────────────
-const HistoryPanel = ({ toolId, onResume, onClose }) => {
-  const [chats,   setChats]   = useState([]);
+// â”€â”€ History workspace â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+const HistoryWorkspace = ({ activeTool, chats, loading, onRefresh, onResume, onClose, onToggleStar, onDelete }) => {
   const [search,  setSearch]  = useState('');
-  const [loading, setLoading] = useState(false);
+  const [scope,   setScope]   = useState('all');
 
-  const fetch = useCallback(async () => {
-    setLoading(true);
-    try {
-      // Only return chats whose toolId belongs to the AI Tools catalog
-      // Other parts of the app (Training LMS, DeckPrep, Reports) use
-      // toolIds like 'pdf-extractor', 'ppt-generator', 'report-generator'
-      // via their own controllers — those should not appear here
-      const r = await axios.get(`${API}/api/grok/history`, {
-        headers: authHeaders(),
-        params: { toolIds: AI_TOOL_IDS.join(','), limit: 100 },
-      });
-      setChats(r.data.histories || []);
-    } catch { toast.error('Failed to load history'); }
-    finally { setLoading(false); }
-  }, []);
+  const decoratedChats = useMemo(() => chats.map((chat) => {
+    const resolved = getToolWithCategory(chat.toolId);
+    return {
+      ...chat,
+      resolvedTool: resolved.tool,
+      resolvedCategoryId: resolved.categoryId,
+      searchBlob: [chat.title, chat.summary, resolved.tool?.name, chat.toolId].filter(Boolean).join(' ').toLowerCase(),
+    };
+  }), [chats]);
 
-  useEffect(() => { fetch(); }, [fetch]);
+  const counts = useMemo(() => {
+    const currentToolCount = decoratedChats.filter((chat) => chat.resolvedTool?.id === activeTool?.id).length;
+    return {
+      all: decoratedChats.length,
+      tool: currentToolCount,
+      starred: decoratedChats.filter((chat) => chat.starred).length,
+    };
+  }, [activeTool?.id, decoratedChats]);
 
-  const toggleStar = async (e, chat) => {
-    e.stopPropagation();
-    await axios.put(`${API}/api/grok/history/${chat._id}`, { starred: !chat.starred }, { headers: authHeaders() });
-    setChats(prev => prev.map(c => c._id === chat._id ? { ...c, starred: !c.starred } : c));
-  };
+  const filteredChats = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    return decoratedChats.filter((chat) => {
+      if (scope === 'tool' && chat.resolvedTool?.id !== activeTool?.id) return false;
+      if (scope === 'starred' && !chat.starred) return false;
+      if (query && !chat.searchBlob.includes(query)) return false;
+      return true;
+    });
+  }, [activeTool?.id, decoratedChats, scope, search]);
 
-  const del = async (e, chatId) => {
-    e.stopPropagation();
-    if (!window.confirm('Delete this conversation?')) return;
-    await axios.delete(`${API}/api/grok/history/${chatId}`, { headers: authHeaders() });
-    setChats(prev => prev.filter(c => c._id !== chatId));
-  };
+  const groupedChats = useMemo(() => {
+    const groups = new Map();
+    filteredChats.forEach((chat) => {
+      const tool = chat.resolvedTool || {};
+      const key = tool.id || chat.toolId || 'general';
+      if (!groups.has(key)) {
+        groups.set(key, {
+          key,
+          label: tool.name || LEGACY_NAMES[chat.toolId] || formatToolLabel(chat.toolId) || 'FundCo AI',
+          color: tool.categoryColor || 'var(--brand-primary)',
+          icon: tool.icon || Brain,
+          chats: [],
+        });
+      }
+      groups.get(key).chats.push(chat);
+    });
+    return Array.from(groups.values());
+  }, [filteredChats]);
 
-  const filtered = chats.filter(c =>
-    c.title?.toLowerCase().includes(search.toLowerCase()) ||
-    c.summary?.toLowerCase().includes(search.toLowerCase())
-  );
+  const scopeButtons = [
+    { id: 'all', label: `All conversations (${counts.all})` },
+    { id: 'tool', label: `${activeTool?.name || 'This tool'} (${counts.tool})` },
+    { id: 'starred', label: `Starred (${counts.starred})` },
+  ];
 
   return (
-    <motion.div initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }}
-      transition={{ type: 'tween', duration: 0.2 }}
-      className="absolute inset-0 flex flex-col z-20 border-l"
-      style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border-color)' }}>
-
-      {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b flex-shrink-0"
+    <div className="flex h-full flex-col" style={{ backgroundColor: 'var(--bg-surface)' }}>
+      <div className="flex items-start justify-between gap-4 px-6 py-5 border-b flex-shrink-0"
         style={{ borderColor: 'var(--border-color)' }}>
-        <div className="flex items-center gap-2">
-          <History className="w-4 h-4" style={{ color: 'var(--brand-primary)' }} />
-          <span className="font-bold text-sm" style={{ color: 'var(--text-primary)' }}>Chat History</span>
+        <div>
+          <div className="flex items-center gap-2">
+            <History className="w-4 h-4" style={{ color: 'var(--brand-primary)' }} />
+            <span className="font-bold text-sm" style={{ color: 'var(--text-primary)' }}>Conversation History</span>
+          </div>
+          <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
+            Reopen past AI conversations without losing where you left off.
+          </p>
         </div>
-        <button onClick={onClose} className="p-1.5 rounded-lg"
-          style={{ color: 'var(--text-muted)' }}
-          onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--bg-hover)'}
-          onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}>
-          <X className="w-4 h-4" />
-        </button>
+        <div className="flex items-center gap-2">
+          <button onClick={onRefresh} className="p-2 rounded-xl border transition-colors"
+            style={{ color: 'var(--text-secondary)', borderColor: 'var(--border-color)', backgroundColor: 'var(--bg-subtle)' }}
+            onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--bg-hover)'}
+            onMouseLeave={e => e.currentTarget.style.backgroundColor = 'var(--bg-subtle)'}>
+            <RotateCcw className="w-4 h-4" />
+          </button>
+          <button onClick={onClose} className="inline-flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-semibold transition-colors"
+            style={{ color: 'var(--text-secondary)', backgroundColor: 'var(--bg-subtle)' }}
+            onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--bg-hover)'}
+            onMouseLeave={e => e.currentTarget.style.backgroundColor = 'var(--bg-subtle)'}>
+            <ChevronLeft className="w-4 h-4" />
+            Back to chat
+          </button>
+        </div>
       </div>
 
-      {/* Search */}
-      <div className="px-4 py-3 border-b flex-shrink-0" style={{ borderColor: 'var(--border-color)' }}>
+      <div className="px-6 py-4 border-b flex-shrink-0 space-y-3" style={{ borderColor: 'var(--border-color)' }}>
         <div className="flex items-center gap-2 px-3 py-2 rounded-xl border"
           style={{ borderColor: 'var(--border-color)', backgroundColor: 'var(--bg-subtle)' }}>
           <Search className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--text-muted)' }} />
           <input value={search} onChange={e => setSearch(e.target.value)}
-            placeholder="Search conversations…"
+            placeholder="Search conversations..."
             className="flex-1 bg-transparent text-sm focus:outline-none"
             style={{ color: 'var(--text-primary)' }} />
         </div>
+        <div className="flex flex-wrap gap-2">
+          {scopeButtons.map((button) => (
+            <button
+              key={button.id}
+              onClick={() => setScope(button.id)}
+              className="px-3 py-1.5 rounded-full text-xs font-semibold transition-colors"
+              style={scope === button.id
+                ? { backgroundColor: 'var(--brand-primary)', color: '#fff' }
+                : { backgroundColor: 'var(--bg-subtle)', color: 'var(--text-secondary)' }}
+            >
+              {button.label}
+            </button>
+          ))}
+        </div>
       </div>
 
-      {/* List */}
-      <div className="flex-1 overflow-y-auto divide-y" style={{ divideColor: 'var(--border-color)' }}>
+      <div className="flex-1 overflow-y-auto px-6 py-6">
         {loading && <div className="flex justify-center py-8"><Spinner /></div>}
-        {!loading && filtered.length === 0 && (
-          <div className="text-center py-12">
-            <MessageSquare className="w-8 h-8 mx-auto mb-2" style={{ color: 'var(--text-muted)' }} />
-            <p className="text-sm" style={{ color: 'var(--text-muted)' }}>No conversations yet</p>
+        {!loading && filteredChats.length === 0 && (
+          <div className="flex flex-col items-center justify-center text-center py-16">
+            <MessageSquare className="w-10 h-10 mb-3" style={{ color: 'var(--text-muted)' }} />
+            <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>No conversations yet</p>
+            <p className="text-sm mt-1 max-w-sm" style={{ color: 'var(--text-muted)' }}>
+              Start a chat with any AI tool and it will appear here automatically.
+            </p>
           </div>
         )}
-        {filtered.map(chat => (
-          <div key={chat._id} onClick={() => onResume(chat)}
-            className="flex items-start gap-3 px-4 py-3 cursor-pointer transition-colors group"
-            onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--bg-hover)'}
-            onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{chat.title}</p>
-              <p className="text-xs truncate mt-0.5" style={{ color: 'var(--text-muted)' }}>
-                {chat.summary || '—'}
-              </p>
-              <p className="text-[10px] mt-1" style={{ color: 'var(--text-muted)' }}>
-                {new Date(chat.updatedAt).toLocaleDateString('en-GB', { day:'numeric', month:'short', year:'numeric' })}
-                {chat.messageCount ? ` · ${chat.messageCount} messages` : ''}
-              </p>
-            </div>
-            <div className="flex items-center gap-1 flex-shrink-0">
-              <button onClick={e => toggleStar(e, chat)} className="p-1 rounded opacity-0 group-hover:opacity-100">
-                {chat.starred
-                  ? <Star className="w-3.5 h-3.5" style={{ color: '#f59e0b', fill: '#f59e0b' }} />
-                  : <Star className="w-3.5 h-3.5" style={{ color: 'var(--text-muted)' }} />}
-              </button>
-              <button onClick={e => del(e, chat._id)} className="p-1 rounded opacity-0 group-hover:opacity-100" style={{ color: '#dc2626' }}>
-                <Trash2 className="w-3.5 h-3.5" />
-              </button>
-            </div>
+        {!loading && filteredChats.length > 0 && (
+          <div className="space-y-6">
+            {groupedChats.map((group) => (
+              <section key={group.key} className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-lg flex items-center justify-center text-white"
+                    style={{ backgroundColor: group.color }}>
+                    <group.icon className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>{group.label}</p>
+                    <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{group.chats.length} conversation{group.chats.length === 1 ? '' : 's'}</p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
+                  {group.chats.map((chat) => (
+                    <button
+                      key={chat._id}
+                      onClick={() => onResume(chat)}
+                      className="w-full text-left rounded-2xl border p-4 transition-all"
+                      style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border-color)' }}
+                      onMouseEnter={e => { e.currentTarget.style.borderColor = group.color; e.currentTarget.style.backgroundColor = 'var(--bg-hover)'; }}
+                      onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border-color)'; e.currentTarget.style.backgroundColor = 'var(--bg-surface)'; }}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{chat.title || group.label}</p>
+                          <p
+                            className="text-xs mt-1 leading-relaxed"
+                            style={{
+                              color: 'var(--text-muted)',
+                              display: '-webkit-box',
+                              WebkitLineClamp: 2,
+                              WebkitBoxOrient: 'vertical',
+                              overflow: 'hidden',
+                            }}
+                          >
+                            {chat.summary || 'No summary yet'}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-1 flex-shrink-0">
+                          <button onClick={(e) => { e.stopPropagation(); onToggleStar(chat); }} className="p-1 rounded-lg" title={chat.starred ? 'Remove star' : 'Star conversation'}>
+                            {chat.starred
+                              ? <Star className="w-3.5 h-3.5" style={{ color: '#f59e0b', fill: '#f59e0b' }} />
+                              : <Star className="w-3.5 h-3.5" style={{ color: 'var(--text-muted)' }} />}
+                          </button>
+                          <button onClick={(e) => { e.stopPropagation(); onDelete(chat); }} className="p-1 rounded-lg" title="Delete conversation" style={{ color: '#dc2626' }}>
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between gap-3 mt-4">
+                        <div className="flex flex-wrap items-center gap-2 text-[11px]" style={{ color: 'var(--text-muted)' }}>
+                          <span>{new Date(chat.updatedAt).toLocaleDateString('en-GB', { day:'numeric', month:'short', year:'numeric' })}</span>
+                          <span>·</span>
+                          <span>{chat.messageCount || 0} messages</span>
+                          {chat.localOnly && (
+                            <>
+                              <span>·</span>
+                              <span>Saved locally</span>
+                            </>
+                          )}
+                        </div>
+                        <span className="text-xs font-semibold" style={{ color: group.color }}>Open</span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </section>
+            ))}
           </div>
-        ))}
+        )}
       </div>
-    </motion.div>
+    </div>
   );
 };
 
-// ── Category nav pill ────────────────────────────────────────────────────────
+// â”€â”€ Category nav pill â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const CategoryPill = ({ cat, isActive, onClick }) => (
   <button onClick={onClick}
     className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold flex-shrink-0 transition-all"
@@ -669,7 +988,7 @@ const CategoryPill = ({ cat, isActive, onClick }) => (
   </button>
 );
 
-// ── Tool card ────────────────────────────────────────────────────────────────
+// â”€â”€ Tool card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const ToolCard = ({ tool, isActive, onClick, cat }) => (
   <motion.button whileHover={{ y: -1 }} onClick={onClick}
     className="w-full flex items-start gap-3 p-4 rounded-xl border text-left transition-all"
@@ -689,18 +1008,23 @@ const ToolCard = ({ tool, isActive, onClick, cat }) => (
   </motion.button>
 );
 
-// ════════════════════════════════════════════════════════════════════════════
-// ── MAIN PAGE ─────────────────────────────────────────────────────────────────
-// ════════════════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// â”€â”€ MAIN PAGE â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 const AiTools = () => {
   const { user, tasks = [] } = useOutletContext();
+  const restoredSession = React.useMemo(() => readAiToolsSession(), []);
+  const restoredTool = getToolWithCategory(restoredSession?.activeToolId);
+  const conversationCacheKey = useMemo(() => buildConversationCacheKey(WORKSPACE_SCOPE, user?._id), [user?._id]);
 
-  const [activeCategory, setActiveCategory] = useState('general');
-  const [activeTool,     setActiveTool]     = useState(ALL_TOOLS[0]);
-  const [activeChatId,   setActiveChatId]   = useState(null);
-  const [showHistory,    setShowHistory]    = useState(false);
+  const [activeCategory, setActiveCategory] = useState(restoredTool.categoryId);
+  const [activeTool,     setActiveTool]     = useState(restoredTool.tool);
+  const [activeChatId,   setActiveChatId]   = useState(restoredSession?.activeChatId || null);
+  const [showHistory,    setShowHistory]    = useState(Boolean(restoredSession?.showHistory));
   const [searchTool,     setSearchTool]     = useState('');
-  const [sidebarOpen,    setSidebarOpen]    = useState(true);
+  const [sidebarOpen,    setSidebarOpen]    = useState(restoredSession?.sidebarOpen ?? true);
+  const [historyChats,   setHistoryChats]   = useState(() => readConversationCache(conversationCacheKey));
+  const [historyLoading, setHistoryLoading] = useState(false);
 
   const cat      = CATEGORIES.find(c => c.id === activeCategory);
   const catTools = cat?.tools || [];
@@ -718,23 +1042,125 @@ const AiTools = () => {
     return ALL_TOOLS.filter(t => t.name.toLowerCase().includes(q) || t.desc.toLowerCase().includes(q));
   }, [searchTool]);
 
+  const historyMap = useMemo(() => {
+    const next = new Map();
+    historyChats.forEach((chat) => {
+      const id = getConversationId(chat);
+      if (id) next.set(id, chat);
+    });
+    return next;
+  }, [historyChats]);
+
+  const recentChats = useMemo(
+    () => historyChats.slice(0, 6).map((chat) => ({ ...chat, resolvedTool: getToolWithCategory(chat.toolId).tool })),
+    [historyChats]
+  );
+
+  const persistHistoryChats = useCallback((updater) => {
+    setHistoryChats((previous) => {
+      const next = typeof updater === 'function' ? updater(previous) : updater;
+      writeConversationCache(conversationCacheKey, next);
+      return next;
+    });
+  }, [conversationCacheKey]);
+
+  const loadHistory = useCallback(async () => {
+    const localChats = readConversationCache(conversationCacheKey);
+    if (localChats.length) {
+      setHistoryChats(localChats);
+    }
+    setHistoryLoading(true);
+    try {
+      const response = await axios.get(`${API}/api/grok/history`, {
+        headers: authHeaders(),
+        params: { limit: 200 },
+      });
+      const merged = mergeConversationLists(response.data.histories || [], localChats);
+      persistHistoryChats(merged);
+    } catch {
+      if (!localChats.length) toast.error('Failed to load history');
+    } finally {
+      setHistoryLoading(false);
+    }
+  }, [conversationCacheKey, persistHistoryChats]);
+
+  useEffect(() => {
+    setHistoryChats(readConversationCache(conversationCacheKey));
+    if (conversationCacheKey) {
+      loadHistory().catch(() => {});
+    }
+  }, [conversationCacheKey, loadHistory]);
+
+  useEffect(() => {
+    writeAiToolsSession({
+      activeCategory,
+      activeToolId: activeTool?.id || ALL_TOOLS[0]?.id,
+      activeChatId,
+      showHistory,
+      sidebarOpen,
+      updatedAt: Date.now(),
+    });
+  }, [activeCategory, activeChatId, activeTool?.id, showHistory, sidebarOpen]);
+
   const selectTool = (tool) => {
-    setActiveTool(tool);
+    const nextTool = getToolWithCategory(tool.id);
+    setActiveCategory(nextTool.categoryId);
+    setActiveTool(nextTool.tool);
     setActiveChatId(null);
     setShowHistory(false);
   };
 
   const handleChatCreated = (meta) => {
-    setActiveChatId(meta.chatId);
+    const nextId = getConversationId(meta);
+    if (nextId) setActiveChatId(nextId);
+  };
+
+  const handleHistoryChanged = (record) => {
+    if (record) {
+      persistHistoryChats((previous) => upsertConversationRecord(previous, record));
+    }
+    if (getServerConversationId(record)) {
+      loadHistory().catch(() => {});
+    }
+  };
+
+  const handleResetChat = () => {
+    setActiveChatId(null);
+  };
+
+  const handleToggleStar = async (chat) => {
+    const serverId = getServerConversationId(chat);
+    if (serverId) {
+      await axios.put(`${API}/api/grok/history/${serverId}`, { starred: !chat.starred }, { headers: authHeaders() });
+    }
+    persistHistoryChats((previous) => previous.map((entry) =>
+      sameConversation(entry, chat)
+        ? { ...entry, starred: !chat.starred, updatedAt: new Date().toISOString() }
+        : entry
+    ));
+  };
+
+  const handleDeleteChat = async (chatRef) => {
+    const target = typeof chatRef === 'string'
+      ? historyChats.find((entry) => sameConversation(entry, { _id: chatRef, chatId: chatRef, localId: chatRef }))
+      : chatRef;
+    const targetId = getConversationId(target || { _id: chatRef, chatId: chatRef, localId: chatRef });
+    const serverId = getServerConversationId(target || { _id: chatRef, chatId: chatRef });
+    if (!window.confirm('Delete this conversation?')) return;
+    if (serverId) {
+      await axios.delete(`${API}/api/grok/history/${serverId}`, { headers: authHeaders() });
+    }
+    persistHistoryChats((previous) => previous.filter((entry) => !sameConversation(entry, target || { _id: targetId, chatId: serverId, localId: targetId })));
+    if (targetId && sameConversation({ _id: activeChatId, chatId: activeChatId, localId: activeChatId }, { _id: targetId, chatId: serverId, localId: targetId })) {
+      setActiveChatId(null);
+    }
   };
 
   const handleResumeChat = (chat) => {
-    const tool = TOOL_MAP[chat.toolId];
-    if (tool) {
-      setActiveTool({ ...tool, categoryColor: CATEGORIES.find(c => c.tools.some(t => t.id === tool.id))?.color });
-      setActiveCategory(CATEGORIES.find(c => c.tools.some(t => t.id === tool.id))?.id || 'general');
-    }
-    setActiveChatId(chat._id);
+    const nextTool = getToolWithCategory(chat.toolId);
+    setActiveTool(nextTool.tool);
+    setActiveCategory(nextTool.categoryId);
+    setActiveChatId(getConversationId(chat));
     setShowHistory(false);
   };
 
@@ -742,7 +1168,7 @@ const AiTools = () => {
     <div className="flex h-full overflow-hidden" style={{ height: 'calc(100vh - 80px)' }}>
       <Toaster position="top-right" />
 
-      {/* ── Left sidebar ── */}
+      {/* â”€â”€ Left sidebar â”€â”€ */}
       <AnimatePresence>
         {sidebarOpen && (
           <motion.div initial={{ width: 0, opacity: 0 }} animate={{ width: 280, opacity: 1 }}
@@ -769,7 +1195,7 @@ const AiTools = () => {
                 style={{ borderColor: 'var(--border-color)', backgroundColor: 'var(--bg-subtle)' }}>
                 <Search className="w-3.5 h-3.5 flex-shrink-0" style={{ color: 'var(--text-muted)' }} />
                 <input value={searchTool} onChange={e => setSearchTool(e.target.value)}
-                  placeholder="Search tools…"
+                  placeholder="Search tools..."
                   className="flex-1 bg-transparent text-xs focus:outline-none"
                   style={{ color: 'var(--text-primary)' }} />
                 {searchTool && <button onClick={() => setSearchTool('')} style={{ color: 'var(--text-muted)' }}><X className="w-3 h-3" /></button>}
@@ -832,20 +1258,62 @@ const AiTools = () => {
               </div>
             </div>
 
-            {/* History button */}
-            <div className="px-3 pb-4 border-t pt-3" style={{ borderColor: 'var(--border-color)' }}>
-              <button onClick={() => setShowHistory(p => !p)}
-                className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all"
-                style={{ backgroundColor: showHistory ? 'var(--brand-light)' : 'var(--bg-subtle)', color: showHistory ? 'var(--brand-primary)' : 'var(--text-secondary)' }}>
-                <History className="w-4 h-4" />
-                Chat History
-              </button>
+            {/* History / recents */}
+            <div className="px-3 pb-4 border-t pt-3 space-y-3" style={{ borderColor: 'var(--border-color)' }}>
+              <div className="flex gap-2">
+                <button onClick={() => setShowHistory(p => !p)}
+                  className="flex-1 flex items-center gap-2.5 justify-center px-3 py-2.5 rounded-xl text-sm font-semibold transition-all"
+                  style={{ backgroundColor: showHistory ? 'var(--brand-light)' : 'var(--bg-subtle)', color: showHistory ? 'var(--brand-primary)' : 'var(--text-secondary)' }}>
+                  <History className="w-4 h-4" />
+                  {showHistory ? 'Back to Chat' : 'Chat History'}
+                </button>
+                <button onClick={() => { setActiveChatId(null); setShowHistory(false); }}
+                  className="px-3 py-2.5 rounded-xl text-sm font-semibold transition-all"
+                  style={{ backgroundColor: 'var(--bg-subtle)', color: 'var(--text-secondary)' }}>
+                  <Plus className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--text-muted)' }}>Recent conversations</p>
+                  <button onClick={loadHistory} className="p-1 rounded-lg" style={{ color: 'var(--text-muted)' }}>
+                    <RotateCcw className={`w-3.5 h-3.5 ${historyLoading ? 'animate-spin' : ''}`} />
+                  </button>
+                </div>
+                <div className="space-y-1.5">
+                  {recentChats.length === 0 && (
+                    <div className="px-3 py-3 rounded-xl border text-xs"
+                      style={{ borderColor: 'var(--border-color)', backgroundColor: 'var(--bg-subtle)', color: 'var(--text-muted)' }}>
+                      No conversations yet
+                    </div>
+                  )}
+                  {recentChats.map((chat) => (
+                    <button
+                      key={chat._id}
+                      onClick={() => handleResumeChat(chat)}
+                      className="w-full text-left px-3 py-2.5 rounded-xl border transition-all"
+                      style={{
+                        borderColor: activeChatId === chat._id ? (chat.resolvedTool?.categoryColor || 'var(--brand-primary)') : 'var(--border-color)',
+                        backgroundColor: 'var(--bg-surface)',
+                      }}
+                      onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--bg-hover)'}
+                      onMouseLeave={e => e.currentTarget.style.backgroundColor = 'var(--bg-surface)'}
+                    >
+                      <p className="text-xs font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{chat.title || chat.resolvedTool?.name || 'FundCo AI'}</p>
+                      <p className="text-[11px] truncate mt-1" style={{ color: 'var(--text-muted)' }}>
+                        {(chat.resolvedTool?.name || 'AI Tool')} · {chat.messageCount || 0} messages
+                      </p>
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* ── Main content ── */}
+      {/* â”€â”€ Main content â”€â”€ */}
       <div className="flex-1 flex flex-col overflow-hidden relative">
         {/* Toggle sidebar button */}
         <button onClick={() => setSidebarOpen(p => !p)}
@@ -858,22 +1326,29 @@ const AiTools = () => {
 
         {/* Chat + history area */}
         <div className="flex-1 overflow-hidden relative">
-          <ChatPanel
-            key={`${activeTool.id}-${activeChatId}`}
-            tool={activeTool}
-            tasks={tasks}
-            chatId={activeChatId}
-            onChatCreated={handleChatCreated}
-          />
-          <AnimatePresence>
-            {showHistory && (
-              <HistoryPanel
-                toolId={activeTool.id}
-                onResume={handleResumeChat}
-                onClose={() => setShowHistory(false)}
-              />
-            )}
-          </AnimatePresence>
+          {showHistory ? (
+            <HistoryWorkspace
+              activeTool={activeTool}
+              chats={historyChats}
+              loading={historyLoading}
+              onRefresh={loadHistory}
+              onResume={handleResumeChat}
+              onClose={() => setShowHistory(false)}
+              onToggleStar={handleToggleStar}
+              onDelete={handleDeleteChat}
+            />
+          ) : (
+            <ChatPanel
+              key={`${activeTool.id}-${activeChatId}`}
+              tool={activeTool}
+              tasks={tasks}
+              chatId={activeChatId}
+              cachedChat={historyMap.get(activeChatId)}
+              onChatCreated={handleChatCreated}
+              onHistoryChanged={handleHistoryChanged}
+              onResetChat={handleResetChat}
+            />
+          )}
         </div>
       </div>
     </div>
@@ -881,3 +1356,4 @@ const AiTools = () => {
 };
 
 export default AiTools;
+

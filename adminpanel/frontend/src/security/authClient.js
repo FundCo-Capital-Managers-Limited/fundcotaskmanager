@@ -84,6 +84,27 @@ const isRefreshSessionExpired = () => {
   return Number.isFinite(expiresAt) && expiresAt <= Date.now();
 };
 
+const isTerminalRefreshError = (error) => {
+  const status = Number(error?.response?.status || 0);
+  if (status === 401 || status === 403) return true;
+
+  const message = String(
+    error?.response?.data?.message
+    || error?.message
+    || ''
+  ).toLowerCase();
+
+  return [
+    'refresh token missing',
+    'refresh token invalid',
+    'refresh token expired',
+    'refresh token reuse detected',
+    'unable to refresh session',
+    'account inactive',
+    'admin access denied',
+  ].some((fragment) => message.includes(fragment));
+};
+
 export const storeAdminSession = ({ token, user, accessTokenExpiresInSeconds, refreshSessionExpiresAt, rememberMe }) => {
   if (token) localStorage.setItem(TOKEN_KEY, token);
   if (user) localStorage.setItem(USER_KEY, JSON.stringify(user));
@@ -132,7 +153,9 @@ export const refreshAdminAccessToken = async () => {
     });
     return data;
   }).catch((error) => {
-    clearAdminSession();
+    if (isTerminalRefreshError(error)) {
+      clearAdminSession();
+    }
     throw error;
   }).finally(() => {
     refreshPromise = null;
@@ -142,19 +165,23 @@ export const refreshAdminAccessToken = async () => {
 };
 
 export const bootstrapAdminSession = async () => {
+  const hasLocalSession = Boolean(getAdminAccessToken() && readStoredAdminUser());
+
   if (isRefreshSessionExpired()) {
     clearAdminSession();
     return false;
   }
-  if (getAdminAccessToken() && readStoredAdminUser()) {
+
+  if (hasLocalSession) {
     if (!isAccessTokenStale()) return true;
     try {
       await refreshAdminAccessToken();
       return true;
-    } catch {
-      return false;
+    } catch (error) {
+      return !isTerminalRefreshError(error);
     }
   }
+
   try {
     await refreshAdminAccessToken();
     return true;
@@ -219,8 +246,7 @@ export const attachAdminAuthInterceptors = (instance) => {
         originalRequest.withCredentials = true;
         return instance(originalRequest);
       } catch (refreshError) {
-        clearAdminSession();
-        throw refreshError;
+        throw isTerminalRefreshError(refreshError) ? refreshError : error;
       }
     }
   );

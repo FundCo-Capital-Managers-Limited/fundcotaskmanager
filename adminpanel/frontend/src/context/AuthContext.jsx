@@ -5,7 +5,6 @@ import {
   bootstrapAdminSession,
   clearAdminSession,
   logoutAdminSession,
-  refreshAdminAccessToken,
   readStoredAdminUser,
   storeAdminSession,
 } from '../security/authClient.js';
@@ -72,13 +71,9 @@ export const AuthProvider = ({ children }) => {
       if (!user && !hasKnownAdminSession()) return;
 
       try {
-        await refreshAdminAccessToken();
+        await bootstrapAdminSession();
       } catch {
-        try {
-          await bootstrapAdminSession();
-        } catch {
-          // bootstrapAdminSession already normalizes local state when recovery fails
-        }
+        // bootstrapAdminSession already normalizes local state when recovery fails
       } finally {
         syncFromStorage();
       }
@@ -90,7 +85,7 @@ export const AuthProvider = ({ children }) => {
       resumeTimeoutId = window.setTimeout(refreshSession, 180);
     };
 
-    const intervalId = window.setInterval(refreshSession, 4 * 60 * 1000);
+    const intervalId = window.setInterval(refreshSession, 10 * 60 * 1000);
     const handleVisible = () => {
       if (document.visibilityState === 'visible') {
         scheduleRefresh();

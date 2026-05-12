@@ -20,10 +20,12 @@ const MeetingReports = lazy(() => import('./pages/MeetingReports.jsx'));
 const Performance = lazy(() => import('./pages/Performance.jsx'));
 const Users = lazy(() => import('./pages/Users.jsx'));
 const Feedbacks = lazy(() => import('./pages/Feedbacks.jsx'));
+const PlatformActivity = lazy(() => import('./pages/PlatformActivity.jsx'));
 const MyTeam = lazy(() => import('./pages/MyTeam.jsx'));
 const Projects = lazy(() => import('./pages/Projects.jsx'));
 const Social = lazy(() => import('./pages/Social.jsx'));
 const TeamChat = lazy(() => import('./pages/TeamChat.jsx'));
+const AiTools = lazy(() => import('./pages/AiTools.jsx'));
 const DeckPrep = lazy(() => import('./pages/DeckPrep.jsx'));
 const FileStorage = lazy(() => import('./pages/FileStorage.jsx'));
 const Training = lazy(() => import('./pages/Training.jsx'));
@@ -86,12 +88,14 @@ const AppRoutes = () => {
           <Route path="/projects/:projectId" element={<Suspense fallback={<Loader />}><Projects /></Suspense>} />
           <Route path="/social" element={<Suspense fallback={<Loader />}><Social /></Suspense>} />
           <Route path="/team-chat" element={<Suspense fallback={<Loader />}><TeamChat /></Suspense>} />
+          <Route path="/ai-tools" element={<Suspense fallback={<Loader />}><AiTools /></Suspense>} />
           <Route path="/deck-prep" element={<Suspense fallback={<Loader />}><DeckPrep /></Suspense>} />
           <Route path="/files" element={<Suspense fallback={<Loader />}><FileStorage /></Suspense>} />
           <Route path="/training" element={<Suspense fallback={<Loader />}><Training /></Suspense>} />
           <Route path="/reminders" element={<Suspense fallback={<Loader />}><Reminders /></Suspense>} />
           <Route path="/meetings" element={<Suspense fallback={<Loader />}><Meetings /></Suspense>} />
           <Route path="/feedbacks" element={<Suspense fallback={<Loader />}><Feedbacks /></Suspense>} />
+          <Route path="/platform-activity" element={<Suspense fallback={<Loader />}><PlatformActivity /></Suspense>} />
           <Route path="/settings" element={<Suspense fallback={<Loader />}><ProfileSettings /></Suspense>} />
           <Route path="/profile" element={<Navigate to="/settings" replace />} />
         </Route>

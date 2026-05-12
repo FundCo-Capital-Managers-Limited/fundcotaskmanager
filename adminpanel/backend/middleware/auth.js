@@ -2,6 +2,8 @@ import jwt from 'jsonwebtoken';
 import User from '../models/userModel.js';
 import { ADMIN_JWT_SECRET } from '../config/security.js';
 
+const LAST_ACTIVE_TOUCH_WINDOW_MS = 2 * 60 * 1000;
+
 // ── Base auth: verifies token and attaches user to req ────────────────────────
 export const authMiddleware = async (req, res, next) => {
   try {
@@ -14,6 +16,10 @@ export const authMiddleware = async (req, res, next) => {
     if (!user.isActive) return res.status(403).json({ success: false, message: 'Account is deactivated' });
 
     req.user = user;
+    const lastActiveAt = user.lastActive ? new Date(user.lastActive).getTime() : 0;
+    if (!lastActiveAt || (Date.now() - lastActiveAt) >= LAST_ACTIVE_TOUCH_WINDOW_MS) {
+      User.updateOne({ _id: user._id }, { $set: { lastActive: new Date() } }).catch(() => {});
+    }
     next();
   } catch (err) {
     if (err.name === 'TokenExpiredError') {

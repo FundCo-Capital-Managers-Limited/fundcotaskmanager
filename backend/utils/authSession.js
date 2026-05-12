@@ -6,12 +6,24 @@ import { IS_PRODUCTION, USER_JWT_SECRET } from '../config/security.js';
 
 const ACCESS_TOKEN_TTL_MINUTES = Math.max(5, Number(process.env.ACCESS_TOKEN_TTL_MINUTES) || 60);
 const REFRESH_TOKEN_TTL_DAYS = Math.max(1, Number(process.env.REFRESH_TOKEN_TTL_DAYS) || 14);
-const SESSION_REFRESH_TOKEN_TTL_DAYS = Math.max(1, Number(process.env.SESSION_REFRESH_TOKEN_TTL_DAYS) || 3);
+const LEGACY_SESSION_REFRESH_TOKEN_TTL_DAYS = Number(process.env.SESSION_REFRESH_TOKEN_TTL_DAYS);
+const SESSION_REFRESH_TOKEN_TTL_HOURS = Math.max(
+  1,
+  Number(process.env.SESSION_REFRESH_TOKEN_TTL_HOURS)
+    || ((Number.isFinite(LEGACY_SESSION_REFRESH_TOKEN_TTL_DAYS) && LEGACY_SESSION_REFRESH_TOKEN_TTL_DAYS > 0)
+      ? LEGACY_SESSION_REFRESH_TOKEN_TTL_DAYS * 24
+      : 1)
+);
+const REFRESH_TOKEN_ROTATION_GRACE_SECONDS = Math.max(
+  5,
+  Number(process.env.REFRESH_TOKEN_ROTATION_GRACE_SECONDS) || 45
+);
 export const REFRESH_COOKIE_NAME = String(process.env.USER_REFRESH_COOKIE_NAME || 'fc_user_rt').trim();
 
 const ACCESS_TOKEN_TTL_SECONDS = ACCESS_TOKEN_TTL_MINUTES * 60;
 const REFRESH_TOKEN_TTL_MS = REFRESH_TOKEN_TTL_DAYS * 24 * 60 * 60 * 1000;
-const SESSION_REFRESH_TOKEN_TTL_MS = SESSION_REFRESH_TOKEN_TTL_DAYS * 24 * 60 * 60 * 1000;
+const SESSION_REFRESH_TOKEN_TTL_MS = SESSION_REFRESH_TOKEN_TTL_HOURS * 60 * 60 * 1000;
+const REFRESH_TOKEN_ROTATION_GRACE_MS = REFRESH_TOKEN_ROTATION_GRACE_SECONDS * 1000;
 
 const hashToken = (value) => crypto.createHash('sha256').update(String(value || '')).digest('hex');
 const randomToken = () => crypto.randomBytes(48).toString('base64url');
@@ -47,6 +59,20 @@ const getCookieOptions = ({ persistent = false, maxAgeMs } = {}) => {
 const getRefreshTtlMs = (persistent) => (persistent ? REFRESH_TOKEN_TTL_MS : SESSION_REFRESH_TOKEN_TTL_MS);
 
 const getAccessTokenPayload = (userId) => ({ id: userId });
+const SESSION_USER_SELECT = 'firstName lastName otherName fullName position unitSector email role isActive preferences pushToken';
+const mapSessionUser = (user) => ({
+  id: user._id,
+  firstName: user.firstName,
+  lastName: user.lastName,
+  otherName: user.otherName,
+  fullName: user.fullName,
+  position: user.position,
+  unitSector: user.unitSector,
+  email: user.email,
+  role: user.role,
+  preferences: user.preferences,
+  pushToken: user.pushToken,
+});
 
 export const createAccessToken = (userId) =>
   jwt.sign(getAccessTokenPayload(userId), USER_JWT_SECRET, {
@@ -103,6 +129,74 @@ const issueRefreshToken = async ({ userId, familyId, ipAddress, userAgent, persi
   return { rawToken, tokenHash, expiresAt, persistent, refreshTtlMs };
 };
 
+const isRotationGraceEligible = (tokenRecord) =>
+  Boolean(
+    tokenRecord?.revokedAt
+    && tokenRecord?.revokedReason === 'rotated'
+    && tokenRecord?.replacedByTokenHash
+    && (Date.now() - tokenRecord.revokedAt.getTime()) <= REFRESH_TOKEN_ROTATION_GRACE_MS
+  );
+
+const findGraceReplacementRecord = async (tokenRecord, platform) => {
+  let nextHash = tokenRecord?.replacedByTokenHash || '';
+  let hopCount = 0;
+
+  while (nextHash && hopCount < 6) {
+    const candidate = await RefreshToken.findOne({ tokenHash: nextHash, platform });
+    if (!candidate) return null;
+
+    if (!candidate.revokedAt && candidate.expiresAt.getTime() > Date.now()) {
+      return candidate;
+    }
+
+    if (!isRotationGraceEligible(candidate)) {
+      return null;
+    }
+
+    nextHash = candidate.replacedByTokenHash || '';
+    hopCount += 1;
+  }
+
+  return null;
+};
+
+const writeRefreshCookie = (res, refreshToken) => {
+  res.cookie(
+    REFRESH_COOKIE_NAME,
+    refreshToken.rawToken,
+    getCookieOptions({
+      persistent: refreshToken.persistent,
+      maxAgeMs: refreshToken.refreshTtlMs,
+    })
+  );
+};
+
+const rotateFromActiveRecord = async ({ user, activeRecord, req, res }) => {
+  const replacement = await issueRefreshToken({
+    userId: user._id,
+    familyId: activeRecord.familyId,
+    ipAddress: req.ip,
+    userAgent: req.get('user-agent'),
+    persistent: Boolean(activeRecord.persistent),
+  });
+
+  activeRecord.revokedAt = new Date();
+  activeRecord.revokedReason = 'rotated';
+  activeRecord.replacedByTokenHash = replacement.tokenHash;
+  activeRecord.lastUsedAt = new Date();
+  await activeRecord.save();
+
+  writeRefreshCookie(res, replacement);
+
+  return {
+    token: createAccessToken(user._id),
+    accessTokenExpiresInSeconds: ACCESS_TOKEN_TTL_SECONDS,
+    refreshSessionExpiresAt: replacement.expiresAt.toISOString(),
+    rememberMe: replacement.persistent,
+    user: mapSessionUser(user),
+  };
+};
+
 export const issueUserSession = async ({ user, req, res, familyId, rememberMe = false }) => {
   const refreshToken = await issueRefreshToken({
     userId: user._id,
@@ -112,14 +206,7 @@ export const issueUserSession = async ({ user, req, res, familyId, rememberMe = 
     persistent: Boolean(rememberMe),
   });
 
-  res.cookie(
-    REFRESH_COOKIE_NAME,
-    refreshToken.rawToken,
-    getCookieOptions({
-      persistent: refreshToken.persistent,
-      maxAgeMs: refreshToken.refreshTtlMs,
-    })
-  );
+  writeRefreshCookie(res, refreshToken);
 
   return {
     token: createAccessToken(user._id),
@@ -178,6 +265,16 @@ export const rotateUserRefreshSession = async ({ req, res }) => {
   }
 
   if (existing.revokedAt) {
+    if (isRotationGraceEligible(existing)) {
+      const graceRecord = await findGraceReplacementRecord(existing, 'user');
+      if (graceRecord) {
+        const graceUser = await User.findById(graceRecord.userId).select(SESSION_USER_SELECT);
+        if (graceUser?.isActive) {
+          return rotateFromActiveRecord({ user: graceUser, activeRecord: graceRecord, req, res });
+        }
+      }
+    }
+
     await RefreshToken.updateMany(
       { familyId: existing.familyId, platform: 'user', revokedAt: null },
       {
@@ -198,9 +295,7 @@ export const rotateUserRefreshSession = async ({ req, res }) => {
     throw new Error('Refresh token expired');
   }
 
-  const user = await User.findById(existing.userId).select(
-    'firstName lastName otherName fullName position unitSector email role isActive preferences pushToken'
-  );
+  const user = await User.findById(existing.userId).select(SESSION_USER_SELECT);
 
   if (!user || !user.isActive) {
     await RefreshToken.updateMany(
@@ -215,46 +310,5 @@ export const rotateUserRefreshSession = async ({ req, res }) => {
     throw new Error('Account inactive');
   }
 
-  const replacement = await issueRefreshToken({
-    userId: user._id,
-    familyId: existing.familyId,
-    ipAddress: req.ip,
-    userAgent: req.get('user-agent'),
-    persistent: Boolean(existing.persistent),
-  });
-
-  existing.revokedAt = new Date();
-  existing.revokedReason = 'rotated';
-  existing.replacedByTokenHash = replacement.tokenHash;
-  existing.lastUsedAt = new Date();
-  await existing.save();
-
-  res.cookie(
-    REFRESH_COOKIE_NAME,
-    replacement.rawToken,
-    getCookieOptions({
-      persistent: replacement.persistent,
-      maxAgeMs: replacement.refreshTtlMs,
-    })
-  );
-
-  return {
-    token: createAccessToken(user._id),
-    accessTokenExpiresInSeconds: ACCESS_TOKEN_TTL_SECONDS,
-    refreshSessionExpiresAt: replacement.expiresAt.toISOString(),
-    rememberMe: replacement.persistent,
-    user: {
-      id: user._id,
-      firstName: user.firstName,
-      lastName: user.lastName,
-      otherName: user.otherName,
-      fullName: user.fullName,
-      position: user.position,
-      unitSector: user.unitSector,
-      email: user.email,
-      role: user.role,
-      preferences: user.preferences,
-      pushToken: user.pushToken,
-    },
-  };
+  return rotateFromActiveRecord({ user, activeRecord: existing, req, res });
 };

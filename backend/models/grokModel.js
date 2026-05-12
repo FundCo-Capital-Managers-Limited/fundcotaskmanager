@@ -3,6 +3,7 @@ import mongoose from 'mongoose';
 
 const grokChatSchema = new mongoose.Schema({
   userId:  { type: mongoose.Schema.Types.ObjectId, ref: 'user', required: true, index: true },
+  actorType: { type: String, enum: ['user', 'admin'], default: 'user', index: true },
   toolId:  { type: String, required: true },
   messages: [{
     role:    { type: String, enum: ['system', 'user', 'assistant'] },
@@ -17,7 +18,7 @@ const grokChatSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 grokChatSchema.index({ title: 'text', summary: 'text' });
-grokChatSchema.index({ userId: 1, toolId: 1, createdAt: -1 });
+grokChatSchema.index({ userId: 1, actorType: 1, toolId: 1, createdAt: -1 });
 
 // Auto-update messageCount
 grokChatSchema.pre('save', function (next) {

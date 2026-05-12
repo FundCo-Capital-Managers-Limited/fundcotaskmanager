@@ -2,6 +2,7 @@ import React from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { NavLink } from 'react-router-dom';
 import {
+  Brain,
   Bell,
   BookOpen,
   CalendarDays,
@@ -17,6 +18,7 @@ import {
   MessageSquare,
   MessageCircleMore,
   Presentation,
+  ShieldCheck,
   Settings,
   Target,
   TrendingUp,
@@ -42,6 +44,7 @@ const navConfig = [
   { to: '/my-team', icon: UsersRound, label: 'My Team', roles: ['team-lead', 'executive', 'admin'] },
   { to: '/team-chat', icon: MessageSquare, label: 'Team Chat', roles: ['team-lead', 'executive', 'admin'], badge: 'chat' },
   { to: '/social', icon: Globe, label: 'Social Feed', roles: ['team-lead', 'executive', 'admin'], badge: 'social' },
+  { to: '/ai-tools', icon: Brain, label: 'AI Tools', roles: ['team-lead', 'executive', 'admin'] },
   { to: '/training', icon: BookOpen, label: 'Training', roles: ['team-lead', 'executive', 'admin'] },
   { to: '/reminders', icon: Bell, label: 'Reminders', roles: ['team-lead', 'executive', 'admin'], badge: 'reminders' },
   { to: '/meetings', icon: Video, label: 'Meetings', roles: ['team-lead', 'executive', 'admin'], badge: 'meetings' },
@@ -50,6 +53,7 @@ const navConfig = [
   { to: '/settings', icon: Settings, label: 'Profile Settings', roles: ['team-lead', 'executive', 'admin'] },
   { divider: true },
   { to: '/feedbacks', icon: MessageCircleMore, label: 'User Feedback', roles: ['admin'] },
+  { to: '/platform-activity', icon: ShieldCheck, label: 'Platform Activity', roles: ['admin'] },
   { to: '/users', icon: Users, label: 'Users', roles: ['admin'] },
 ];
 

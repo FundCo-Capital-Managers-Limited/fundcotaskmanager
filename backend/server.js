@@ -37,6 +37,7 @@ import roomRouter from './routes/roomRoutes.js';
 import notificationRouter from './routes/notificationRoutes.js';
 import meetingReportRouter from './routes/meetingReportRoutes.js';
 import linkPreviewRouter from './routes/linkPreviewRoutes.js';
+import platformActivityRouter from './routes/platformActivityRoutes.js';
 
 import { startReminderScheduler } from './utils/reminderScheduler.js';
 import Meeting from './models/meetingModel.js';
@@ -184,6 +185,7 @@ app.use('/api/meeting-reports', meetingReportRouter);
 app.use('/api/rooms',       roomRouter);
 app.use('/api/notifications', notificationRouter);
 app.use('/api/link-preview', linkPreviewRouter);
+app.use('/api/platform-activity', platformActivityRouter);
 
 // Socket.IO Auth
 io.use(async (socket, next) => {

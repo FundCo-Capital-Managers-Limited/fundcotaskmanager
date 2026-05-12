@@ -34,35 +34,55 @@ Partners: GVE, Darway Coast, ACOB, AquaEarth, Farm Warehouse.
 Green Kiosk: Solar-powered kiosks for rural energy. Black Soldier Fly: Sustainable waste management.
 `.trim();
 
+const PLATFORM_KNOWLEDGE = `
+The live FundCo platform includes tasks, goals, reminders, projects, reports, meeting reports, team chat, video meetings, training, exams, performance tracking, file storage, notifications, and AI productivity tools.
+Admins and executives use the platform for approvals, company oversight, project control, performance review, platform activity reporting, and management coordination.
+Users rely on the platform for assigned work, collaboration, reporting, learning, and operational accountability.
+When platform workflows are discussed, stay grounded in these modules and the user's actual context. Do not invent unavailable features or hidden data.
+`.trim();
+
+const OPERATING_STYLE = `
+You are an internal FundCo work engine, not a public chatbot.
+Give direct, useful answers that help people complete work faster and with better judgment.
+Use clear structure, correct FundCo terms, and practical next steps.
+When the user asks for analysis, call out risks, missing information, weak assumptions, and decisions that need escalation.
+When the prompt depends on company records, attached documents, or task data, use only what is actually provided and say plainly when something is missing.
+Prefer action lists, decision notes, compact tables, and executive-ready summaries over vague prose.
+Do not use hype, filler, or exaggerated language.
+`.trim();
+
+const withOperatingContext = (specialistPrompt) =>
+  `${COMPANY_KNOWLEDGE}\n\n${PLATFORM_KNOWLEDGE}\n\n${OPERATING_STYLE}\n\n${specialistPrompt}`;
+
 // ── Tool system prompts ───────────────────────────────────────────────────────
 const TOOL_PROMPTS = {
-  'general':                   `${COMPANY_KNOWLEDGE}\n\nYou are FundCo AI, a knowledgeable assistant for FundCo Capital Managers. Be concise, accurate, and professional. Use Markdown formatting. Address the user as "you". Analyze attached files thoroughly.`,
-  'report-generator':          `${COMPANY_KNOWLEDGE}\n\nYou are a professional report writer. Generate clear, structured progress reports in Markdown using ONLY the tasks provided. Be truthful about completed and incomplete work. Use FundCo terminology.`,
-  'task-prioritizer':          `${COMPANY_KNOWLEDGE}\n\nYou are a task management expert. Analyze and prioritize tasks using Eisenhower matrix or MoSCoW. Output a sorted list with scores and reasoning. Use FundCo SOPs for context.`,
-  'effort-estimator':          `${COMPANY_KNOWLEDGE}\n\nYou are a project estimation specialist. Provide realistic time and resource estimates with phase breakdowns. Use FundCo terms like CAPEX/OPEX.`,
-  'task-breaker':              `${COMPANY_KNOWLEDGE}\n\nYou are a task decomposition expert. Break tasks into atomic sub-tasks with dependencies and estimates. Align with FundCo unit responsibilities.`,
-  'email-writer':              `${COMPANY_KNOWLEDGE}\n\nYou are a professional communicator. Draft clear, structured emails with subject, greeting, body, and closing. Adapt tone as needed.`,
-  'summary-generator':         `${COMPANY_KNOWLEDGE}\n\nYou are a summarization expert. Create concise summaries highlighting key points, actions, deadlines, and risks. Use bullet points.`,
-  'brainstormer':              `${COMPANY_KNOWLEDGE}\n\nYou are a creative brainstormer. Generate diverse ideas with pros/cons and feasibility scores. Tailor ideas to FundCo's sectors.`,
-  'document-analyzer':         `${COMPANY_KNOWLEDGE}\n\nYou are a document analysis expert. Extract key information from attached files, identify anomalies, and suggest actions. Analyze SOPs and BoQs thoroughly.`,
-  'mini-grid-planner':         `${COMPANY_KNOWLEDGE}\n\nYou are a mini-grid planning expert. Use FundCo SOPs for site survey, design (PV, BESS), and installation. Include BoQ, timelines, and ESG risks.`,
-  'lcoe-calculator':           `${COMPANY_KNOWLEDGE}\n\nYou are an LCOE calculation expert. Calculate levelized cost of energy incorporating CAPEX/OPEX, energy yield, and depreciation. Provide comparisons to grid/diesel.`,
-  'ppa-drafter':               `${COMPANY_KNOWLEDGE}\n\nYou are a PPA drafting expert. Draft Power Purchase Agreements based on FundCo SOPs including tariff rates, terms, and carbon credits.`,
-  'carbon-credit-estimator':   `${COMPANY_KNOWLEDGE}\n\nYou are a carbon credit estimation expert. Calculate CO2 avoidance from diesel displacement. Align with NDCs and CBI certification.`,
-  'mortgage-simulator':        `${COMPANY_KNOWLEDGE}\n\nYou are a mortgage simulation expert for HSF. Factor in ROI, payback period, and green bonds in financial models.`,
-  'property-valuator':         `${COMPANY_KNOWLEDGE}\n\nYou are a property valuation expert. Incorporate ESG factors (BEES rating), location analysis, and market data.`,
-  'green-building-assessor':   `${COMPANY_KNOWLEDGE}\n\nYou are a green building assessment expert. Assess energy efficiency, environmental impact, and sustainability ratings.`,
-  'crop-yield-predictor':      `${COMPANY_KNOWLEDGE}\n\nYou are a crop yield prediction expert for Agronomie. Factor in energy access from mini-grids, soil health, and BSF farming.`,
-  'pue-optimizer':             `${COMPANY_KNOWLEDGE}\n\nYou are a Productive Use of Energy optimizer. Analyze agro-processing needs (milling, cold storage) and optimize energy usage.`,
-  'ev-infrastructure-planner': `${COMPANY_KNOWLEDGE}\n\nYou are an EV infrastructure planning expert for SSM. Plan charging and swapping stations with solar integration.`,
-  'portfolio-risk-analyzer':   `${COMPANY_KNOWLEDGE}\n\nYou are a portfolio risk analysis expert. Assess FX risks, NPL exposure, and ESG compliance. Run stress tests.`,
-  'esg-compliance-checker':    `${COMPANY_KNOWLEDGE}\n\nYou are an ESG compliance expert. Check against IFC standards and UN principles. Flag non-compliance issues.`,
-  'investment-forecaster':     `${COMPANY_KNOWLEDGE}\n\nYou are an investment forecasting expert. Project ROI and payback periods using market trends and financial models.`,
-  'financial-structurer':      `${COMPANY_KNOWLEDGE}\n\nYou are a financial structuring expert. Design debt/equity financing, green bond structures, and payment plans.`,
-  'contract-drafter':          `${COMPANY_KNOWLEDGE}\n\nYou are a contract drafting expert. Draft EPC, PPA, and other contracts based on FundCo SOPs and legal templates.`,
-  'procurement-advisor':       `${COMPANY_KNOWLEDGE}\n\nYou are a procurement advisor. Guide supplier selection, RFQ processes, and PO management using FundCo SOPs.`,
-  'boq-generator':             `${COMPANY_KNOWLEDGE}\n\nYou are a Bill of Quantities expert. Generate detailed BoQs for FundCo projects with materials, quantities, and cost estimates.`,
-  'sdg-impact-analyzer':       `${COMPANY_KNOWLEDGE}\n\nYou are an SDG impact analysis expert. Map project activities to UN Sustainable Development Goals with measurable indicators.`,
+  'general':                   withOperatingContext(`You are FundCo AI, the internal assistant for FundCo Capital Managers. Be concise, accurate, professional, and deeply grounded in FundCo operations. Use Markdown formatting and analyze attached files thoroughly.`),
+  'report-generator':          withOperatingContext(`You are a professional report writer. Generate clear, structured progress reports in Markdown using ONLY the tasks provided. Be truthful about completed and incomplete work. Use FundCo terminology.`),
+  'task-prioritizer':          withOperatingContext(`You are a task management expert. Analyze and prioritize tasks using Eisenhower matrix or MoSCoW. Output a sorted list with scores and reasoning. Use FundCo SOPs for context.`),
+  'effort-estimator':          withOperatingContext(`You are a project estimation specialist. Provide realistic time and resource estimates with phase breakdowns. Use FundCo terms like CAPEX and OPEX.`),
+  'task-breaker':              withOperatingContext(`You are a task decomposition expert. Break tasks into atomic sub-tasks with dependencies, decision points, and estimates. Align with FundCo unit responsibilities.`),
+  'email-writer':              withOperatingContext(`You are a professional communicator. Draft clear, structured emails with subject, greeting, body, and closing. Adapt tone as needed.`),
+  'summary-generator':         withOperatingContext(`You are a summarization expert. Create concise summaries highlighting key points, actions, deadlines, and risks. Use bullet points when they improve clarity.`),
+  'brainstormer':              withOperatingContext(`You are a practical ideation partner. Generate grounded ideas with pros, risks, and feasibility scores. Tailor ideas to FundCo's sectors.`),
+  'document-analyzer':         withOperatingContext(`You are a document analysis expert. Extract key information from attached files, identify anomalies, and suggest actions. Analyze SOPs and BoQs thoroughly.`),
+  'mini-grid-planner':         withOperatingContext(`You are a mini-grid planning expert. Use FundCo SOPs for site survey, design (PV, BESS), and installation. Include BoQ, timelines, and ESG risks.`),
+  'lcoe-calculator':           withOperatingContext(`You are an LCOE calculation expert. Calculate levelized cost of energy incorporating CAPEX, OPEX, energy yield, and depreciation. Provide comparisons to grid and diesel.`),
+  'ppa-drafter':               withOperatingContext(`You are a PPA drafting expert. Draft Power Purchase Agreements based on FundCo SOPs including tariff rates, terms, and carbon credits.`),
+  'carbon-credit-estimator':   withOperatingContext(`You are a carbon credit estimation expert. Calculate CO2 avoidance from diesel displacement. Align with NDCs and CBI certification.`),
+  'mortgage-simulator':        withOperatingContext(`You are a mortgage simulation expert for HSF. Factor in ROI, payback period, and green bonds in financial models.`),
+  'property-valuator':         withOperatingContext(`You are a property valuation expert. Incorporate ESG factors (BEES rating), location analysis, and market data.`),
+  'green-building-assessor':   withOperatingContext(`You are a green building assessment expert. Assess energy efficiency, environmental impact, and sustainability ratings.`),
+  'crop-yield-predictor':      withOperatingContext(`You are a crop yield prediction expert for Agronomie. Factor in energy access from mini-grids, soil health, and BSF farming.`),
+  'pue-optimizer':             withOperatingContext(`You are a Productive Use of Energy optimizer. Analyze agro-processing needs such as milling and cold storage, then optimize energy usage.`),
+  'ev-infrastructure-planner': withOperatingContext(`You are an EV infrastructure planning expert for SSM. Plan charging and swapping stations with solar integration.`),
+  'portfolio-risk-analyzer':   withOperatingContext(`You are a portfolio risk analysis expert. Assess FX risks, NPL exposure, and ESG compliance. Run stress tests and call out decision points.`),
+  'esg-compliance-checker':    withOperatingContext(`You are an ESG compliance expert. Check against IFC standards and UN principles. Flag non-compliance issues clearly.`),
+  'investment-forecaster':     withOperatingContext(`You are an investment forecasting expert. Project ROI and payback periods using market trends and financial models.`),
+  'financial-structurer':      withOperatingContext(`You are a financial structuring expert. Design debt and equity financing, green bond structures, and payment plans.`),
+  'contract-drafter':          withOperatingContext(`You are a contract drafting expert. Draft EPC, PPA, and other contracts based on FundCo SOPs and legal templates.`),
+  'procurement-advisor':       withOperatingContext(`You are a procurement advisor. Guide supplier selection, RFQ processes, and purchase order management using FundCo SOPs.`),
+  'boq-generator':             withOperatingContext(`You are a Bill of Quantities expert. Generate detailed BoQs for FundCo projects with materials, quantities, and cost estimates.`),
+  'sdg-impact-analyzer':       withOperatingContext(`You are an SDG impact analysis expert. Map project activities to UN Sustainable Development Goals with measurable indicators.`),
 };
 
 // ── File processing helper ─────────────────────────────────────────────────────
@@ -145,6 +165,36 @@ const generateTitleAndSummary = async (fullContent) => {
   }
 };
 
+const getActorType = (req) => (req.platformUserType === 'admin' ? 'admin' : 'user');
+
+const buildActorFilter = (req, extra = {}) => ({
+  ...extra,
+  userId: req.user._id,
+  $or: [
+    { actorType: getActorType(req) },
+    { actorType: { $exists: false } },
+  ],
+});
+
+const toChatSummary = (chat) => ({
+  _id: chat._id,
+  chatId: chat._id,
+  toolId: chat.toolId,
+  title: chat.title || 'FundCo AI Chat',
+  summary: chat.summary || '',
+  starred: Boolean(chat.starred),
+  tags: Array.isArray(chat.tags) ? chat.tags : [],
+  messageCount: Number(chat.messageCount || chat.messages?.length || 0),
+  createdAt: chat.createdAt,
+  updatedAt: chat.updatedAt,
+});
+
+const toChatDetail = (chat) => ({
+  ...toChatSummary(chat),
+  taskContext: chat.taskContext || null,
+  messages: Array.isArray(chat.messages) ? chat.messages : [],
+});
+
 // ── Main chat handler (streaming SSE) ────────────────────────────────────────
 export const grokChat = async (req, res) => {
   let { messages, taskContext, toolId, chatId } = req.body;
@@ -200,38 +250,55 @@ export const grokChat = async (req, res) => {
         res.write(`data: ${JSON.stringify({ content: delta })}\n\n`);
       }
     }
-    res.write('data: [DONE]\n\n');
-
-    // Persist / update chat history
+    // Persist / update chat history before closing the stream so the
+    // frontend can reopen the conversation immediately.
+    let savedMeta = null;
     try {
       const assistantMsg = { role: 'assistant', content: fullContent };
       const allMessages  = [...messages, assistantMsg];
 
+      let existing = null;
       if (chatId) {
-        // Continue existing chat
-        const existing = await GrokChat.findOne({ _id: chatId, userId: req.user._id });
-        if (existing) {
-          existing.messages = allMessages;
-          existing.taskContext = taskContext || existing.taskContext;
-          await existing.save();
-          res.write(`data: ${JSON.stringify({ chatId: existing._id.toString(), saved: true })}\n\n`);
-        }
+        existing = await GrokChat.findOne(buildActorFilter(req, { _id: chatId }));
+      }
+
+      if (existing) {
+        existing.toolId = toolId || existing.toolId;
+        existing.messages = allMessages;
+        existing.taskContext = taskContext || existing.taskContext;
+        existing.actorType = getActorType(req);
+        await existing.save();
+        savedMeta = {
+          ...toChatSummary(existing),
+          chatId: existing._id.toString(),
+          saved: true,
+        };
       } else {
-        // Create new chat
+        // Create new chat when no chat exists yet or the provided chatId
+        // no longer resolves cleanly. This keeps the UI recoverable.
         const { title, summary } = await generateTitleAndSummary(fullContent);
         const newChat = await GrokChat.create({
           userId:      req.user._id,
+          actorType:   getActorType(req),
           toolId,
           messages:    allMessages,
           taskContext,
           title,
           summary,
         });
-        res.write(`data: ${JSON.stringify({ chatId: newChat._id.toString(), title, summary, saved: true })}\n\n`);
+        savedMeta = {
+          ...toChatSummary(newChat),
+          chatId: newChat._id.toString(),
+          saved: true,
+        };
       }
     } catch (saveErr) {
       console.error('Chat save error:', saveErr.message);
     }
+    if (savedMeta) {
+      res.write(`data: ${JSON.stringify(savedMeta)}\n\n`);
+    }
+    res.write('data: [DONE]\n\n');
   } catch (err) {
     console.error('FundCo AI error:', err.message);
     res.write(`data: ${JSON.stringify({ error: 'FundCo AI is temporarily unavailable. Please try again.' })}\n\n`);
@@ -244,7 +311,7 @@ export const grokChat = async (req, res) => {
 export const getChatHistory = async (req, res) => {
   try {
     const { toolId, toolIds, search, starred, page = 1, limit = 30 } = req.query;
-    const filter = { userId: req.user._id };
+    const filter = buildActorFilter(req);
     // toolIds = comma-separated list (AI Tools section scope)
     // toolId  = single exact match
     if (toolIds) {
@@ -262,7 +329,12 @@ export const getChatHistory = async (req, res) => {
       .select('-messages'); // Don't send full messages in list — saves bandwidth
 
     const total = await GrokChat.countDocuments(filter);
-    res.json({ success: true, histories: chats, total, page: Number(page) });
+    res.json({
+      success: true,
+      histories: chats.map(toChatSummary),
+      total,
+      page: Number(page),
+    });
   } catch (err) {
     res.status(500).json({ success: false, error: 'Failed to fetch history' });
   }
@@ -271,9 +343,9 @@ export const getChatHistory = async (req, res) => {
 // ── Get single chat (with messages) ──────────────────────────────────────────
 export const getChatById = async (req, res) => {
   try {
-    const chat = await GrokChat.findOne({ _id: req.params.chatId, userId: req.user._id });
+    const chat = await GrokChat.findOne(buildActorFilter(req, { _id: req.params.chatId }));
     if (!chat) return res.status(404).json({ success: false, error: 'Chat not found' });
-    res.json({ success: true, chat });
+    res.json({ success: true, chat: toChatDetail(chat) });
   } catch (err) {
     res.status(500).json({ success: false, error: 'Failed to fetch chat' });
   }
@@ -289,12 +361,12 @@ export const updateChat = async (req, res) => {
     if (starred !== undefined) update.starred = starred;
 
     const chat = await GrokChat.findOneAndUpdate(
-      { _id: req.params.chatId, userId: req.user._id },
+      buildActorFilter(req, { _id: req.params.chatId }),
       update,
       { new: true }
     );
     if (!chat) return res.status(404).json({ success: false, error: 'Chat not found' });
-    res.json({ success: true, chat });
+    res.json({ success: true, chat: toChatSummary(chat) });
   } catch (err) {
     res.status(500).json({ success: false, error: 'Failed to update chat' });
   }
@@ -303,7 +375,7 @@ export const updateChat = async (req, res) => {
 // ── Delete chat ───────────────────────────────────────────────────────────────
 export const deleteChat = async (req, res) => {
   try {
-    const deleted = await GrokChat.findOneAndDelete({ _id: req.params.chatId, userId: req.user._id });
+    const deleted = await GrokChat.findOneAndDelete(buildActorFilter(req, { _id: req.params.chatId }));
     if (!deleted) return res.status(404).json({ success: false, error: 'Chat not found' });
     res.json({ success: true });
   } catch (err) {
@@ -314,7 +386,7 @@ export const deleteChat = async (req, res) => {
 // ── Delete all chats for a tool ───────────────────────────────────────────────
 export const clearToolHistory = async (req, res) => {
   try {
-    await GrokChat.deleteMany({ userId: req.user._id, toolId: req.params.toolId });
+    await GrokChat.deleteMany(buildActorFilter(req, { toolId: req.params.toolId }));
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ success: false, error: 'Failed to clear history' });
