@@ -4,7 +4,7 @@ import {
   List, CheckCircle, Menu, Info, X, LayoutDashboard, Clock,
   Calendar, MessageSquare, File, FileText, CreditCard, Sparkles,
   AlertCircle, Bell, Target, Award, Video, BookOpen, Instagram,
-  ChevronRight, ChevronLeft, LineChart, Presentation, MessageCircle, FolderKanban,
+  ChevronRight, ChevronLeft, CircleDollarSign, LineChart, Presentation, MessageCircle, FolderKanban,
 } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 import axios from 'axios';
@@ -93,6 +93,7 @@ const Sidebar = ({ user, isExpanded, onToggle, mobileOpen = false, onCloseMobile
     { text: 'Analytics',      path: '/analytics',          icon: LineChart },
     { text: 'Calendar',       path: '/calendar',           icon: Calendar },
     { text: 'Projects',       path: '/projects',           icon: FolderKanban,    badge: projectBadge },
+    { text: 'Revenue Projects', path: '/revenue-projects', icon: CircleDollarSign },
     { text: 'Goals',          path: '/goals',              icon: Target,          badge: goalBadge },
     { text: 'Reminders',      path: '/reminders',          icon: Bell,           badge: reminderBadge },
     { text: 'Team Chat',      path: '/team-chat',          icon: MessageSquare,  badge: chatBadge },

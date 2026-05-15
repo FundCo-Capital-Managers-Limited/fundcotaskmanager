@@ -12,6 +12,15 @@ const TaskModal = ({ isOpen, onClose, taskToEdit, onSave, onLogout, isReadOnly =
   const today = new Date().toISOString().split('T')[0];
   const isApproved = taskToEdit?.submissionStatus === 'approved';
   const locked = isApproved || isReadOnly;
+  const revenueProjectTask = Boolean(taskToEdit?.revenueProject?.projectId);
+  const taskDetailLocked = locked || revenueProjectTask;
+  const priorityLocked = locked || Boolean(taskToEdit?.revenueProject?.priorityLocked);
+  const checklistTextLocked = locked || revenueProjectTask;
+  const checklistCompletionBlocked = Boolean(
+    taskToEdit?.revenueProject?.completionRequiresPhaseRelease
+    && !taskToEdit?.revenueProject?.phaseCompletionUnlocked
+  );
+  const revenuePhaseTitle = String(taskToEdit?.revenueProject?.phaseTitle || '').trim();
 
   useEffect(() => {
     if (!isOpen) return;
@@ -61,7 +70,7 @@ const TaskModal = ({ isOpen, onClose, taskToEdit, onSave, onLogout, isReadOnly =
     setLoading(true);
     setError(null);
     try {
-      onSave?.({ _id: taskData.id, ...taskData, checklist: checklist.filter((i) => i.text.trim()) });
+      await onSave?.({ _id: taskData.id, ...taskData, checklist: checklist.filter((i) => i.text.trim()) });
       onClose();
     } catch (err) {
       setError(err.response?.data?.message || 'Unexpected error occurred');
@@ -147,9 +156,14 @@ const TaskModal = ({ isOpen, onClose, taskToEdit, onSave, onLogout, isReadOnly =
                   borderColor: 'var(--input-border)',
                   color: 'var(--text-primary)',
                 }}
-                disabled={locked}
+                disabled={taskDetailLocked}
                 required
               />
+              {revenueProjectTask ? (
+                <p className="mt-2 text-xs leading-5" style={{ color: 'var(--text-secondary)' }}>
+                  Task title and instruction details are controlled by admin for revenue-linked project work.
+                </p>
+              ) : null}
             </div>
 
             {/* Description */}
@@ -169,7 +183,7 @@ const TaskModal = ({ isOpen, onClose, taskToEdit, onSave, onLogout, isReadOnly =
                   borderColor: 'var(--input-border)',
                   color: 'var(--text-primary)',
                 }}
-                disabled={locked}
+                disabled={taskDetailLocked}
               />
             </div>
 
@@ -184,7 +198,7 @@ const TaskModal = ({ isOpen, onClose, taskToEdit, onSave, onLogout, isReadOnly =
                     <button
                       key={value}
                       type="button"
-                      disabled={locked}
+                      disabled={priorityLocked}
                       onClick={() => setTaskData((p) => ({ ...p, priority: value }))}
                       className="flex-1 py-2.5 rounded-lg text-xs font-bold border-2 transition-all"
                       style={
@@ -197,6 +211,11 @@ const TaskModal = ({ isOpen, onClose, taskToEdit, onSave, onLogout, isReadOnly =
                     </button>
                   ))}
                 </div>
+                {revenueProjectTask ? (
+                  <p className="mt-2 text-xs leading-5" style={{ color: 'var(--text-secondary)' }}>
+                    Priority is fixed for this revenue-linked project task and can only be changed by admin.
+                  </p>
+                ) : null}
               </div>
 
               <div>
@@ -215,7 +234,7 @@ const TaskModal = ({ isOpen, onClose, taskToEdit, onSave, onLogout, isReadOnly =
                     borderColor: 'var(--input-border)',
                     color: 'var(--text-primary)',
                   }}
-                  disabled={locked}
+                  disabled={taskDetailLocked}
                 />
               </div>
             </div>
@@ -225,6 +244,17 @@ const TaskModal = ({ isOpen, onClose, taskToEdit, onSave, onLogout, isReadOnly =
               <label className="block text-xs font-bold uppercase tracking-wider mb-1.5" style={{ color: 'var(--text-secondary)' }}>
                 Checklist {checklist.length > 0 && `(${checklist.filter((i) => i.completed).length}/${checklist.length})`}
               </label>
+
+              {revenueProjectTask ? (
+                <div
+                  className="mb-3 rounded-xl px-4 py-3 text-xs leading-5"
+                  style={{ backgroundColor: 'var(--brand-light)', color: 'var(--text-secondary)' }}
+                >
+                  {checklistCompletionBlocked
+                    ? `You can update checklist progress here, but this task cannot be marked done until admin completes ${revenuePhaseTitle ? `the "${revenuePhaseTitle}" phase` : 'the linked project phase'}.`
+                    : `${revenuePhaseTitle ? `The "${revenuePhaseTitle}" phase is complete.` : 'The linked project phase is complete.'} Finish your checklist, then you can mark this task done and submit it.`}
+                </div>
+              ) : null}
 
               {checklist.length > 0 && (
                 <div className="space-y-2 mb-3 max-h-48 overflow-y-auto">
@@ -254,12 +284,12 @@ const TaskModal = ({ isOpen, onClose, taskToEdit, onSave, onLogout, isReadOnly =
                           n[idx].text = e.target.value;
                           setChecklist(n);
                         }}
-                        disabled={locked}
+                        disabled={checklistTextLocked}
                         className={`flex-1 text-sm bg-transparent focus:outline-none ${item.completed ? 'line-through' : ''
                           }`}
                         style={{ color: item.completed ? 'var(--text-muted)' : 'var(--text-primary)' }}
                       />
-                      {!locked && (
+                      {!checklistTextLocked && (
                         <button
                           type="button"
                           onClick={() => setChecklist(checklist.filter((_, i) => i !== idx))}
@@ -273,7 +303,7 @@ const TaskModal = ({ isOpen, onClose, taskToEdit, onSave, onLogout, isReadOnly =
                 </div>
               )}
 
-              {!locked && (
+              {!checklistTextLocked && (
                 <div className="flex gap-2">
                   <input
                     type="text"

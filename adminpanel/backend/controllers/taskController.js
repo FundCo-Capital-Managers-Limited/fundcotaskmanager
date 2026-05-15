@@ -1,6 +1,7 @@
 import Task from '../models/taskModel.js';
 import Reminder from '../models/reminderModel.js';
 import User from '../models/userModel.js';
+import RevenueProject from '../models/revenueProjectModel.js';
 import { buildTeamQuery } from '../middleware/teamFilter.js';
 import { createNotification } from '../utils/notificationService.js';
 import {
@@ -524,6 +525,12 @@ export const updateTask = async (req, res) => {
       });
     }
 
+    if (updated?.revenueProject?.projectId && nextOwnerId) {
+      await RevenueProject.findByIdAndUpdate(updated.revenueProject.projectId, {
+        $addToSet: { members: nextOwnerId },
+      }).catch(() => {});
+    }
+
     res.json({ success: true, task: updated });
   } catch (err) {
     console.error('updateTask error:', err.message);
@@ -541,6 +548,11 @@ export const deleteTask = async (req, res) => {
 
     const ownerId = getUserId(task.owner);
     await Task.findByIdAndDelete(req.params.id);
+    if (task.revenueProject?.projectId) {
+      await RevenueProject.findByIdAndUpdate(task.revenueProject.projectId, {
+        $pull: { tasks: task._id },
+      }).catch(() => {});
+    }
     await deleteTaskReminder({ taskId: req.params.id, userId: ownerId, io: req.io, authHeader: req.headers.authorization || '' });
 
     await emitTaskRealtime({ event: 'deleteTask', userId: ownerId, payload: req.params.id, io: req.io });

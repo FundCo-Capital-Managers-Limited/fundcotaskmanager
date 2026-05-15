@@ -213,6 +213,7 @@ const TeamChat = () => {
   const [forwardMessage, setForwardMessage] = useState(null);
   const fileRef = useRef(null);
   const bottomRef = useRef(null);
+  const unreadCountsRef = useRef({});
 
   const fetchInitial = useCallback(async () => {
     setLoading(true);
@@ -236,21 +237,31 @@ const TeamChat = () => {
     fetchInitial();
   }, [fetchInitial]);
 
+  useEffect(() => {
+    unreadCountsRef.current = unreadCounts || {};
+  }, [unreadCounts]);
+
   const markRead = useCallback(async (chatId) => {
     if (!chatId) return;
-    const hadUnread = Number(unreadCounts[chatId]) > 0;
-    setUnreadCounts((current) => {
-      const copy = { ...current };
-      delete copy[chatId];
-      return copy;
-    });
+    const hadUnread = Number(unreadCountsRef.current?.[chatId]) > 0;
+    if (hadUnread) {
+      setUnreadCounts((current) => {
+        if (!Object.prototype.hasOwnProperty.call(current || {}, chatId)) return current;
+        const copy = { ...current };
+        delete copy[chatId];
+        return copy;
+      });
+      const nextUnread = { ...(unreadCountsRef.current || {}) };
+      delete nextUnread[chatId];
+      unreadCountsRef.current = nextUnread;
+    }
     try {
       await userApi.post(`/api/chats/${chatId}/read`);
     } catch {
     } finally {
       if (hadUnread) refreshNotifications();
     }
-  }, [refreshNotifications, unreadCounts]);
+  }, [refreshNotifications]);
 
   const fetchMessages = useCallback(async (chatId, silent = false) => {
     if (!chatId) return;

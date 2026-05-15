@@ -34,22 +34,23 @@ const isRetryableError = (error) => {
 
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-export const uploadFileToIPFS = async (buffer, fileName, mimeType, retries = 3) => {
+export const uploadFileToIPFS = async (fileInput, fileName, mimeType, retries = 3, fileSize = 0) => {
   const PINATA_JWT = process.env.PINATA_JWT;
   if (!PINATA_JWT) {
     throw new Error('PINATA_JWT is not defined in environment variables');
   }
 
   const totalAttempts = Math.max(1, Number(retries) + 1);
-  const timeout = resolveTimeout(buffer?.length);
+  const payloadSize = Number(fileSize || fileInput?.length || 0);
+  const timeout = resolveTimeout(payloadSize);
   let lastError = null;
 
   for (let attempt = 1; attempt <= totalAttempts; attempt += 1) {
     try {
-      console.log(`Preparing to upload to Pinata: ${fileName}, size: ${buffer.length}, type: ${mimeType}, attempt: ${attempt}/${totalAttempts}, timeout: ${timeout}ms`);
+      console.log(`Preparing to upload to Pinata: ${fileName}, size: ${payloadSize}, type: ${mimeType}, attempt: ${attempt}/${totalAttempts}, timeout: ${timeout}ms`);
 
       const formData = new FormData();
-      formData.append('file', buffer, {
+      formData.append('file', fileInput, {
         filename: fileName,
         contentType: mimeType,
       });

@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { CheckCircle2, CheckSquare, Clock, Filter, ListChecks, PenSquare, Search, ShieldAlert, X } from 'lucide-react';
 import axios from 'axios';
 import { format } from 'date-fns';
+import toast from 'react-hot-toast';
 import { useOutletContext } from 'react-router-dom';
 import TaskItem from '../components/TaskItem';
 import TaskModal from '../components/TaskModal';
@@ -40,6 +41,10 @@ const getAppealLabel = (status) => {
   if (status === 'rejected') return 'Rejected';
   return 'Not Responded';
 };
+const getRevenuePhaseGateLabel = (task) => {
+  const phaseTitle = String(task?.revenueProject?.phaseTitle || '').trim();
+  return phaseTitle ? `"${phaseTitle}" phase` : 'linked project phase';
+};
 
 const SkeletonCard = () => (
   <div className="animate-pulse rounded-xl border p-4" style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border-color)' }}>
@@ -56,7 +61,11 @@ const AssignedTaskActionModal = ({ isOpen, task, onClose, onAction }) => {
   if (!isOpen || !task) return null;
 
   const isCompleted = isCompletedValue(task.completed);
-  const canSubmit = isCompleted && task.submissionStatus === 'not_submitted';
+  const completionLockedByProject = Boolean(
+    task?.revenueProject?.completionRequiresPhaseRelease
+    && !task?.revenueProject?.phaseCompletionUnlocked
+  );
+  const canSubmit = isCompleted && task.submissionStatus === 'not_submitted' && !completionLockedByProject;
   const canAppeal = task.createdByAdmin && task.appealStatus === 'not_appealed';
 
   return (
@@ -75,14 +84,19 @@ const AssignedTaskActionModal = ({ isOpen, task, onClose, onAction }) => {
         </div>
 
         <div className="space-y-2 p-4">
+          {completionLockedByProject ? (
+            <div className="rounded-xl px-4 py-3 text-sm leading-6" style={{ backgroundColor: 'var(--brand-light)', color: 'var(--text-secondary)' }}>
+              This task stays open until admin completes the {getRevenuePhaseGateLabel(task)}.
+            </div>
+          ) : null}
           <button
             onClick={() => onAction('complete')}
-            disabled={isCompleted}
-            className={`flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-semibold transition-colors ${isCompleted ? 'cursor-not-allowed opacity-60' : 'hover:bg-green-50'}`}
-            style={{ color: '#16a34a', backgroundColor: isCompleted ? '#f0fdf4' : 'transparent' }}
+            disabled={isCompleted || completionLockedByProject}
+            className={`flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-semibold transition-colors ${(isCompleted || completionLockedByProject) ? 'cursor-not-allowed opacity-60' : 'hover:bg-green-50'}`}
+            style={{ color: '#16a34a', backgroundColor: (isCompleted || completionLockedByProject) ? '#f0fdf4' : 'transparent' }}
           >
             <CheckCircle2 className="h-4 w-4 flex-shrink-0" />
-            {isCompleted ? 'Already Completed' : 'Mark as Done'}
+            {isCompleted ? 'Already Completed' : completionLockedByProject ? 'Waiting for Phase Release' : 'Mark as Done'}
           </button>
 
           {canSubmit ? (
@@ -231,6 +245,7 @@ const Assigned = () => {
       setShowEditModal(false);
       setSelectedTask(null);
     } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to update task');
       if (error.response?.status === 401) onLogout?.();
     }
   }, [onLogout, refreshTasks]);
@@ -248,6 +263,7 @@ const Assigned = () => {
       setShowActionModal(false);
       setSelectedTask(null);
     } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to update task');
       if (error.response?.status === 401) onLogout?.();
     }
   };
@@ -261,6 +277,7 @@ const Assigned = () => {
       setShowActionModal(false);
       setSelectedTask(null);
     } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to submit task');
       if (error.response?.status === 401) onLogout?.();
     }
   };
@@ -275,6 +292,7 @@ const Assigned = () => {
       setShowActionModal(false);
       setSelectedTask(null);
     } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to appeal task');
       if (error.response?.status === 401) onLogout?.();
     }
   };

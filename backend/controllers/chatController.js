@@ -2,6 +2,7 @@
 import validator from 'validator';
 import sanitizeHtml from 'sanitize-html';
 import mongoose from 'mongoose';
+import { createReadStream, promises as fs } from 'fs';
 import Chat from '../models/chatModel.js';
 import File from '../models/fileModel.js';
 import Message from '../models/messageModel.js';
@@ -27,6 +28,7 @@ const getMessagePreview = ({ content, fileName, fileUrl, stickerLabel }) => {
     return 'Sent a message';
 };
 const ALLOWED_CHAT_UPLOAD_MIME_PREFIXES = ['image/', 'video/', 'audio/', 'application/', 'text/'];
+const CHAT_UPLOAD_LIMIT_BYTES = 1024 * 1024 * 1024;
 
 const buildMentions = (mentions = [], chatMembers = [], senderId) => {
     const memberSet = new Set((chatMembers || []).map((memberId) => String(memberId)));
@@ -603,62 +605,70 @@ export const uploadChatFile = async (req, res) => {
         }
 
         const file = req.files.file;
-        if (file.size > 50 * 1024 * 1024) {
-            return res.status(400).json({ success: false, message: 'File size exceeds 50MB' });
+        if (file.size > CHAT_UPLOAD_LIMIT_BYTES) {
+            return res.status(400).json({ success: false, message: 'File size exceeds 1GB' });
         }
         if (!ALLOWED_CHAT_UPLOAD_MIME_PREFIXES.some((prefix) => String(file.mimetype || '').startsWith(prefix))) {
             return res.status(400).json({ success: false, message: 'Unsupported file type' });
         }
-        const buffer = file.data;
         const fileName = sanitizeHtml(file.name, { allowedTags: [], allowedAttributes: {} });
         const mimeType = file.mimetype;
-        const cid = await uploadFileToIPFS(buffer, fileName, mimeType);
-        const fileUrl = `https://gateway.pinata.cloud/ipfs/${cid}`;
-        const contentType = mimeType.split('/')[0];
-        const extension = fileName.includes('.') ? fileName.split('.').pop().toLowerCase() : 'bin';
-        const owners = [...new Set((chat.members || []).map((memberId) => String(memberId)))];
-        const tagList = ['chat', `chat-${chatId}`];
+        const tempFilePath = String(file.tempFilePath || '').trim();
 
-        const savedFiles = await Promise.all(owners.map(async (ownerId) => {
-            const created = await File.create({
+        try {
+            const fileInput = tempFilePath ? createReadStream(tempFilePath) : file.data;
+            const cid = await uploadFileToIPFS(fileInput, fileName, mimeType, 3, file.size);
+            const fileUrl = `https://gateway.pinata.cloud/ipfs/${cid}`;
+            const contentType = mimeType.split('/')[0];
+            const extension = fileName.includes('.') ? fileName.split('.').pop().toLowerCase() : 'bin';
+            const owners = [...new Set((chat.members || []).map((memberId) => String(memberId)))];
+            const tagList = ['chat', `chat-${chatId}`];
+
+            const savedFiles = await Promise.all(owners.map(async (ownerId) => {
+                const created = await File.create({
+                    fileName,
+                    cid,
+                    size: file.size,
+                    type: extension,
+                    owner: ownerId,
+                    folderId: null,
+                    taskId: null,
+                    taskTitle: null,
+                    tags: tagList,
+                });
+
+                req.io?.to(`user:${ownerId}`).emit('fileReceived', created.toObject());
+                return created;
+            }));
+
+            const senderName = getFullName(req.user);
+            await Promise.all(owners
+                .filter((ownerId) => ownerId !== String(req.user._id))
+                .map((ownerId) => createNotification({
+                    userId: ownerId,
+                    type: 'file',
+                    title: `New file in ${chat.type === 'group' ? (chat.name || 'group chat') : 'chat'}`,
+                    body: `${senderName} shared ${fileName}`,
+                    actorId: req.user._id,
+                    actorName: senderName,
+                    entityId: savedFiles.find((item) => String(item.owner) === ownerId)?._id || '',
+                    entityType: 'File',
+                    data: { chatId, fileName },
+                    io: req.io,
+                })));
+
+            res.json({
+                success: true,
+                fileUrl,
+                contentType,
                 fileName,
-                cid,
-                size: file.size,
-                type: extension,
-                owner: ownerId,
-                folderId: null,
-                taskId: null,
-                taskTitle: null,
-                tags: tagList,
+                fileRecordId: savedFiles.find((item) => String(item.owner) === String(req.user._id))?._id || null,
             });
-
-            req.io?.to(`user:${ownerId}`).emit('fileReceived', created.toObject());
-            return created;
-        }));
-
-        const senderName = getFullName(req.user);
-        await Promise.all(owners
-            .filter((ownerId) => ownerId !== String(req.user._id))
-            .map((ownerId) => createNotification({
-                userId: ownerId,
-                type: 'file',
-                title: `New file in ${chat.type === 'group' ? (chat.name || 'group chat') : 'chat'}`,
-                body: `${senderName} shared ${fileName}`,
-                actorId: req.user._id,
-                actorName: senderName,
-                entityId: savedFiles.find((item) => String(item.owner) === ownerId)?._id || '',
-                entityType: 'File',
-                data: { chatId, fileName },
-                io: req.io,
-            })));
-
-        res.json({
-            success: true,
-            fileUrl,
-            contentType,
-            fileName,
-            fileRecordId: savedFiles.find((item) => String(item.owner) === String(req.user._id))?._id || null,
-        });
+        } finally {
+            if (tempFilePath) {
+                await fs.unlink(tempFilePath).catch(() => {});
+            }
+        }
     } catch (error) {
         console.error('Error uploading chat file:', error.message, error.stack);
         res.status(500).json({ success: false, message: 'Failed to upload file' });

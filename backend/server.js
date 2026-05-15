@@ -27,6 +27,7 @@ import reminderRouter from './routes/reminderRoutes.js';
 import goalRouter from './routes/goalRoutes.js';
 import performanceRouter from './routes/performanceRoutes.js';
 import projectRouter from './routes/projectRoutes.js';
+import revenueProjectRouter from './routes/revenueProjectRoutes.js';
 import meetingRouter from './routes/meetingRoutes.js';
 import learningRouter from './routes/learningRoutes.js';
 import feedbackRouter from './routes/feedbackRoutes.js';
@@ -57,6 +58,7 @@ import './models/feedbackModel.js';
 import './models/notificationModel.js';
 import './models/refreshTokenModel.js';
 import './models/projectModel.js';
+import './models/revenueProjectModel.js';
 import './models/adminTeamModel.js';
 import './models/meetingReportModel.js';
 import Room from './models/roomModel.js';
@@ -157,7 +159,17 @@ const sharedUploadOptions = {
     createParentPath: false,
     useTempFiles: false,
 };
-app.use('/api/chats', fileUpload(sharedUploadOptions));
+const chatUploadOptions = {
+    ...sharedUploadOptions,
+    limits: {
+        fileSize: 1024 * 1024 * 1024,
+        files: 5,
+    },
+    createParentPath: true,
+    useTempFiles: true,
+    tempFileDir: './tmp/chat-uploads',
+};
+app.use('/api/chats', fileUpload(chatUploadOptions));
 app.use('/api/bot', fileUpload(sharedUploadOptions));
 app.use('/api/posts', fileUpload(sharedUploadOptions));
 app.use('/api/meeting-reports', fileUpload(sharedUploadOptions));
@@ -175,6 +187,7 @@ app.use('/api/reminders',   reminderRouter);
 app.use('/api/goals',       goalRouter);
 app.use('/api/performance', performanceRouter);
 app.use('/api/projects',    projectRouter);
+app.use('/api/revenue-projects', revenueProjectRouter);
 app.use('/api/grok',        grokRouter);
 app.use('/api/meetings',    meetingRouter);
 app.use('/api/learning',    learningRouter);

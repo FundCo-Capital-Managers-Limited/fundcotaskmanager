@@ -38,6 +38,16 @@ const taskSchema = new mongoose.Schema({
   assignedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'user' },
   createdAt: { type: Date, default: Date.now },
   files: [{ type: mongoose.Schema.Types.ObjectId, ref: 'File' }],
+  revenueProject: {
+    projectId: { type: mongoose.Schema.Types.ObjectId, ref: 'RevenueProject', default: null },
+    name: { type: String, trim: true, default: '' },
+    phaseId: { type: mongoose.Schema.Types.ObjectId, default: null },
+    phaseTitle: { type: String, trim: true, default: '' },
+    phaseOrder: { type: Number, default: 0 },
+    priorityLocked: { type: Boolean, default: false },
+    completionRequiresPhaseRelease: { type: Boolean, default: false },
+    phaseCompletionUnlocked: { type: Boolean, default: false },
+  },
   adminComments: [{
     user: { type: mongoose.Schema.Types.ObjectId, ref: 'user', required: true },
     content: { type: String, required: true, trim: true, maxlength: 1000 },

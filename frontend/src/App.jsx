@@ -23,6 +23,7 @@ import AiTools from './pages/AiTools';
 import Reminders from './pages/Reminders';
 import Goals from './pages/Goals';
 import Projects from './pages/Projects';
+import RevenueProjects from './pages/RevenueProjects';
 import Appraisals from './pages/Appraisals';
 import Meeting from './pages/Meeting';
 import Training from './pages/Training';
@@ -201,6 +202,7 @@ const App = () => {
           <Route path="/goals" element={<Goals />} />
           <Route path="/projects" element={<Projects />} />
           <Route path="/projects/:projectId" element={<Projects />} />
+          <Route path="/revenue-projects" element={<RevenueProjects />} />
           <Route path="/appraisals" element={<Appraisals />} />
           <Route path="/meeting" element={<Meeting />} />
           <Route path="/training" element={<Training />} />

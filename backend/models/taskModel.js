@@ -77,6 +77,43 @@ const taskSchema = new mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId,
         ref: 'File',
     }],
+    revenueProject: {
+        projectId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'RevenueProject',
+            default: null,
+        },
+        name: {
+            type: String,
+            trim: true,
+            default: '',
+        },
+        phaseId: {
+            type: mongoose.Schema.Types.ObjectId,
+            default: null,
+        },
+        phaseTitle: {
+            type: String,
+            trim: true,
+            default: '',
+        },
+        phaseOrder: {
+            type: Number,
+            default: 0,
+        },
+        priorityLocked: {
+            type: Boolean,
+            default: false,
+        },
+        completionRequiresPhaseRelease: {
+            type: Boolean,
+            default: false,
+        },
+        phaseCompletionUnlocked: {
+            type: Boolean,
+            default: false,
+        },
+    },
     // NEW: admin comments on tasks — visible to both admin and user
     adminComments: [{
         user: { type: mongoose.Schema.Types.ObjectId, ref: 'user', required: true },

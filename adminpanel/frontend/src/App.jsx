@@ -23,6 +23,7 @@ const Feedbacks = lazy(() => import('./pages/Feedbacks.jsx'));
 const PlatformActivity = lazy(() => import('./pages/PlatformActivity.jsx'));
 const MyTeam = lazy(() => import('./pages/MyTeam.jsx'));
 const Projects = lazy(() => import('./pages/Projects.jsx'));
+const RevenueProjects = lazy(() => import('./pages/RevenueProjects.jsx'));
 const Social = lazy(() => import('./pages/Social.jsx'));
 const TeamChat = lazy(() => import('./pages/TeamChat.jsx'));
 const AiTools = lazy(() => import('./pages/AiTools.jsx'));
@@ -86,6 +87,7 @@ const AppRoutes = () => {
           <Route path="/my-team" element={<Suspense fallback={<Loader />}><MyTeam /></Suspense>} />
           <Route path="/projects" element={<Suspense fallback={<Loader />}><Projects /></Suspense>} />
           <Route path="/projects/:projectId" element={<Suspense fallback={<Loader />}><Projects /></Suspense>} />
+          <Route path="/revenue-projects" element={<Suspense fallback={<Loader />}><RevenueProjects /></Suspense>} />
           <Route path="/social" element={<Suspense fallback={<Loader />}><Social /></Suspense>} />
           <Route path="/team-chat" element={<Suspense fallback={<Loader />}><TeamChat /></Suspense>} />
           <Route path="/ai-tools" element={<Suspense fallback={<Loader />}><AiTools /></Suspense>} />

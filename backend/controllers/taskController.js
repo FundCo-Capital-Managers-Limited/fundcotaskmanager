@@ -2,8 +2,21 @@
 import Task from '../models/taskModel.js';
 import Reminder from '../models/reminderModel.js';
 import User from '../models/userModel.js';
+import RevenueProject from '../models/revenueProjectModel.js';
 import { createNotification } from '../utils/notificationService.js';
 import { createNotificationInAdminBackend } from '../utils/adminRealtime.js';
+
+const isTruthyCompleted = (value) => [true, 1, 'yes', 'true'].includes(typeof value === 'string' ? value.toLowerCase() : value);
+const isRevenueProjectTask = (task) => Boolean(task?.revenueProject?.projectId);
+const isRevenueProjectCompletionLocked = (task) => (
+    isRevenueProjectTask(task)
+    && task?.revenueProject?.completionRequiresPhaseRelease
+    && !task?.revenueProject?.phaseCompletionUnlocked
+);
+const getRevenueTaskGateLabel = (task) => {
+    const phaseTitle = String(task?.revenueProject?.phaseTitle || '').trim();
+    return phaseTitle ? `the "${phaseTitle}" phase is completed by admin` : 'the linked project phase is completed by admin';
+};
 
 // Helper to create smart reminder after task creation / update
 const createOrUpdateTaskReminder = async (task, userId, io) => {
@@ -135,6 +148,35 @@ export const updateTask = async (req, res) => {
         const existing = await Task.findOne({ _id: req.params.id, owner: req.user._id });
         if (!existing) return res.status(404).json({ success: false, message: 'Task not found or not yours' });
 
+        if (
+            isRevenueProjectTask(existing)
+            && existing.revenueProject?.priorityLocked
+            && data.priority !== undefined
+            && String(data.priority) !== String(existing.priority)
+        ) {
+            return res.status(403).json({
+                success: false,
+                message: 'Priority for this revenue project task is locked by management.',
+            });
+        }
+
+        if (isRevenueProjectCompletionLocked(existing)) {
+            const checklistCompletionAttempt = Array.isArray(data.checklist)
+                && data.checklist.length > 0
+                && data.checklist.every((item) => Boolean(item?.completed));
+
+            if (data.completed !== undefined && isTruthyCompleted(data.completed)) {
+                return res.status(400).json({
+                    success: false,
+                    message: `This task cannot be marked done until ${getRevenueTaskGateLabel(existing)}.`,
+                });
+            }
+
+            if (checklistCompletionAttempt) {
+                data.completed = false;
+            }
+        }
+
         if (data.dueDate !== undefined) {
             if (data.dueDate === '' || data.dueDate === null) {
                 data.dueDate = undefined;
@@ -157,8 +199,10 @@ export const updateTask = async (req, res) => {
 
         if (updated.checklist && updated.checklist.length > 0) {
             const allCompleted = updated.checklist.every(item => item.completed);
-            if (updated.completed !== allCompleted) {
-                updated.completed = allCompleted;
+            const canMarkComplete = !isRevenueProjectCompletionLocked(updated);
+            const nextCompleted = updated.completed || (allCompleted && canMarkComplete);
+            if (updated.completed !== nextCompleted) {
+                updated.completed = nextCompleted;
                 await updated.save();
             }
         }
@@ -204,6 +248,12 @@ export const submitTask = async (req, res) => {
     try {
         const task = await Task.findOne({ _id: req.params.id, owner: req.user._id });
         if (!task) return res.status(404).json({ success: false, message: 'Task not found or not yours' });
+        if (isRevenueProjectCompletionLocked(task)) {
+            return res.status(400).json({
+                success: false,
+                message: `This task cannot be submitted until ${getRevenueTaskGateLabel(task)}.`,
+            });
+        }
         if (!task.completed) return res.status(400).json({ success: false, message: 'Task must be completed before submission' });
         if (task.submissionStatus !== 'not_submitted') return res.status(400).json({ success: false, message: 'Task already submitted' });
 
@@ -257,10 +307,22 @@ export const appealTask = async (req, res) => {
 };
 export const deleteTask = async (req, res) => {
     try {
+        const task = await Task.findOne({ _id: req.params.id, owner: req.user._id });
+        if (!task) return res.status(404).json({ success: false, message: 'Task not found or not yours' });
+        if (isRevenueProjectTask(task) && task.createdByAdmin) {
+            return res.status(403).json({
+                success: false,
+                message: 'Revenue project tasks assigned by admin cannot be deleted by users.',
+            });
+        }
+
         const deleted = await Task.findOneAndDelete({ _id: req.params.id, owner: req.user._id });
         if (!deleted) return res.status(404).json({ success: false, message: 'Task not found or not yours' });
 
         await Reminder.deleteMany({ targetId: req.params.id, targetModel: 'Task', user: req.user._id });
+        if (deleted.revenueProject?.projectId) {
+            await RevenueProject.findByIdAndUpdate(deleted.revenueProject.projectId, { $pull: { tasks: deleted._id } }).catch(() => {});
+        }
         req.io.to(`user:${req.user._id}`).emit('reminderDeleted', req.params.id);
         req.io.to(`user:${req.user._id}`).emit('deleteTask', req.params.id);
 
