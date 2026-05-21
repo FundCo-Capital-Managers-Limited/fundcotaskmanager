@@ -10,6 +10,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import api from '../utils/api.js';
+import useDebouncedValue from '../hooks/useDebouncedValue.js';
 import {
   EmptyState,
   FilterChip,
@@ -21,6 +22,8 @@ import {
   SearchInput,
   StatCard,
 } from '../components/ui.jsx';
+
+const MY_GOALS_BATCH = 24;
 
 const emptyForm = {
   title: '',
@@ -53,16 +56,18 @@ const MyGoals = () => {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [timeframe, setTimeframe] = useState('');
+  const [visibleCount, setVisibleCount] = useState(MY_GOALS_BATCH);
   const [modalOpen, setModalOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [editingGoal, setEditingGoal] = useState(null);
   const [form, setForm] = useState(emptyForm);
+  const debouncedSearch = useDebouncedValue(search, 320);
 
   const fetchGoals = useCallback(async () => {
     setLoading(true);
     try {
       const params = {};
-      if (search) params.search = search;
+      if (debouncedSearch) params.search = debouncedSearch;
       if (timeframe) params.timeframe = timeframe;
 
       const { data } = await api.get('/goals/mine/overview', { params });
@@ -75,7 +80,7 @@ const MyGoals = () => {
     } finally {
       setLoading(false);
     }
-  }, [search, timeframe]);
+  }, [debouncedSearch, timeframe]);
 
   useEffect(() => {
     fetchGoals();
@@ -165,10 +170,19 @@ const MyGoals = () => {
     }
   };
 
+  useEffect(() => {
+    setVisibleCount(MY_GOALS_BATCH);
+  }, [debouncedSearch, timeframe, goals]);
+
   const visibleGoals = useMemo(() => goals.filter((goal) => {
-    if (!search) return true;
-    return String(goal.title || '').toLowerCase().includes(search.toLowerCase());
-  }), [goals, search]);
+    if (!debouncedSearch) return true;
+    return String(goal.title || '').toLowerCase().includes(debouncedSearch.toLowerCase());
+  }), [debouncedSearch, goals]);
+
+  const renderedGoals = useMemo(
+    () => visibleGoals.slice(0, visibleCount),
+    [visibleCount, visibleGoals],
+  );
 
   return (
     <div className="page-shell">
@@ -209,7 +223,7 @@ const MyGoals = () => {
       ) : (
         <Panel title="Goal board" subtitle={`${visibleGoals.length} goal${visibleGoals.length === 1 ? '' : 's'} visible`}>
           <div className="space-y-3">
-            {visibleGoals.map((goal) => {
+            {renderedGoals.map((goal) => {
               const progress = progressFor(goal);
               return (
                 <div key={goal._id} className="card p-4">
@@ -263,6 +277,16 @@ const MyGoals = () => {
               );
             })}
           </div>
+          {visibleGoals.length > renderedGoals.length ? (
+            <div className="mt-4 flex flex-col gap-3 border-t pt-4 sm:flex-row sm:items-center sm:justify-between" style={{ borderColor: 'var(--c-border)' }}>
+              <p className="text-sm" style={{ color: 'var(--c-text-3)' }}>
+                Showing {renderedGoals.length} of {visibleGoals.length} goals
+              </p>
+              <button type="button" className="btn-secondary rounded-full" onClick={() => setVisibleCount((current) => current + MY_GOALS_BATCH)}>
+                Load more
+              </button>
+            </div>
+          ) : null}
         </Panel>
       )}
 

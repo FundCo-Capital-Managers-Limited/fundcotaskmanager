@@ -26,6 +26,13 @@ const getPersonName = (user, fallback = '') => {
   if (!user) return fallback;
   return user.fullName || `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email || fallback;
 };
+const getAssignerName = (task) => {
+  const snapshotName = String(task?.assignedBySnapshot?.name || '').trim();
+  if (snapshotName) return snapshotName;
+  const snapshotEmail = String(task?.assignedBySnapshot?.email || '').trim();
+  if (snapshotEmail) return snapshotEmail;
+  return getPersonName(task?.assignedBy, '');
+};
 const formatTaskMoment = (value) => {
   if (!value) return '';
   const date = new Date(value);
@@ -75,7 +82,7 @@ const TaskItem = ({
   const submissionLabel = getSubmissionLabel(task);
   const isOverdue = task.dueDate && isPast(new Date(task.dueDate)) && !isCompleted;
   const hasAdminComments = Array.isArray(task.adminComments) && task.adminComments.length > 0;
-  const assignedByName = getPersonName(task.assignedBy, '');
+  const assignedByName = getAssignerName(task);
 
   const menuActions = useMemo(() => {
     const actions = [];

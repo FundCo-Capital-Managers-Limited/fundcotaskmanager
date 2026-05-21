@@ -225,20 +225,36 @@ io.use(async (socket, next) => {
 // ─────────────────────────────────────────────────────────────
 // Socket.IO Events
 const activeUserSockets = new Map();
+const pendingOfflineTimers = new Map();
+const PRESENCE_OFFLINE_GRACE_MS = 15000;
+const shouldLogSocketLifecycle = (process.env.NODE_ENV || '').toLowerCase() !== 'production';
+const logSocketLifecycle = (message) => {
+    if (shouldLogSocketLifecycle) console.log(message);
+};
 
 io.on('connection', async (socket) => {
-    console.log(`✅ Socket connected: ${socket.id} | User: ${socket.user?.id || 'unknown'}`);
+    logSocketLifecycle(`✅ Socket connected: ${socket.id} | User: ${socket.user?.id || 'unknown'}`);
 
     const userId = String(socket.user.id);
     const connectedAt = new Date();
-    if (!activeUserSockets.has(userId)) activeUserSockets.set(userId, new Set());
+    const existingSockets = activeUserSockets.get(userId);
+    const hadPendingOffline = pendingOfflineTimers.has(userId);
+    const wasOffline = !existingSockets || existingSockets.size === 0;
+    if (hadPendingOffline) {
+        clearTimeout(pendingOfflineTimers.get(userId));
+        pendingOfflineTimers.delete(userId);
+    }
+
+    if (!existingSockets) activeUserSockets.set(userId, new Set());
     activeUserSockets.get(userId).add(socket.id);
 
-    try {
-        await User.findByIdAndUpdate(userId, { online: true, lastActive: connectedAt }, { runValidators: false });
-        io.emit('presence:update', { userId, online: true, lastActive: connectedAt });
-    } catch (err) {
-        console.error('Error updating presence:', err.message);
+    if (wasOffline && !hadPendingOffline) {
+        try {
+            await User.findByIdAndUpdate(userId, { online: true, lastActive: connectedAt }, { runValidators: false });
+            io.emit('presence:update', { userId, online: true, lastActive: connectedAt });
+        } catch (err) {
+            console.error('Error updating presence:', err.message);
+        }
     }
 
     socket.join(`user:${userId}`);
@@ -262,20 +278,31 @@ io.on('connection', async (socket) => {
 
     socket.on('error',      (err)    => console.error('Socket error:', err.message));
     socket.on('disconnect', async (reason) => {
-        console.log(`❌ Socket disconnected: ${socket.id} | ${reason}`);
+        logSocketLifecycle(`❌ Socket disconnected: ${socket.id} | ${reason}`);
         const sockets = activeUserSockets.get(userId);
         if (!sockets) return;
         sockets.delete(socket.id);
         if (sockets.size > 0) return;
-        activeUserSockets.delete(userId);
 
-        const lastActive = new Date();
-        try {
-            await User.findByIdAndUpdate(userId, { online: false, lastActive }, { runValidators: false });
-            io.emit('presence:update', { userId, online: false, lastActive });
-        } catch (err) {
-            console.error('Error updating disconnect presence:', err.message);
-        }
+        const existingTimer = pendingOfflineTimers.get(userId);
+        if (existingTimer) clearTimeout(existingTimer);
+
+        const offlineTimer = setTimeout(async () => {
+            pendingOfflineTimers.delete(userId);
+            const latestSockets = activeUserSockets.get(userId);
+            if (latestSockets && latestSockets.size > 0) return;
+            activeUserSockets.delete(userId);
+
+            const lastActive = new Date();
+            try {
+                await User.findByIdAndUpdate(userId, { online: false, lastActive }, { runValidators: false });
+                io.emit('presence:update', { userId, online: false, lastActive });
+            } catch (err) {
+                console.error('Error updating disconnect presence:', err.message);
+            }
+        }, PRESENCE_OFFLINE_GRACE_MS);
+
+        pendingOfflineTimers.set(userId, offlineTimer);
     });
 });
 

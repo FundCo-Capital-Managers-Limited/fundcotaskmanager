@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -143,7 +143,9 @@ const getTaskSubmissionLabel = (task) => {
   return '';
 };
 const getTaskAssignerLabel = (task) => {
-  const assigner = getPersonName(task?.assignedBy, '');
+  const assigner = String(task?.assignedBySnapshot?.name || '').trim()
+    || String(task?.assignedBySnapshot?.email || '').trim()
+    || getPersonName(task?.assignedBy, '');
   return assigner ? `Assigned by ${assigner}` : '';
 };
 
@@ -1646,6 +1648,7 @@ const Projects = () => {
   const navigate = useNavigate();
   const { projectId = '' } = useParams();
   const { markTypeRead } = useNotifications();
+  const fetchAllRef = useRef(null);
   const [projects, setProjects] = useState([]);
   const [summary, setSummary] = useState({ total: 0, active: 0, atRisk: 0, overdueTasks: 0, members: 0, openRisks: 0, overdueMilestones: 0 });
   const [users, setUsers] = useState([]);
@@ -1686,6 +1689,10 @@ const Projects = () => {
   }, [fetchAll]);
 
   useEffect(() => {
+    fetchAllRef.current = fetchAll;
+  }, [fetchAll]);
+
+  useEffect(() => {
     markTypeRead?.('project');
   }, [markTypeRead]);
 
@@ -1702,7 +1709,7 @@ const Projects = () => {
     const refreshIfRelevant = (payload) => {
       if (!payload) return;
       if (payload.type === 'project' || payload.entityType === 'project' || payload.data?.projectId) {
-        fetchAll();
+        fetchAllRef.current?.();
       }
     };
 
@@ -1712,7 +1719,7 @@ const Projects = () => {
       socket.off('notification:new', refreshIfRelevant);
       socket.disconnect();
     };
-  }, [fetchAll]);
+  }, []);
 
   const saveProject = async (form) => {
     try {

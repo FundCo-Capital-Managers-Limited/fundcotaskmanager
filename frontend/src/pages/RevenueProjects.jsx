@@ -351,7 +351,13 @@ const RevenueProjects = () => {
                                   <p className="font-black" style={{ color: 'var(--text-primary)' }}>{task.title}</p>
                                   <p className="mt-1 text-xs" style={{ color: 'var(--text-secondary)' }}>
                                     {task.dueDate ? `Due ${formatShortDate(task.dueDate)}` : 'No due date'}
-                                    {task.assignedBy ? ` · Assigned by ${memberLabel(task.assignedBy)}` : ''}
+                                    {(String(task?.assignedBySnapshot?.name || '').trim()
+                                      || String(task?.assignedBySnapshot?.email || '').trim()
+                                      || task.assignedBy)
+                                      ? ` · Assigned by ${String(task?.assignedBySnapshot?.name || '').trim()
+                                        || String(task?.assignedBySnapshot?.email || '').trim()
+                                        || memberLabel(task.assignedBy)}`
+                                      : ''}
                                   </p>
                                   {task.description ? <p className="mt-2 text-sm leading-6" style={{ color: 'var(--text-secondary)' }}>{task.description}</p> : null}
                                 </div>

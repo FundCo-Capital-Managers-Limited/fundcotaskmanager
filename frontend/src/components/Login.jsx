@@ -8,6 +8,7 @@ import { bootstrapUserSession, getUserApiBase, storeUserSession } from '../secur
 
 const API_URL    = getUserApiBase();
 const INIT_FORM  = { email: '', password: '' };
+const normalizeEmail = (value) => String(value || '').trim().toLowerCase();
 
 const Login = ({ onSubmit, onSwitchMode }) => {
   const [showPassword, setShowPassword] = useState(false);
@@ -45,7 +46,7 @@ const Login = ({ onSubmit, onSwitchMode }) => {
     try {
       const { data } = await axios.post(
         `${API_URL}/api/user/login`,
-        { ...formData, rememberMe },
+        { ...formData, email: normalizeEmail(formData.email), rememberMe },
         { withCredentials: true }
       );
       if (!data.success || !data.token) throw new Error(data.message || 'Login failed');
@@ -61,7 +62,7 @@ const Login = ({ onSubmit, onSwitchMode }) => {
       setFormData(INIT_FORM);
       setTimeout(() => navigate('/'), 800);
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Login failed. Please try again.');
+      toast.error(err.response?.data?.message || err.message || 'Login failed. Please try again.');
     } finally {
       setLoading(false);
     }

@@ -17,6 +17,38 @@ const getRevenueTaskGateLabel = (task) => {
     const phaseTitle = String(task?.revenueProject?.phaseTitle || '').trim();
     return phaseTitle ? `the "${phaseTitle}" phase is completed by admin` : 'the linked project phase is completed by admin';
 };
+const buildAssignerSnapshot = (user) => ({
+    name: `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || user?.fullName || user?.email || '',
+    email: String(user?.email || '').trim(),
+    role: String(user?.role || '').trim(),
+    capturedAt: new Date(),
+});
+const hasAssignerSnapshot = (task) => Boolean(
+    String(task?.assignedBySnapshot?.name || '').trim()
+    || String(task?.assignedBySnapshot?.email || '').trim()
+);
+const backfillAssignerSnapshots = async (input) => {
+    const tasks = Array.isArray(input) ? input : [input].filter(Boolean);
+    const updates = [];
+
+    tasks.forEach((task) => {
+        if (!task?.createdByAdmin || hasAssignerSnapshot(task) || !task?.assignedBy) return;
+        const snapshot = buildAssignerSnapshot(task.assignedBy);
+        task.assignedBySnapshot = snapshot;
+        updates.push({
+            updateOne: {
+                filter: { _id: task._id },
+                update: { $set: { assignedBySnapshot: snapshot } },
+            },
+        });
+    });
+
+    if (updates.length) {
+        await Task.bulkWrite(updates, { ordered: false }).catch(() => {});
+    }
+
+    return input;
+};
 
 // Helper to create smart reminder after task creation / update
 const createOrUpdateTaskReminder = async (task, userId, io) => {
@@ -207,6 +239,8 @@ export const updateTask = async (req, res) => {
             }
         }
 
+        await backfillAssignerSnapshots(updated);
+
         await createOrUpdateTaskReminder(updated, req.user._id, req.io);
 
         req.io.to(`user:${req.user._id}`).emit('updateTask', updated);
@@ -223,6 +257,7 @@ export const getTasks = async (req, res) => {
         const tasks = await Task.find({ owner: req.user._id })
             .populate(TASK_POPULATE)
             .sort({ createdAt: -1 });
+        await backfillAssignerSnapshots(tasks);
         res.json({ success: true, tasks });
     } catch (err) {
         console.error('Error fetching tasks:', err.message);
@@ -236,6 +271,7 @@ export const getTaskById = async (req, res) => {
         const task = await Task.findOne({ _id: req.params.id, owner: req.user._id })
             .populate(TASK_POPULATE);
         if (!task) return res.status(404).json({ success: false, message: 'Task not found' });
+        await backfillAssignerSnapshots(task);
         res.json({ success: true, task });
     } catch (err) {
         console.error('Error fetching task:', err.message);
@@ -263,6 +299,7 @@ export const submitTask = async (req, res) => {
         task.reviewedBy = null;
         const savedTask = await task.save();
         const updated = await Task.findById(savedTask._id).populate(TASK_POPULATE);
+        await backfillAssignerSnapshots(updated);
         req.io.to(`user:${req.user._id}`).emit('updateTask', updated);
 
         await notifyAssignedAdmin({

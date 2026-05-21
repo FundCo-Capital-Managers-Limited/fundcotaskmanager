@@ -8,9 +8,18 @@ import {
   rotateAdminRefreshSession,
 } from '../utils/authSession.js';
 
+const normalizeEmail = (value) => String(value || '').trim().toLowerCase();
+const setNoStore = (res) => {
+  res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+  res.set('Pragma', 'no-cache');
+  res.set('Expires', '0');
+};
+
 // ── Admin Login ───────────────────────────────────────────────────────────────
 export const adminLogin = async (req, res) => {
-  const { email, password, rememberMe } = req.body;
+  const email = normalizeEmail(req.body?.email);
+  const { password, rememberMe } = req.body;
+  setNoStore(res);
   if (!email || !password) return res.status(400).json({ success: false, message: 'Email and password required' });
 
   try {
@@ -61,6 +70,7 @@ export const adminLogin = async (req, res) => {
 // ── Get current admin user ────────────────────────────────────────────────────
 export const getAdminMe = async (req, res) => {
   try {
+    setNoStore(res);
     res.json({
       success: true,
       user: {
@@ -125,6 +135,7 @@ export const changeAdminPassword = async (req, res) => {
 
 export const refreshAdminSession = async (req, res) => {
   try {
+    setNoStore(res);
     const session = await rotateAdminRefreshSession({ req, res });
     res.json({
       success: true,
@@ -146,6 +157,7 @@ export const adminLogout = async (req, res) => {
   } catch (err) {
     console.error('Admin logout revoke error:', err.message);
   }
+  setNoStore(res);
   clearRefreshCookie(res);
   res.json({ success: true, message: 'Logged out' });
 };

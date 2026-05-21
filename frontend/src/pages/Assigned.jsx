@@ -8,8 +8,10 @@ import { useOutletContext } from 'react-router-dom';
 import TaskItem from '../components/TaskItem';
 import TaskModal from '../components/TaskModal';
 import { useNotifications } from '../context/NotificationContext.jsx';
+import useDebouncedValue from '../hooks/useDebouncedValue.js';
 
 const API_BASE_URL = `${import.meta.env.VITE_API_URL}/api/tasks`;
+const ASSIGNED_TASKS_BATCH = 30;
 const isCompletedValue = (value) => [true, 1, 'yes'].includes(typeof value === 'string' ? value.toLowerCase() : value);
 
 const getPersonName = (user, fallback = '') => user?.fullName || `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || user?.email || fallback;
@@ -199,10 +201,12 @@ const Assigned = () => {
   const { markTypeRead } = useNotifications();
   const [sortBy, setSortBy] = useState('newest');
   const [search, setSearch] = useState('');
+  const [visibleCount, setVisibleCount] = useState(ASSIGNED_TASKS_BATCH);
   const [selectedTask, setSelectedTask] = useState(null);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showActionModal, setShowActionModal] = useState(false);
   const [showAppealModal, setShowAppealModal] = useState(false);
+  const debouncedSearch = useDebouncedValue(search, 220);
 
   useEffect(() => {
     markTypeRead?.('task');
@@ -212,8 +216,8 @@ const Assigned = () => {
     tasks
       .filter((task) => task.createdByAdmin)
       .filter((task) =>
-        task.title.toLowerCase().includes(search.toLowerCase()) ||
-        task.description?.toLowerCase().includes(search.toLowerCase())
+        task.title.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
+        task.description?.toLowerCase().includes(debouncedSearch.toLowerCase())
       )
       .sort((left, right) => {
         if (sortBy === 'newest') return new Date(right.createdAt) - new Date(left.createdAt);
@@ -221,7 +225,16 @@ const Assigned = () => {
         const order = { high: 3, medium: 2, low: 1 };
         return (order[right.priority?.toLowerCase()] || 0) - (order[left.priority?.toLowerCase()] || 0);
       })
-  ), [tasks, sortBy, search]);
+  ), [debouncedSearch, sortBy, tasks]);
+
+  useEffect(() => {
+    setVisibleCount(ASSIGNED_TASKS_BATCH);
+  }, [debouncedSearch, sortBy, tasks]);
+
+  const visibleTasks = useMemo(
+    () => sortedTasks.slice(0, visibleCount),
+    [sortedTasks, visibleCount],
+  );
 
   const getAuthHeaders = () => {
     const token = localStorage.getItem('token');
@@ -381,8 +394,9 @@ const Assigned = () => {
           <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>Tasks assigned by admin will appear here.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          {sortedTasks.map((task, index) => (
+        <>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          {visibleTasks.map((task, index) => (
             <motion.div
               key={task._id || task.id}
               initial={{ opacity: 0, y: 8 }}
@@ -404,7 +418,24 @@ const Assigned = () => {
               />
             </motion.div>
           ))}
-        </div>
+          </div>
+
+          {sortedTasks.length > visibleTasks.length ? (
+            <div className="flex flex-col gap-3 border-t pt-4 sm:flex-row sm:items-center sm:justify-between" style={{ borderColor: 'var(--border-color)' }}>
+              <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+                Showing {visibleTasks.length} of {sortedTasks.length} tasks
+              </p>
+              <button
+                type="button"
+                className="px-4 py-2 rounded-xl border text-sm font-semibold transition-all hover:scale-[1.01]"
+                style={{ borderColor: 'var(--border-color)', color: 'var(--text-primary)', backgroundColor: 'var(--bg-surface)' }}
+                onClick={() => setVisibleCount((current) => current + ASSIGNED_TASKS_BATCH)}
+              >
+                Load more
+              </button>
+            </div>
+          ) : null}
+        </>
       )}
 
       <AnimatePresence>

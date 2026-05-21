@@ -1,5 +1,5 @@
 // src/pages/Goals.jsx
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useOutletContext, useNavigate } from 'react-router-dom';
 import {
   Target, X, Plus, Loader2, Edit2, Trash2, CheckCircle2, Circle,
@@ -12,8 +12,10 @@ import io from 'socket.io-client';
 import moment from 'moment-timezone';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
+import useDebouncedValue from '../hooks/useDebouncedValue.js';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const GOALS_BATCH = 24;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const calcProgress = (subGoals) => {
@@ -495,6 +497,8 @@ const Goals = () => {
   const [filterBy,      setFilterBy]      = useState('all');
   const [showCreate,    setShowCreate]    = useState(false);
   const [activeGoal,    setActiveGoal]    = useState(null);
+  const [visibleCount,  setVisibleCount]  = useState(GOALS_BATCH);
+  const debouncedSearch = useDebouncedValue(search, 220);
 
   const getHeaders = useCallback(() => ({
     Authorization: `Bearer ${localStorage.getItem('token')}`,
@@ -597,26 +601,35 @@ const Goals = () => {
   };
 
   // ── Filter + sort ────────────────────────────────────────────────────────
-  const filtered = goals.filter(g => {
-    if (!g.title.toLowerCase().includes(search.toLowerCase())) return false;
+  const filtered = useMemo(() => goals.filter(g => {
+    if (!g.title.toLowerCase().includes(debouncedSearch.toLowerCase())) return false;
     const pct = calcProgress(g.subGoals);
     if (filterBy === 'completed') return pct === 100;
-    if (filterBy === 'active')    return pct < 100;
-    if (filterBy === 'personal')  return g.type === 'personal';
-    if (filterBy === 'task')      return g.type === 'task';
+    if (filterBy === 'active') return pct < 100;
+    if (filterBy === 'personal') return g.type === 'personal';
+    if (filterBy === 'task') return g.type === 'task';
     return true;
   }).sort((a, b) => {
-    if (sortBy === 'progress-asc')  return calcProgress(a.subGoals) - calcProgress(b.subGoals);
+    if (sortBy === 'progress-asc') return calcProgress(a.subGoals) - calcProgress(b.subGoals);
     if (sortBy === 'progress-desc') return calcProgress(b.subGoals) - calcProgress(a.subGoals);
     return new Date(b.createdAt) - new Date(a.createdAt);
-  });
+  }), [debouncedSearch, filterBy, goals, sortBy]);
 
-  const stats = {
-    total:    goals.length,
-    completed:goals.filter(g => calcProgress(g.subGoals) === 100).length,
-    active:   goals.filter(g => calcProgress(g.subGoals) < 100).length,
-    avgPct:   Math.round(goals.reduce((s, g) => s + calcProgress(g.subGoals), 0) / (goals.length || 1)),
-  };
+  useEffect(() => {
+    setVisibleCount(GOALS_BATCH);
+  }, [debouncedSearch, filterBy, goals, sortBy]);
+
+  const visibleGoals = useMemo(
+    () => filtered.slice(0, visibleCount),
+    [filtered, visibleCount],
+  );
+
+  const stats = useMemo(() => ({
+    total: goals.length,
+    completed: goals.filter(g => calcProgress(g.subGoals) === 100).length,
+    active: goals.filter(g => calcProgress(g.subGoals) < 100).length,
+    avgPct: Math.round(goals.reduce((s, g) => s + calcProgress(g.subGoals), 0) / (goals.length || 1)),
+  }), [goals]);
 
   const defaultGoal = () => ({
     title: '', subGoals: [], type: 'personal', timeframe: 'weekly',
@@ -692,12 +705,12 @@ const Goals = () => {
           style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border-color)' }}>
           <Target className="w-12 h-12 mx-auto mb-4" style={{ color: 'var(--text-muted)' }} />
           <p className="font-bold" style={{ color: 'var(--text-secondary)' }}>
-            {search || filterBy !== 'all' ? 'No goals match your filters' : 'No goals yet'}
+            {debouncedSearch || filterBy !== 'all' ? 'No goals match your filters' : 'No goals yet'}
           </p>
           <p className="text-sm mt-1 mb-5" style={{ color: 'var(--text-muted)' }}>
-            {!search && filterBy === 'all' && 'Set your first goal and start tracking progress'}
+            {!debouncedSearch && filterBy === 'all' && 'Set your first goal and start tracking progress'}
           </p>
-          {filterBy === 'all' && !search && (
+          {filterBy === 'all' && !debouncedSearch && (
             <button onClick={() => setShowCreate(true)}
               className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold text-white hover:opacity-90"
               style={{ backgroundColor: 'var(--brand-primary)' }}>
@@ -706,13 +719,31 @@ const Goals = () => {
           )}
         </div>
       ) : (
-        <AnimatePresence mode="popLayout">
+        <>
+          <AnimatePresence mode="popLayout">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filtered.map((goal, i) => (
+            {visibleGoals.map((goal, i) => (
               <GoalCard key={goal._id} goal={goal} index={i} onClick={() => setActiveGoal(goal)} />
             ))}
           </div>
-        </AnimatePresence>
+          </AnimatePresence>
+
+          {filtered.length > visibleGoals.length ? (
+            <div className="flex flex-col gap-3 border-t pt-4 sm:flex-row sm:items-center sm:justify-between" style={{ borderColor: 'var(--border-color)' }}>
+              <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+                Showing {visibleGoals.length} of {filtered.length} goals
+              </p>
+              <button
+                type="button"
+                className="px-4 py-2 rounded-xl border text-sm font-semibold transition-all hover:scale-[1.01]"
+                style={{ borderColor: 'var(--border-color)', color: 'var(--text-primary)', backgroundColor: 'var(--bg-surface)' }}
+                onClick={() => setVisibleCount((current) => current + GOALS_BATCH)}
+              >
+                Load more
+              </button>
+            </div>
+          ) : null}
+        </>
       )}
 
       {/* Create modal */}

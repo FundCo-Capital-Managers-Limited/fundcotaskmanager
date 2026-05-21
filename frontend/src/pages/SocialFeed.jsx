@@ -566,6 +566,7 @@ const PostComposer = ({ user, editPost = null, onSubmit, onCancel, uploading, po
 // ── MAIN ──────────────────────────────────────────────────────────────────────
 const SocialFeed = () => {
   const { user } = useOutletContext();
+  const currentUserId = user?._id || user?.id || '';
   const { markTypeRead } = useNotifications();
   const [posts, setPosts]             = useState([]);
   const [page, setPage]               = useState(1);
@@ -629,7 +630,7 @@ const SocialFeed = () => {
     });
 
     return () => { socket.disconnect(); };
-  }, [user]);
+  }, [currentUserId]);
 
   // ── Fetch posts ──────────────────────────────────────────────────────────
   const fetchPosts = useCallback(async (pg = 1, reset = false) => {

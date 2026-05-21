@@ -17,6 +17,14 @@ const hasKnownAdminSession = () => Boolean(
   || localStorage.getItem('fundcoAdminRefreshExpiresAt')
 );
 
+const serializeUser = (value) => {
+  try {
+    return JSON.stringify(value || null);
+  } catch {
+    return '';
+  }
+};
+
 export const useAuth = () => useContext(AuthContext);
 
 export const AuthProvider = ({ children }) => {
@@ -26,6 +34,15 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     let active = true;
 
+    const syncStoredUser = () => {
+      const nextUser = readStoredAdminUser();
+      setUser((previousUser) => (
+        serializeUser(previousUser) === serializeUser(nextUser)
+          ? previousUser
+          : nextUser
+      ));
+    };
+
     const syncSession = async () => {
       await bootstrapAdminSession();
       if (!active) return;
@@ -33,13 +50,17 @@ export const AuthProvider = ({ children }) => {
       try {
         const { data } = await api.get('/auth/me');
         if (data.success) {
-          setUser(data.user);
+          setUser((previousUser) => (
+            serializeUser(previousUser) === serializeUser(data.user)
+              ? previousUser
+              : data.user
+          ));
           storeAdminSession({ token: localStorage.getItem('adminToken'), user: data.user });
         } else {
           setUser(null);
         }
       } catch {
-        setUser(readStoredAdminUser());
+        syncStoredUser();
       } finally {
         if (active) setLoading(false);
       }
@@ -47,7 +68,7 @@ export const AuthProvider = ({ children }) => {
 
     syncSession();
 
-    const handleAuthChange = () => setUser(readStoredAdminUser());
+    const handleAuthChange = () => syncStoredUser();
     window.addEventListener(adminAuthEvents.AUTH_CHANGE_EVENT, handleAuthChange);
 
     return () => {
@@ -64,7 +85,12 @@ export const AuthProvider = ({ children }) => {
 
     const syncFromStorage = () => {
       if (!active) return;
-      setUser(readStoredAdminUser());
+      const nextUser = readStoredAdminUser();
+      setUser((previousUser) => (
+        serializeUser(previousUser) === serializeUser(nextUser)
+          ? previousUser
+          : nextUser
+      ));
     };
 
     const refreshSession = async () => {

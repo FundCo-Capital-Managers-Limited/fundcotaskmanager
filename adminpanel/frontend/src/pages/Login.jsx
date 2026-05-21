@@ -13,6 +13,7 @@ const Login = () => {
 
   const { login } = useAuth();
   const navigate = useNavigate();
+  const normalizeEmail = (value) => String(value || '').trim().toLowerCase();
 
   const handle = async (e) => {
     e.preventDefault();
@@ -21,7 +22,7 @@ const Login = () => {
     setLoading(true);
 
     try {
-      const data = await login(email, password, rememberMe);
+      const data = await login(normalizeEmail(email), password, rememberMe);
 
       if (data.success) {
         // Show toast with auto-dismiss

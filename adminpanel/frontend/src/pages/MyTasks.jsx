@@ -20,6 +20,7 @@ import api from '../utils/api.js';
 import userApi from '../utils/userApi.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useNotifications } from '../context/NotificationContext.jsx';
+import useDebouncedValue from '../hooks/useDebouncedValue.js';
 import {
   EmptyState,
   FilterChip,
@@ -32,6 +33,8 @@ import {
   SegmentedTabs,
   StatCard,
 } from '../components/ui.jsx';
+
+const MY_TASKS_BATCH = 30;
 
 const PRI = {
   High: { c: '#dc2626', bg: '#fef2f2' },
@@ -59,6 +62,8 @@ const getPersonName = (user, fallback = '') => {
   if (!user) return fallback;
   return user.fullName || `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email || fallback;
 };
+const getAssignerSnapshotName = (task) => String(task?.assignedBySnapshot?.name || '').trim()
+  || String(task?.assignedBySnapshot?.email || '').trim();
 const formatTaskMoment = (value) => {
   if (!value) return '';
   const date = new Date(value);
@@ -68,10 +73,13 @@ const formatTaskMoment = (value) => {
 
 const getAssignerLabel = (task, currentUserId) => {
   const assignerId = getAssignerId(task);
-  if (!assignerId || assignerId === currentUserId) return 'Created by you';
-  const firstName = task?.assignedBy?.firstName || '';
-  const lastName = task?.assignedBy?.lastName || '';
-  const label = `${firstName} ${lastName}`.trim() || task?.assignedBy?.email || 'Another admin';
+  if (assignerId && assignerId === currentUserId) return 'Created by you';
+  const label = getAssignerSnapshotName(task)
+    || `${task?.assignedBy?.firstName || ''} ${task?.assignedBy?.lastName || ''}`.trim()
+    || task?.assignedBy?.email
+    || '';
+  if (!assignerId && task?.createdByAdmin && label) return `Assigned by ${label}`;
+  if (!assignerId) return 'Created by you';
   return `Assigned by ${label}`;
 };
 const getSubmissionLabel = (task) => {
@@ -92,13 +100,15 @@ const getSubmissionLabel = (task) => {
 };
 
 const matchesScope = (task, scope, currentUserId) => {
+  const assignerId = getAssignerId(task);
+  const hasSnapshot = Boolean(getAssignerSnapshotName(task));
   if (scope === 'created') {
-    const assignerId = getAssignerId(task);
-    return !assignerId || assignerId === currentUserId;
+    if (assignerId) return assignerId === currentUserId;
+    return !task?.createdByAdmin && !hasSnapshot;
   }
   if (scope === 'received') {
-    const assignerId = getAssignerId(task);
-    return Boolean(assignerId) && assignerId !== currentUserId;
+    if (assignerId) return assignerId !== currentUserId;
+    return Boolean(task?.createdByAdmin && hasSnapshot);
   }
   return true;
 };
@@ -126,10 +136,12 @@ const MyTasks = () => {
   const [search, setSearch] = useState('');
   const [scope, setScope] = useState('all');
   const [status, setStatus] = useState('all');
+  const [visibleCount, setVisibleCount] = useState(MY_TASKS_BATCH);
   const [viewTask, setViewTask] = useState(null);
   const [showAssignModal, setShowAssignModal] = useState(false);
 
   const currentUserId = getCurrentUserId(user);
+  const debouncedSearch = useDebouncedValue(search, 220);
 
   const fetchTasks = useCallback(async () => {
     setLoading(true);
@@ -193,7 +205,7 @@ const MyTasks = () => {
   }, [currentUserId, tasks]);
 
   const filteredTasks = useMemo(() => {
-    const searchValue = search.trim().toLowerCase();
+    const searchValue = debouncedSearch.trim().toLowerCase();
 
     return tasks
       .filter((task) => matchesScope(task, scope, currentUserId))
@@ -211,7 +223,16 @@ const MyTasks = () => {
         return haystack.includes(searchValue);
       })
       .sort((left, right) => new Date(right.createdAt) - new Date(left.createdAt));
-  }, [currentUserId, scope, search, status, tasks]);
+  }, [currentUserId, debouncedSearch, scope, status, tasks]);
+
+  useEffect(() => {
+    setVisibleCount(MY_TASKS_BATCH);
+  }, [debouncedSearch, scope, status, tasks]);
+
+  const visibleTasks = useMemo(
+    () => filteredTasks.slice(0, visibleCount),
+    [filteredTasks, visibleCount],
+  );
 
   const handleMarkDone = useCallback(async (task) => {
     try {
@@ -328,7 +349,7 @@ const MyTasks = () => {
       ) : (
         <Panel title="Your workload" subtitle="Open any task to see progress, comments, and submit it for approval.">
           <div className="space-y-3">
-            {filteredTasks.map((task) => {
+            {visibleTasks.map((task) => {
               const pri = PRI[task.priority] || PRI.Low;
               const sub = SUB[task.submissionStatus] || SUB.not_submitted;
               const progress = progressFor(task);
@@ -383,6 +404,16 @@ const MyTasks = () => {
               );
             })}
           </div>
+          {filteredTasks.length > visibleTasks.length ? (
+            <div className="mt-4 flex flex-col gap-3 border-t pt-4 sm:flex-row sm:items-center sm:justify-between" style={{ borderColor: 'var(--c-border)' }}>
+              <p className="text-sm" style={{ color: 'var(--c-text-3)' }}>
+                Showing {visibleTasks.length} of {filteredTasks.length} tasks
+              </p>
+              <button className="btn-secondary rounded-full" onClick={() => setVisibleCount((current) => current + MY_TASKS_BATCH)}>
+                Load more
+              </button>
+            </div>
+          ) : null}
         </Panel>
       )}
 

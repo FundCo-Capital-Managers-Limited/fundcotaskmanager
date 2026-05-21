@@ -10,6 +10,13 @@ import {
     rotateUserRefreshSession,
 } from '../utils/authSession.js';
 
+const normalizeEmail = (value) => String(value || '').trim().toLowerCase();
+const setNoStore = (res) => {
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+    res.set('Pragma', 'no-cache');
+    res.set('Expires', '0');
+};
+
 // Register user - DISABLED: Admin creates accounts manually
 export async function registerUser(req, res) {
     return res.status(403).json({
@@ -20,7 +27,9 @@ export async function registerUser(req, res) {
 
 // Login user
 export async function loginUser(req, res) {
-    const { email, password, rememberMe } = req.body;
+    const email = normalizeEmail(req.body?.email);
+    const { password, rememberMe } = req.body;
+    setNoStore(res);
     if (!email || !password) {
         return res.status(400).json({ success: false, message: 'Email and password required' });
     }
@@ -62,6 +71,7 @@ export async function loginUser(req, res) {
 // Get current user
 export async function getCurrentUser(req, res) {
     try {
+        setNoStore(res);
         const user = await User.findById(req.user.id).select('firstName lastName otherName position unitSector email role preferences pushToken fullName');
         if (!user) {
             return res.status(404).json({ success: false, message: 'User not found' });
@@ -143,6 +153,7 @@ export async function updatePushToken(req, res) {
 
 export async function refreshUserSession(req, res) {
     try {
+        setNoStore(res);
         const session = await rotateUserRefreshSession({ req, res });
         res.json({
             success: true,
@@ -164,6 +175,7 @@ export async function logoutUser(req, res) {
     } catch (err) {
         console.error('Error revoking user refresh token:', err.message);
     }
+    setNoStore(res);
     clearRefreshCookie(res);
     res.json({ success: true, message: 'Logged out' });
 }

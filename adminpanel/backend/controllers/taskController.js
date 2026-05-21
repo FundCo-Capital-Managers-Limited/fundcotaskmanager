@@ -14,10 +14,50 @@ const getActorName = (user) => user?.fullName || user?.email || 'Admin';
 const getTaskId = (task) => String(task?._id || task?.id || '');
 const getUserId = (value) => String(value?._id || value || '');
 const getCurrentAdminId = (req) => String(req.user?._id || req.user?.id || '');
+const parsePositiveInt = (value, fallback) => {
+  const parsed = Number.parseInt(value, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+};
+const buildAssignerSnapshot = (user) => ({
+  name: `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || user?.fullName || user?.email || '',
+  email: String(user?.email || '').trim(),
+  role: String(user?.role || '').trim(),
+  capturedAt: new Date(),
+});
+const hasAssignerSnapshot = (task) => Boolean(
+  String(task?.assignedBySnapshot?.name || '').trim()
+  || String(task?.assignedBySnapshot?.email || '').trim()
+);
 const isSelfAssignedTask = (task) => {
   const ownerId = getUserId(task?.owner);
   const assignerId = getUserId(task?.assignedBy);
+  if (task?.createdByAdmin) {
+    return Boolean(ownerId) && Boolean(assignerId) && assignerId === ownerId;
+  }
   return Boolean(ownerId) && (!assignerId || assignerId === ownerId);
+};
+
+const backfillAssignerSnapshots = async (input) => {
+  const tasks = Array.isArray(input) ? input : [input].filter(Boolean);
+  const updates = [];
+
+  tasks.forEach((task) => {
+    if (!task?.createdByAdmin || hasAssignerSnapshot(task) || !task?.assignedBy) return;
+    const snapshot = buildAssignerSnapshot(task.assignedBy);
+    task.assignedBySnapshot = snapshot;
+    updates.push({
+      updateOne: {
+        filter: { _id: task._id },
+        update: { $set: { assignedBySnapshot: snapshot } },
+      },
+    });
+  });
+
+  if (updates.length) {
+    await Task.bulkWrite(updates, { ordered: false }).catch(() => {});
+  }
+
+  return input;
 };
 
 const getTaskReviewAccess = ({ task, reviewerId, reviewerRole, teamMemberIds }) => {
@@ -342,6 +382,8 @@ export const getAllTasks = async (req, res) => {
       Task.countDocuments(query),
     ]);
 
+    await backfillAssignerSnapshots(tasks);
+
     res.json({
       success: true, tasks, total,
       pagination: { page: Number(page), limit: Number(limit), total, pages: Math.ceil(total / limit) },
@@ -362,6 +404,7 @@ export const getTaskById = async (req, res) => {
       .populate('adminComments.user', 'firstName lastName avatar')
       .lean();
     if (!task) return res.status(404).json({ success: false, message: 'Task not found' });
+    await backfillAssignerSnapshots(task);
     res.json({ success: true, task });
   } catch (err) {
     res.status(500).json({ success: false, message: 'Failed to fetch task' });
@@ -399,6 +442,7 @@ export const createTaskForUser = async (req, res) => {
       appealStatus: 'not_appealed',
       createdByAdmin: true,
       assignedBy: req.user._id,
+      assignedBySnapshot: buildAssignerSnapshot(req.user),
       owner: ownerId,
     });
 
@@ -452,9 +496,16 @@ export const updateTask = async (req, res) => {
     if (data.dueDate) data.dueDate = new Date(data.dueDate);
     if (data.dueDate === '' || data.dueDate === null) data.dueDate = undefined;
 
+    const previousOwnerId = getUserId(existingTask.owner);
+
     if (data.ownerId) {
       data.owner = data.ownerId;
       delete data.ownerId;
+    }
+
+    if (data.owner && getUserId(data.owner) !== previousOwnerId) {
+      data.assignedBy = req.user._id;
+      data.assignedBySnapshot = buildAssignerSnapshot(req.user);
     }
 
     const updated = await Task.findByIdAndUpdate(req.params.id, data, { returnDocument: 'after', runValidators: true })
@@ -463,7 +514,6 @@ export const updateTask = async (req, res) => {
       .populate('reviewedBy', 'firstName lastName fullName email')
       .lean();
 
-    const previousOwnerId = getUserId(existingTask.owner);
     const nextOwnerId = getUserId(updated.owner);
     const actorName = getActorName(req.user);
 
@@ -803,7 +853,7 @@ export const bulkAction = async (req, res) => {
         if (!data?.ownerId) return res.status(400).json({ success: false, message: 'ownerId required for reassign' });
         result = await Task.updateMany(
           { _id: { $in: taskIds } },
-          { $set: { owner: data.ownerId, assignedBy: req.user._id } }
+          { $set: { owner: data.ownerId, assignedBy: req.user._id, assignedBySnapshot: buildAssignerSnapshot(req.user) } }
         );
         break;
       default:
@@ -868,28 +918,42 @@ export const getTasksAssignedByMeStats = async (req, res) => {
 export const getTasksAssignedByMeOverview = async (req, res) => {
   try {
     const { query, blocked } = await buildAssignedByMeTaskQuery(req);
+    const page = parsePositiveInt(req.query.page, 1);
+    const limit = Math.min(parsePositiveInt(req.query.limit, 24), 100);
     if (blocked || !query) {
       return res.json({
         success: true,
         tasks: [],
         total: 0,
         stats: computeTaskStats([]),
+        pagination: { page, limit, total: 0, pages: 0 },
       });
     }
 
-    const tasks = await Task.find(query)
-      .populate('owner', 'firstName lastName otherName email position unitSector avatar')
-      .populate('assignedBy', 'firstName lastName email')
-      .populate('reviewedBy', 'firstName lastName fullName email')
-      .populate('adminComments.user', 'firstName lastName avatar')
-      .sort({ createdAt: -1 })
-      .lean();
+    const [tasks, total, statsRecords] = await Promise.all([
+      Task.find(query)
+        .populate('owner', 'firstName lastName otherName email position unitSector avatar')
+        .populate('assignedBy', 'firstName lastName email')
+        .populate('reviewedBy', 'firstName lastName fullName email')
+        .populate('adminComments.user', 'firstName lastName avatar')
+        .sort({ createdAt: -1 })
+        .skip((page - 1) * limit)
+        .limit(limit)
+        .lean(),
+      Task.countDocuments(query),
+      Task.find(query)
+        .select('completed dueDate submissionStatus priority')
+        .lean(),
+    ]);
+
+    await backfillAssignerSnapshots(tasks);
 
     res.json({
       success: true,
       tasks,
-      total: tasks.length,
-      stats: computeTaskStats(tasks),
+      total,
+      stats: computeTaskStats(statsRecords),
+      pagination: { page, limit, total, pages: Math.ceil(total / limit) },
     });
   } catch (err) {
     console.error('getTasksAssignedByMeOverview error:', err.message);

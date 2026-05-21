@@ -1021,6 +1021,7 @@ const FolderCard = ({ folder, onOpen, onDelete, onRename, viewMode }) => {
 // ════════════════════════════════════════════════════════════════════════════
 const FileStorage = () => {
   const { user, tasks = [], onLogout } = useOutletContext();
+  const fetchAllRef = useRef(null);
 
   // ── State ────────────────────────────────────────────────────────────────
   const [files,       setFiles]       = useState([]);
@@ -1079,6 +1080,10 @@ const FileStorage = () => {
   useEffect(() => { if (page > 1) fetchAll(page, false); }, [page]); // eslint-disable-line
 
   useEffect(() => {
+    fetchAllRef.current = fetchAll;
+  }, [fetchAll]);
+
+  useEffect(() => {
     const token = localStorage.getItem('token');
     if (!token) return undefined;
 
@@ -1089,7 +1094,7 @@ const FileStorage = () => {
     });
 
     const handleFileReceived = () => {
-      fetchAll(1, true);
+      fetchAllRef.current?.(1, true);
       toast.success('A chat document was added to your file storage.');
     };
 
@@ -1098,7 +1103,7 @@ const FileStorage = () => {
       socket.off('fileReceived', handleFileReceived);
       socket.disconnect();
     };
-  }, [fetchAll]);
+  }, []);
 
   // Infinite scroll
   useEffect(() => {

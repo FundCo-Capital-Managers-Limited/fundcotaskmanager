@@ -146,6 +146,7 @@ const queuePopupNotification = (notification, popupCacheRef) => {
 
 export const NotificationProvider = ({ children }) => {
   const { user, loading: authLoading } = useAuth();
+  const userId = user?._id || user?.id || '';
   const [items, setItems] = useState([]);
   const [popupItems, setPopupItems] = useState([]);
   const [popupsExpanded, setPopupsExpanded] = useState(false);
@@ -153,9 +154,11 @@ export const NotificationProvider = ({ children }) => {
   const [loading, setLoading] = useState(false);
   const [lastUpdated, setLastUpdated] = useState(null);
   const popupCacheRef = useRef(new Map());
+  const refreshRef = useRef(null);
+  const queuedRefreshRef = useRef(null);
 
   const refresh = useCallback(async () => {
-    if (!user || authLoading) {
+    if (!userId || authLoading) {
       setItems([]);
       setCounts(EMPTY_COUNTS);
       return [];
@@ -275,17 +278,31 @@ export const NotificationProvider = ({ children }) => {
     } finally {
       setLoading(false);
     }
-  }, [authLoading, user]);
+  }, [authLoading, userId]);
+
+  useEffect(() => {
+    refreshRef.current = refresh;
+  }, [refresh]);
+
+  const scheduleRefresh = useCallback((delayMs = 250) => {
+    if (queuedRefreshRef.current) {
+      window.clearTimeout(queuedRefreshRef.current);
+    }
+    queuedRefreshRef.current = window.setTimeout(() => {
+      queuedRefreshRef.current = null;
+      refreshRef.current?.();
+    }, delayMs);
+  }, []);
 
   useEffect(() => {
     const token = getToken();
-    if (!token || !user || authLoading) {
+    if (!token || !userId || authLoading) {
       setItems([]);
       setCounts(EMPTY_COUNTS);
       return undefined;
     }
 
-    refresh();
+    refreshRef.current?.();
 
     const userSocket = io(USER_API_BASE, {
       auth: (cb) => cb({ token: localStorage.getItem('adminToken') }),
@@ -306,21 +323,25 @@ export const NotificationProvider = ({ children }) => {
           ...current.filter((item) => item.id !== nextPopup.id && getToastKey(item) !== getToastKey(nextPopup)),
         ].slice(0, 20));
       }
-      refresh();
+      scheduleRefresh(400);
     };
 
     userSocket.on('notification:new', handleIncoming);
     adminSocket.on('notification:new', handleIncoming);
 
-    const timer = setInterval(refresh, 30000);
+    const timer = setInterval(() => refreshRef.current?.(), 30000);
     return () => {
       clearInterval(timer);
+      if (queuedRefreshRef.current) {
+        window.clearTimeout(queuedRefreshRef.current);
+        queuedRefreshRef.current = null;
+      }
       userSocket.off('notification:new', handleIncoming);
       adminSocket.off('notification:new', handleIncoming);
       userSocket.disconnect();
       adminSocket.disconnect();
     };
-  }, [authLoading, refresh, user]);
+  }, [authLoading, scheduleRefresh, userId]);
 
   useEffect(() => {
     if (popupItems.length === 0) {

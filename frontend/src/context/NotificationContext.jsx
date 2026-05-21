@@ -176,6 +176,8 @@ export const NotificationProvider = ({ children }) => {
   const [lastUpdated, setLastUpdated] = useState(null);
   const taskSnapshotRef = useRef(new Map());
   const popupCacheRef = useRef(new Map());
+  const refreshRef = useRef(null);
+  const queuedRefreshRef = useRef(null);
 
   const items = useMemo(() => {
     const merged = new Map();
@@ -264,6 +266,20 @@ export const NotificationProvider = ({ children }) => {
     }
   }, []);
 
+  useEffect(() => {
+    refreshRef.current = refresh;
+  }, [refresh]);
+
+  const scheduleRefresh = useCallback((delayMs = 250) => {
+    if (queuedRefreshRef.current) {
+      window.clearTimeout(queuedRefreshRef.current);
+    }
+    queuedRefreshRef.current = window.setTimeout(() => {
+      queuedRefreshRef.current = null;
+      refreshRef.current?.();
+    }, delayMs);
+  }, []);
+
   const pushLiveNotification = useCallback((notification) => {
     if (!notification?.id || !notification?.dedupeKey) return;
 
@@ -292,7 +308,7 @@ export const NotificationProvider = ({ children }) => {
       return undefined;
     }
 
-    refresh();
+    refreshRef.current?.();
 
     const userSocket = io(USER_API_BASE, {
       auth: (cb) => cb({ token: localStorage.getItem('token') }),
@@ -303,7 +319,7 @@ export const NotificationProvider = ({ children }) => {
       if (payload?.type && payload?.title) {
         pushLiveNotification(makeLiveNotification(payload));
       }
-      refresh();
+      scheduleRefresh(400);
     };
 
     const rememberTask = (task) => {
@@ -319,9 +335,11 @@ export const NotificationProvider = ({ children }) => {
       }
 
       const taskId = getTaskId(task);
-      const assignedBy = task?.assignedBy
-        ? `${task.assignedBy.firstName || ''} ${task.assignedBy.lastName || ''}`.trim() || task.assignedBy.email || ''
-        : '';
+      const assignedBy = String(task?.assignedBySnapshot?.name || '').trim()
+        || String(task?.assignedBySnapshot?.email || '').trim()
+        || (task?.assignedBy
+          ? `${task.assignedBy.firstName || ''} ${task.assignedBy.lastName || ''}`.trim() || task.assignedBy.email || ''
+          : '');
 
       pushLiveTaskNotification(makeLiveTaskNotification({
         taskId,
@@ -395,9 +413,13 @@ export const NotificationProvider = ({ children }) => {
     userSocket.on('taskReviewed', handleTaskReviewed);
     userSocket.on('taskCommented', handleTaskCommented);
 
-    const timer = setInterval(refresh, 30000);
+    const timer = setInterval(() => refreshRef.current?.(), 30000);
     return () => {
       clearInterval(timer);
+      if (queuedRefreshRef.current) {
+        window.clearTimeout(queuedRefreshRef.current);
+        queuedRefreshRef.current = null;
+      }
       userSocket.off('notification:new', handleIncoming);
       userSocket.off('newTask', handleNewTask);
       userSocket.off('updateTask', handleUpdateTask);
@@ -405,7 +427,7 @@ export const NotificationProvider = ({ children }) => {
       userSocket.off('taskCommented', handleTaskCommented);
       userSocket.disconnect();
     };
-  }, [pushLiveNotification, pushLiveTaskNotification, refresh]);
+  }, [pushLiveNotification, pushLiveTaskNotification, scheduleRefresh]);
 
   useEffect(() => {
     if (popupItems.length === 0) {

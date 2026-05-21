@@ -148,11 +148,16 @@ io.use(async (socket, next) => {
   } catch { next(new Error('Auth failed')); }
 });
 
+const shouldLogSocketLifecycle = (process.env.NODE_ENV || '').toLowerCase() !== 'production';
+const logSocketLifecycle = (message) => {
+  if (shouldLogSocketLifecycle) console.log(message);
+};
+
 io.on('connection', (socket) => {
-  console.log(`✅ Admin socket connected: ${socket.id}`);
+  logSocketLifecycle(`✅ Admin socket connected: ${socket.id}`);
   socket.join(`admin:${socket.user.id}`);
   socket.join(`user:${socket.user.id}`);
-  socket.on('disconnect', () => console.log(`❌ Admin socket disconnected: ${socket.id}`));
+  socket.on('disconnect', () => logSocketLifecycle(`❌ Admin socket disconnected: ${socket.id}`));
 });
 
 // ── Health ────────────────────────────────────────────────────────────────────

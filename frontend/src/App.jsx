@@ -50,6 +50,14 @@ const hasKnownUserSession = () => Boolean(
   || localStorage.getItem('fundcoUserRefreshExpiresAt')
 );
 
+const serializeUser = (value) => {
+  try {
+    return JSON.stringify(value || null);
+  } catch {
+    return '';
+  }
+};
+
 const App = () => {
   const navigate = useNavigate();
   const [currentUser, setCurrentUser] = useState(() => readStoredUser());
@@ -58,16 +66,25 @@ const App = () => {
   useEffect(() => {
     let active = true;
 
+    const syncStoredUser = () => {
+      const nextUser = readStoredUser();
+      setCurrentUser((previousUser) => (
+        serializeUser(previousUser) === serializeUser(nextUser)
+          ? previousUser
+          : nextUser
+      ));
+    };
+
     const syncSession = async () => {
       await bootstrapUserSession();
       if (!active) return;
-      setCurrentUser(readStoredUser());
+      syncStoredUser();
       setAuthReady(true);
     };
 
     syncSession();
 
-    const handleAuthChange = () => setCurrentUser(readStoredUser());
+    const handleAuthChange = () => syncStoredUser();
     window.addEventListener(userAuthEvents.AUTH_CHANGE_EVENT, handleAuthChange);
 
     return () => {
@@ -84,7 +101,12 @@ const App = () => {
 
     const syncFromStorage = () => {
       if (!active) return;
-      setCurrentUser(readStoredUser());
+      const nextUser = readStoredUser();
+      setCurrentUser((previousUser) => (
+        serializeUser(previousUser) === serializeUser(nextUser)
+          ? previousUser
+          : nextUser
+      ));
     };
 
     const refreshSession = async () => {

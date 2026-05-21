@@ -3,8 +3,11 @@ import axios from 'axios';
 const normalizeBase = (value) => String(value || '').trim().replace(/\/+$/, '');
 const AUTH_REFRESH_EXEMPT_PATHS = [
   '/api/admin/auth/login',
+  '/auth/login',
   '/api/admin/auth/forgot',
+  '/auth/forgot',
   '/api/admin/auth/reset',
+  '/auth/reset',
 ];
 
 const isBrowserLocal = () => {
@@ -35,6 +38,7 @@ const REMEMBER_ME_KEY = 'fundcoAdminRememberMe';
 const AUTH_CHANGE_EVENT = 'fundco-admin-auth:changed';
 
 let refreshPromise = null;
+const AUTH_REFRESH_RETRY_DELAY_MS = 350;
 
 const isManagedUrl = (url) => {
   const normalized = String(url || '').trim();
@@ -42,13 +46,30 @@ const isManagedUrl = (url) => {
 };
 
 const shouldSkipRefreshForRequest = (request) => {
-  const normalized = String(request?.url || '').trim().toLowerCase();
+  const base = String(request?.baseURL || '').trim().replace(/\/+$/, '');
+  const path = String(request?.url || '').trim();
+  const normalized = `${base}${path.startsWith('/') ? path : `/${path}`}`.toLowerCase();
   return AUTH_REFRESH_EXEMPT_PATHS.some((path) => normalized.includes(path));
 };
 
 const emitAuthChange = () => {
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new Event(AUTH_CHANGE_EVENT));
+  }
+};
+
+const readSessionSnapshot = () => ({
+  hasToken: Boolean(localStorage.getItem(TOKEN_KEY)),
+  userRaw: localStorage.getItem(USER_KEY) || '',
+});
+
+const emitAuthChangeIfNeeded = (previousSnapshot) => {
+  const nextSnapshot = readSessionSnapshot();
+  if (
+    previousSnapshot.hasToken !== nextSnapshot.hasToken
+    || previousSnapshot.userRaw !== nextSnapshot.userRaw
+  ) {
+    emitAuthChange();
   }
 };
 
@@ -105,7 +126,54 @@ const isTerminalRefreshError = (error) => {
   ].some((fragment) => message.includes(fragment));
 };
 
+const isRetryableRefreshError = (error) => {
+  const status = Number(error?.response?.status || 0);
+  if (status >= 500) return true;
+
+  const message = String(
+    error?.response?.data?.message
+    || error?.message
+    || ''
+  ).toLowerCase();
+
+  return [
+    'refresh token missing',
+    'network error',
+    'failed to fetch',
+    'load failed',
+    'timeout',
+    'socket hang up',
+  ].some((fragment) => message.includes(fragment));
+};
+
+const delay = (ms) => new Promise((resolve) => window.setTimeout(resolve, ms));
+const toSessionExpiredError = (error) => {
+  const nextError = error instanceof Error ? error : new Error('Session expired. Please sign in again.');
+  nextError.message = 'Session expired. Please sign in again.';
+  nextError.response = {
+    ...(error?.response || {}),
+    status: 401,
+    data: {
+      ...(error?.response?.data || {}),
+      message: 'Session expired. Please sign in again.',
+    },
+  };
+  nextError.isAuthExpired = true;
+  return nextError;
+};
+
+const requestRefresh = () => axios.post(
+  `${API_BASE}/api/admin/auth/refresh`,
+  {},
+  {
+    withCredentials: true,
+    skipAuthRefresh: true,
+    skipAuthHeader: true,
+  }
+);
+
 export const storeAdminSession = ({ token, user, accessTokenExpiresInSeconds, refreshSessionExpiresAt, rememberMe }) => {
+  const previousSnapshot = readSessionSnapshot();
   if (token) localStorage.setItem(TOKEN_KEY, token);
   if (user) localStorage.setItem(USER_KEY, JSON.stringify(user));
   if (Number.isFinite(accessTokenExpiresInSeconds) && accessTokenExpiresInSeconds > 0) {
@@ -117,7 +185,7 @@ export const storeAdminSession = ({ token, user, accessTokenExpiresInSeconds, re
   if (typeof rememberMe === 'boolean') {
     localStorage.setItem(REMEMBER_ME_KEY, rememberMe ? 'true' : 'false');
   }
-  emitAuthChange();
+  emitAuthChangeIfNeeded(previousSnapshot);
 };
 
 export const clearAdminSession = () => {
@@ -132,32 +200,39 @@ export const clearAdminSession = () => {
 export const refreshAdminAccessToken = async () => {
   if (refreshPromise) return refreshPromise;
 
-  refreshPromise = axios.post(
-    `${API_BASE}/api/admin/auth/refresh`,
-    {},
-    {
-      withCredentials: true,
-      skipAuthRefresh: true,
-      skipAuthHeader: true,
+  refreshPromise = (async () => {
+    let lastError = null;
+
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      try {
+        const { data } = await requestRefresh();
+        if (!data?.success || !data?.token || !data?.user) {
+          throw new Error(data?.message || 'Unable to refresh session');
+        }
+        storeAdminSession({
+          token: data.token,
+          user: data.user,
+          accessTokenExpiresInSeconds: data.accessTokenExpiresInSeconds,
+          refreshSessionExpiresAt: data.refreshSessionExpiresAt,
+          rememberMe: typeof data.rememberMe === 'boolean' ? data.rememberMe : readStoredSessionMeta().rememberMe,
+        });
+        return data;
+      } catch (error) {
+        lastError = error;
+        if (attempt === 0 && isRetryableRefreshError(error)) {
+          await delay(AUTH_REFRESH_RETRY_DELAY_MS);
+          continue;
+        }
+        if (isTerminalRefreshError(error)) {
+          clearAdminSession();
+          throw toSessionExpiredError(error);
+        }
+        throw error;
+      }
     }
-  ).then(({ data }) => {
-    if (!data?.success || !data?.token || !data?.user) {
-      throw new Error(data?.message || 'Unable to refresh session');
-    }
-    storeAdminSession({
-      token: data.token,
-      user: data.user,
-      accessTokenExpiresInSeconds: data.accessTokenExpiresInSeconds,
-      refreshSessionExpiresAt: data.refreshSessionExpiresAt,
-      rememberMe: typeof data.rememberMe === 'boolean' ? data.rememberMe : readStoredSessionMeta().rememberMe,
-    });
-    return data;
-  }).catch((error) => {
-    if (isTerminalRefreshError(error)) {
-      clearAdminSession();
-    }
-    throw error;
-  }).finally(() => {
+
+    throw lastError || new Error('Unable to refresh session');
+  })().finally(() => {
     refreshPromise = null;
   });
 
@@ -246,7 +321,7 @@ export const attachAdminAuthInterceptors = (instance) => {
         originalRequest.withCredentials = true;
         return instance(originalRequest);
       } catch (refreshError) {
-        throw isTerminalRefreshError(refreshError) ? refreshError : error;
+        throw isTerminalRefreshError(refreshError) ? toSessionExpiredError(refreshError) : error;
       }
     }
   );

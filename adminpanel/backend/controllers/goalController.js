@@ -3,6 +3,10 @@ import { buildTeamQuery } from '../middleware/teamFilter.js';
 import { createNotification } from '../utils/notificationService.js';
 
 const getCurrentAdminId = (req) => String(req.user?._id || req.user?.id || '');
+const parsePositiveInt = (value, fallback) => {
+  const parsed = Number.parseInt(value, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+};
 
 const computeGoalStats = (goals = []) => {
   const total = goals.length;
@@ -22,6 +26,8 @@ export const getAllGoals = async (req, res) => {
   try {
     const query = buildTeamQuery(req.teamMemberIds, 'owner');
     const { search, type, timeframe, ownerId } = req.query;
+    const page = parsePositiveInt(req.query.page, 1);
+    const limit = Math.min(parsePositiveInt(req.query.limit, 24), 100);
 
     if (search) query.title = { $regex: search, $options: 'i' };
     if (type) query.type = type;
@@ -29,18 +35,33 @@ export const getAllGoals = async (req, res) => {
     if (ownerId) {
       const ownerKey = String(ownerId);
       if (req.teamMemberIds && !req.teamMemberIds.map(String).includes(ownerKey)) {
-        return res.json({ success: true, goals: [], total: 0 });
+        return res.json({
+          success: true,
+          goals: [],
+          total: 0,
+          pagination: { page, limit, total: 0, pages: 0 },
+        });
       }
       query.owner = ownerKey;
     }
 
-    const goals = await Goal.find(query)
-      .populate('owner', 'firstName lastName otherName email position unitSector avatar')
-      .populate('adminComments.user', 'firstName lastName avatar')
-      .sort({ createdAt: -1 })
-      .lean();
+    const [goals, total] = await Promise.all([
+      Goal.find(query)
+        .populate('owner', 'firstName lastName otherName email position unitSector avatar')
+        .populate('adminComments.user', 'firstName lastName avatar')
+        .sort({ createdAt: -1 })
+        .skip((page - 1) * limit)
+        .limit(limit)
+        .lean(),
+      Goal.countDocuments(query),
+    ]);
 
-    res.json({ success: true, goals, total: goals.length });
+    res.json({
+      success: true,
+      goals,
+      total,
+      pagination: { page, limit, total, pages: Math.ceil(total / limit) },
+    });
   } catch (err) {
     console.error('getAllGoals error:', err.message);
     res.status(500).json({ success: false, message: 'Failed to fetch goals' });

@@ -83,6 +83,7 @@ const TypeIcon = ({ type, className = 'h-5 w-5' }) => {
 };
 
 const FileStorage = () => {
+  const fetchAllRef = useRef(null);
   const [files, setFiles] = useState([]);
   const [folders, setFolders] = useState([]);
   const [tasks, setTasks] = useState([]);
@@ -135,6 +136,10 @@ const FileStorage = () => {
   }, [fetchAll]);
 
   useEffect(() => {
+    fetchAllRef.current = fetchAll;
+  }, [fetchAll]);
+
+  useEffect(() => {
     const token = localStorage.getItem('adminToken');
     if (!token) return undefined;
 
@@ -145,7 +150,7 @@ const FileStorage = () => {
     });
 
     const handleFileReceived = () => {
-      fetchAll();
+      fetchAllRef.current?.();
       toast.success('A chat document was added to your file storage.');
     };
 
@@ -154,7 +159,7 @@ const FileStorage = () => {
       socket.off('fileReceived', handleFileReceived);
       socket.disconnect();
     };
-  }, [fetchAll]);
+  }, []);
 
   const currentFolders = useMemo(
     () => folders.filter((folder) => (folder.parentId || null) === (currentFolderId || null)),

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import axios from 'axios';
 import { format } from 'date-fns';
 import { AlertTriangle, ArrowLeft, Calendar, CircleDollarSign, Flag, FolderKanban, ListTodo, Search, ShieldAlert, Target, Users } from 'lucide-react';
@@ -193,7 +193,9 @@ const ProjectCard = ({ project, onSelect }) => {
 
 const TaskRow = ({ task }) => {
   const submissionLabel = getTaskStatusLabel(task);
-  const assignedBy = getPersonName(task.assignedBy, '');
+  const assignedBy = String(task?.assignedBySnapshot?.name || '').trim()
+    || String(task?.assignedBySnapshot?.email || '').trim()
+    || getPersonName(task.assignedBy, '');
 
   return (
     <div className="rounded-xl border p-3" style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border-color)' }}>
@@ -529,6 +531,7 @@ const Projects = () => {
   const { projectId = '' } = useParams();
   const { user } = useOutletContext();
   const { markTypeRead } = useNotifications();
+  const fetchProjectsRef = useRef(null);
   const [projects, setProjects] = useState([]);
   const [summary, setSummary] = useState({ total: 0, active: 0, atRisk: 0, myOpenTasks: 0 });
   const [loading, setLoading] = useState(true);
@@ -565,6 +568,10 @@ const Projects = () => {
   }, [fetchProjects]);
 
   useEffect(() => {
+    fetchProjectsRef.current = fetchProjects;
+  }, [fetchProjects]);
+
+  useEffect(() => {
     markTypeRead('project');
   }, [markTypeRead]);
 
@@ -581,11 +588,11 @@ const Projects = () => {
     const refreshIfRelevant = (payload) => {
       if (!payload) return;
       if (payload.type === 'project' || payload.entityType === 'project' || payload.data?.projectId) {
-        fetchProjects();
+        fetchProjectsRef.current?.();
       }
     };
 
-    const handleTaskActivity = () => fetchProjects();
+    const handleTaskActivity = () => fetchProjectsRef.current?.();
 
     socket.on('notification:new', refreshIfRelevant);
     socket.on('newTask', handleTaskActivity);
@@ -599,7 +606,7 @@ const Projects = () => {
       socket.off('taskReviewed', handleTaskActivity);
       socket.disconnect();
     };
-  }, [fetchProjects]);
+  }, []);
 
   const filteredProjects = useMemo(() => {
     if (focusFilter === 'risk') return projects.filter((project) => project.health === 'at-risk');

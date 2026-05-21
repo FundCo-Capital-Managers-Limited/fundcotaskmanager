@@ -18,6 +18,7 @@ import {
 import api from '../utils/api.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useNotifications } from '../context/NotificationContext.jsx';
+import useDebouncedValue from '../hooks/useDebouncedValue.js';
 import {
   EmptyState,
   FilterChip,
@@ -33,6 +34,7 @@ import {
 const PRI = { High: { c: '#dc2626', bg: '#fef2f2' }, Medium: { c: '#d97706', bg: '#fffbeb' }, Low: { c: '#6b7494', bg: '#f7f8fb' } };
 const SUB = { approved: { c: '#059669', bg: '#ecfdf5' }, submitted: { c: '#d97706', bg: '#fffbeb' }, rejected: { c: '#dc2626', bg: '#fef2f2' }, not_submitted: { c: '#6b7494', bg: '#f7f8fb' } };
 const RESPONSE = { accepted: { label: 'Accepted by user', c: '#0284c7', bg: '#e0f2fe' }, rejected: { label: 'Rejected by user', c: '#b91c1c', bg: '#fef2f2' } };
+const TASKS_PAGE_SIZE = 36;
 
 const getId = (value) => {
   if (!value) return '';
@@ -45,6 +47,9 @@ const getCurrentUserId = (user) => String(user?._id || user?.id || '');
 const isSelfAssignedTask = (task) => {
   const ownerId = getId(task?.owner);
   const assignerId = getId(task?.assignedBy);
+  if (task?.createdByAdmin) {
+    return Boolean(ownerId) && Boolean(assignerId) && assignerId === ownerId;
+  }
   return Boolean(ownerId) && (!assignerId || assignerId === ownerId);
 };
 
@@ -69,6 +74,8 @@ const getPersonName = (user, fallback = '') => {
   if (!user) return fallback;
   return user.fullName || `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email || fallback;
 };
+const getAssignerSnapshotName = (task) => String(task?.assignedBySnapshot?.name || '').trim()
+  || String(task?.assignedBySnapshot?.email || '').trim();
 
 const formatTaskMoment = (value) => {
   if (!value) return '';
@@ -98,7 +105,8 @@ const getAssignerLabel = (task, currentUserId) => {
   if (isSelfAssignedTask(task)) return 'Self assigned';
   const assignerId = getId(task?.assignedBy);
   if (assignerId && assignerId === currentUserId) return 'Assigned by you';
-  const assigner = getPersonName(task?.assignedBy, '');
+  const assigner = getAssignerSnapshotName(task) || getPersonName(task?.assignedBy, '');
+  if (task?.createdByAdmin && !assigner) return 'Assigned by admin';
   return assigner ? `Assigned by ${assigner}` : 'Assigner unavailable';
 };
 
@@ -112,19 +120,22 @@ const TasksAssignedByMe = () => {
   const [filter, setFilter] = useState('all');
   const [search, setSearch] = useState('');
   const [selectedOwner, setSelectedOwner] = useState('');
+  const [page, setPage] = useState(1);
+  const [pagination, setPagination] = useState({ page: 1, limit: TASKS_PAGE_SIZE, total: 0, pages: 0 });
   const [formTask, setFormTask] = useState(null);
   const [formMode, setFormMode] = useState('create');
   const [viewTask, setViewTask] = useState(null);
   const [display, setDisplay] = useState('list');
 
   const currentUserId = getCurrentUserId(user);
+  const debouncedSearch = useDebouncedValue(search, 320);
 
   const fetchTasks = useCallback(async () => {
     setLoading(true);
     try {
-      const params = {};
+      const params = { page, limit: TASKS_PAGE_SIZE };
       if (filter !== 'all') params.status = filter;
-      if (search) params.search = search;
+      if (debouncedSearch) params.search = debouncedSearch;
       if (selectedOwner) params.ownerId = selectedOwner;
 
       const [overviewRes, usersRes] = await Promise.all([
@@ -134,17 +145,28 @@ const TasksAssignedByMe = () => {
 
       setTasks(overviewRes.data.tasks || []);
       setStats(overviewRes.data.stats || {});
+      setPagination(overviewRes.data.pagination || { page, limit: TASKS_PAGE_SIZE, total: overviewRes.data.total || 0, pages: 0 });
       setUsers(usersRes.data.users || []);
     } catch (error) {
       toast.error(error.response?.data?.message || 'Failed to load assigned tasks');
     } finally {
       setLoading(false);
     }
-  }, [filter, search, selectedOwner]);
+  }, [debouncedSearch, filter, page, selectedOwner]);
 
   useEffect(() => {
     fetchTasks();
   }, [fetchTasks]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch, filter, selectedOwner]);
+
+  useEffect(() => {
+    if (pagination.pages > 0 && page > pagination.pages) {
+      setPage(pagination.pages);
+    }
+  }, [page, pagination.pages]);
 
   useEffect(() => {
     markTypeRead?.('task');
@@ -217,6 +239,10 @@ const TasksAssignedByMe = () => {
     const owner = users.find((item) => item._id === selectedOwner);
     return owner ? `${owner.firstName || ''} ${owner.lastName || ''}`.trim() || owner.email : 'selected assignee';
   }, [selectedOwner, users]);
+  const totalTasks = pagination.total || 0;
+  const totalPages = Math.max(pagination.pages || 0, 1);
+  const pageStart = totalTasks === 0 ? 0 : (page - 1) * TASKS_PAGE_SIZE + 1;
+  const pageEnd = totalTasks === 0 ? 0 : Math.min(page * TASKS_PAGE_SIZE, totalTasks);
 
   return (
     <div className="page-shell">
@@ -283,7 +309,7 @@ const TasksAssignedByMe = () => {
       ) : tasks.length === 0 ? (
         <EmptyState icon={ListTodo} title="No assigned tasks found" description="Tasks you assign from the admin side will show up here with full follow-up control." />
       ) : display === 'list' ? (
-        <Panel title="Assigned work" subtitle={`${tasks.length} tasks visible for ${selectedOwnerLabel}`}>
+        <Panel title="Assigned work" subtitle={`${totalTasks} tasks found for ${selectedOwnerLabel}`}>
           <div className="space-y-3">
             {tasks.map((task, index) => {
               const overdue = task.dueDate && new Date(task.dueDate) < new Date() && !task.completed;
@@ -369,6 +395,27 @@ const TasksAssignedByMe = () => {
           })}
         </div>
       )}
+
+      {!loading && totalTasks > 0 ? (
+        <Panel>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm" style={{ color: 'var(--c-text-3)' }}>
+              Showing {pageStart}-{pageEnd} of {totalTasks} tasks
+            </p>
+            <div className="flex items-center gap-2">
+              <button className="btn-secondary rounded-full" disabled={page <= 1} onClick={() => setPage((current) => Math.max(1, current - 1))}>
+                Previous
+              </button>
+              <span className="text-sm font-medium" style={{ color: 'var(--c-text-2)' }}>
+                Page {page} of {totalPages}
+              </span>
+              <button className="btn-secondary rounded-full" disabled={page >= totalPages} onClick={() => setPage((current) => Math.min(totalPages, current + 1))}>
+                Next
+              </button>
+            </div>
+          </div>
+        </Panel>
+      ) : null}
 
       <TaskFormModal open={formTask !== null} task={formTask?._id ? formTask : null} mode={formMode} users={users} onClose={() => setFormTask(null)} onSave={handleSave} />
       <TaskDetailModal

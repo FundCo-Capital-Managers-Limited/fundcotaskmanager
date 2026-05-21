@@ -69,6 +69,27 @@ const taskSchema = new mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId,
         ref: 'user',
     },
+    assignedBySnapshot: {
+        name: {
+            type: String,
+            trim: true,
+            default: '',
+        },
+        email: {
+            type: String,
+            trim: true,
+            default: '',
+        },
+        role: {
+            type: String,
+            trim: true,
+            default: '',
+        },
+        capturedAt: {
+            type: Date,
+            default: null,
+        },
+    },
     createdAt: {
         type: Date,
         default: Date.now,

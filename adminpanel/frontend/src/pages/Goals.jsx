@@ -1,9 +1,10 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
 import { CalendarRange, Edit2, Plus, Search, Send, Target, Trash2, Users, X } from 'lucide-react';
 import api from '../utils/api.js';
 import { useAuth } from '../context/AuthContext.jsx';
+import useDebouncedValue from '../hooks/useDebouncedValue.js';
 import {
   EmptyState,
   FilterChip,
@@ -17,6 +18,8 @@ import {
   StatCard,
 } from '../components/ui.jsx';
 
+const GOALS_PAGE_SIZE = 24;
+
 const Goals = () => {
   const { hasRole } = useAuth();
   const [goals, setGoals] = useState([]);
@@ -26,18 +29,22 @@ const Goals = () => {
   const [search, setSearch] = useState('');
   const [view, setView] = useState('board');
   const [timeframeFilter, setTimeframeFilter] = useState('');
+  const [page, setPage] = useState(1);
+  const [pagination, setPagination] = useState({ page: 1, limit: GOALS_PAGE_SIZE, total: 0, pages: 0 });
   const [formGoal, setFormGoal] = useState(null);
   const [viewGoal, setViewGoal] = useState(null);
+  const debouncedSearch = useDebouncedValue(search, 320);
 
   const fetchAll = useCallback(async () => {
     setLoading(true);
     try {
       const [g, s, u] = await Promise.all([
-        api.get('/goals', { params: { search } }),
+        api.get('/goals', { params: { search: debouncedSearch, timeframe: timeframeFilter || undefined, page, limit: GOALS_PAGE_SIZE } }),
         api.get('/goals/stats'),
         api.get('/team/available-users'),
       ]);
       setGoals(g.data.goals || []);
+      setPagination(g.data.pagination || { page, limit: GOALS_PAGE_SIZE, total: g.data.total || 0, pages: 0 });
       setStats(s.data.stats || {});
       setUsers(u.data.users || []);
     } catch {
@@ -45,11 +52,21 @@ const Goals = () => {
     } finally {
       setLoading(false);
     }
-  }, [search]);
+  }, [debouncedSearch, page, timeframeFilter]);
 
   useEffect(() => {
     fetchAll();
   }, [fetchAll]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch, timeframeFilter]);
+
+  useEffect(() => {
+    if (pagination.pages > 0 && page > pagination.pages) {
+      setPage(pagination.pages);
+    }
+  }, [page, pagination.pages]);
 
   const progressFor = (goal) => {
     if (!goal.subGoals?.length) return 0;
@@ -58,7 +75,11 @@ const Goals = () => {
     );
   };
 
-  const filteredGoals = goals.filter((goal) => !timeframeFilter || goal.timeframe === timeframeFilter);
+  const filteredGoals = useMemo(() => goals, [goals]);
+  const totalGoals = pagination.total || 0;
+  const totalPages = Math.max(pagination.pages || 0, 1);
+  const pageStart = totalGoals === 0 ? 0 : (page - 1) * GOALS_PAGE_SIZE + 1;
+  const pageEnd = totalGoals === 0 ? 0 : Math.min(page * GOALS_PAGE_SIZE, totalGoals);
 
   const handleSave = async (data, isEdit, goalId) => {
     try {
@@ -153,7 +174,8 @@ const Goals = () => {
       ) : filteredGoals.length === 0 ? (
         <EmptyState icon={Target} title="No goals found" description="Create a goal or change the filters." />
       ) : (
-        <div className={view === 'board' ? 'grid gap-4 md:grid-cols-2 2xl:grid-cols-3' : 'space-y-3'}>
+        <>
+          <div className={view === 'board' ? 'grid gap-4 md:grid-cols-2 2xl:grid-cols-3' : 'space-y-3'}>
           {filteredGoals.map((goal) => {
             const progress = progressFor(goal);
             const owner = goal.owner ? `${goal.owner.firstName} ${goal.owner.lastName}` : 'Unassigned';
@@ -252,7 +274,27 @@ const Goals = () => {
               </div>
             );
           })}
-        </div>
+          </div>
+
+          <Panel>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-sm" style={{ color: 'var(--c-text-3)' }}>
+                Showing {pageStart}-{pageEnd} of {totalGoals} goals
+              </p>
+              <div className="flex items-center gap-2">
+                <button className="btn-secondary rounded-full" disabled={page <= 1} onClick={() => setPage((current) => Math.max(1, current - 1))}>
+                  Previous
+                </button>
+                <span className="text-sm font-medium" style={{ color: 'var(--c-text-2)' }}>
+                  Page {page} of {totalPages}
+                </span>
+                <button className="btn-secondary rounded-full" disabled={page >= totalPages} onClick={() => setPage((current) => Math.min(totalPages, current + 1))}>
+                  Next
+                </button>
+              </div>
+            </div>
+          </Panel>
+        </>
       )}
 
       <GoalFormModal

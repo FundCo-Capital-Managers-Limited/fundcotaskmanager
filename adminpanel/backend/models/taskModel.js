@@ -36,6 +36,12 @@ const taskSchema = new mongoose.Schema({
   },
   createdByAdmin: { type: Boolean, default: false },
   assignedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'user' },
+  assignedBySnapshot: {
+    name: { type: String, trim: true, default: '' },
+    email: { type: String, trim: true, default: '' },
+    role: { type: String, trim: true, default: '' },
+    capturedAt: { type: Date, default: null },
+  },
   createdAt: { type: Date, default: Date.now },
   files: [{ type: mongoose.Schema.Types.ObjectId, ref: 'File' }],
   revenueProject: {
