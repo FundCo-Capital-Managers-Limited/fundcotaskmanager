@@ -27,7 +27,7 @@ const messageSchema = new mongoose.Schema(
         stickerLabel: { type: String, trim: true, default: '' },
         isDeleted:  { type: Boolean, default: false },
         isEdited:   { type: Boolean, default: false },
-        // Per-user soft delete — message stays in DB, hidden only for this user
+        // Per-user soft delete message stays in DB, hidden only for this user
         deletedFor: [{ type: mongoose.Schema.Types.ObjectId, ref: 'user' }],
         // Reply-to: stores a snapshot so the preview is always available even if original is deleted
         replyTo: {
@@ -85,3 +85,6 @@ messageSchema.index({ sender: 1, createdAt: -1 });
 
 const Message = mongoose.models.Message || mongoose.model('Message', messageSchema);
 export default Message;
+
+
+

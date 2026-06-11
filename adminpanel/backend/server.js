@@ -83,7 +83,7 @@ const corsOrigin = (origin, callback) => {
   return callback(new Error(`Origin not allowed by CORS: ${origin}`));
 };
 
-// ── Socket.IO ─────────────────────────────────────────────────────────────────
+// Socket.IO
 const io = new Server(httpServer, {
   cors: {
     origin: corsOrigin,
@@ -102,7 +102,7 @@ global.adminIo = io;
 // Attach io to every request
 app.use((req, res, next) => { req.io = io; next(); });
 
-// ── CORS ──────────────────────────────────────────────────────────────────────
+// CORS
 app.use(cors({
   origin: corsOrigin,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
@@ -114,7 +114,7 @@ app.use(applySecurityHeaders);
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// ── Routes ────────────────────────────────────────────────────────────────────
+// Routes
 app.use('/api/admin/auth', authRoutes);
 app.use('/api/admin/users', userRoutes);
 app.use('/api/admin/team', teamRoutes);
@@ -131,7 +131,7 @@ app.use('/api/admin/meetings', meetingRoutes);
 app.use('/api/admin/notifications', notificationRoutes);
 app.use('/api/admin/shared', sharedProxyRoutes);
 
-// ── Socket.IO Auth ────────────────────────────────────────────────────────────
+// Socket.IO Auth
 io.use(async (socket, next) => {
   try {
     const token = socket.handshake.auth?.token || socket.handshake.headers?.authorization?.split(' ')[1];
@@ -154,31 +154,31 @@ const logSocketLifecycle = (message) => {
 };
 
 io.on('connection', (socket) => {
-  logSocketLifecycle(`✅ Admin socket connected: ${socket.id}`);
+  logSocketLifecycle(`Admin socket connected: ${socket.id}`);
   socket.join(`admin:${socket.user.id}`);
   socket.join(`user:${socket.user.id}`);
-  socket.on('disconnect', () => logSocketLifecycle(`❌ Admin socket disconnected: ${socket.id}`));
+  socket.on('disconnect', () => logSocketLifecycle(`Admin socket disconnected: ${socket.id}`));
 });
 
-// ── Health ────────────────────────────────────────────────────────────────────
+// Health
 app.get('/', (req, res) => res.json({
   success: true, message: 'Admin API running', port,
   socketEnabled: true,
 }));
 
-// ── Global error handler ──────────────────────────────────────────────────────
+// Global error handler
 app.use((err, req, res, next) => {
   console.error('Admin server error:', err.stack);
   res.status(500).json({ success: false, message: 'Internal server error' });
 });
 
-// ── Start ─────────────────────────────────────────────────────────────────────
+// Start
 async function startServer() {
   try {
     await connectDB();
     httpServer.listen(port, '0.0.0.0', () => {
-      console.log(`🚀 Admin server running on port ${port}`);
-      console.log(`📡 Admin Socket.IO ready`);
+      console.log(`Admin server running on port ${port}`);
+      console.log(`Admin Socket.IO ready`);
     });
   } catch (err) {
     console.error('Failed to start admin server:', err.message);
@@ -188,3 +188,6 @@ async function startServer() {
 
 export { app, io };
 if (process.env.NODE_ENV !== 'test') startServer();
+
+
+

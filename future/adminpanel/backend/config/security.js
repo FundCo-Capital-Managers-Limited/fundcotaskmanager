@@ -37,3 +37,6 @@ export const assertFutureAdminSecurityEnv = () => {
     throw new Error('Legacy JWT_SECRET is no longer supported. Use ADMIN_JWT_SECRET instead.');
   }
 };
+
+
+

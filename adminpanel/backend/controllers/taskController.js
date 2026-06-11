@@ -319,7 +319,7 @@ const computeTaskStats = (tasks = []) => {
   };
 };
 
-// ── Get all tasks (team-filtered) ─────────────────────────────────────────────
+// Get all tasks (team-filtered)
 export const getAllTasks = async (req, res) => {
   try {
     const query = buildTeamQuery(req.teamMemberIds, 'owner');
@@ -394,7 +394,7 @@ export const getAllTasks = async (req, res) => {
   }
 };
 
-// ── Get single task ───────────────────────────────────────────────────────────
+// Get single task
 export const getTaskById = async (req, res) => {
   try {
     const task = await Task.findById(req.params.id)
@@ -411,7 +411,7 @@ export const getTaskById = async (req, res) => {
   }
 };
 
-// ── Create task for a user (Team Lead+ can assign) ────────────────────────────
+// Create task for a user (Team Lead+ can assign)
 export const createTaskForUser = async (req, res) => {
   try {
     const { title, description, priority, dueDate, checklist = [], ownerId } = req.body;
@@ -866,7 +866,7 @@ export const bulkAction = async (req, res) => {
   }
 };
 
-// ── Task stats (dashboard) ────────────────────────────────────────────────────
+// Task stats (dashboard)
 export const getTaskStats = async (req, res) => {
   try {
     const query = buildTeamQuery(req.teamMemberIds, 'owner');
@@ -960,3 +960,6 @@ export const getTasksAssignedByMeOverview = async (req, res) => {
     res.status(500).json({ success: false, message: 'Failed to fetch assigned tasks' });
   }
 };
+
+
+

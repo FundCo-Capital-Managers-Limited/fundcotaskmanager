@@ -53,3 +53,6 @@ reportSchema.index({ title: 'text', content: 'text' });
 
 const Report = mongoose.models.Report || mongoose.model('Report', reportSchema);
 export default Report;
+
+
+

@@ -23,7 +23,7 @@ const openai = new OpenAI({
   baseURL: 'https://api.x.ai/v1',
 });
 
-// ── Company knowledge ─────────────────────────────────────────────────────────
+// Company knowledge
 const COMPANY_KNOWLEDGE = `
 FundCo Capital Managers: Alternative asset manager focusing on sustainable infrastructure.
 Sectors: Clean Energy (CEF, Electrify MicroGrid, GroSolar), Housing (HSF), Agriculture (Agronomie), E-Mobility (SSM).
@@ -34,7 +34,7 @@ Partners: GVE, Darway Coast, ACOB, AquaEarth, Farm Warehouse.
 Green Kiosk: Solar-powered kiosks for rural energy. Black Soldier Fly: Sustainable waste management.
 `.trim();
 
-// ── Tool system prompts ───────────────────────────────────────────────────────
+// Tool system prompts
 const TOOL_PROMPTS = {
   'general':                   `${COMPANY_KNOWLEDGE}\n\nYou are FundCo AI, a knowledgeable assistant for FundCo Capital Managers. Be concise, accurate, and professional. Use Markdown formatting. Address the user as "you". Analyze attached files thoroughly.`,
   'report-generator':          `${COMPANY_KNOWLEDGE}\n\nYou are a professional report writer. Generate clear, structured progress reports in Markdown using ONLY the tasks provided. Be truthful about completed and incomplete work. Use FundCo terminology.`,
@@ -65,7 +65,7 @@ const TOOL_PROMPTS = {
   'sdg-impact-analyzer':       `${COMPANY_KNOWLEDGE}\n\nYou are an SDG impact analysis expert. Map project activities to UN Sustainable Development Goals with measurable indicators.`,
 };
 
-// ── File processing helper ─────────────────────────────────────────────────────
+// File processing helper
 const processFiles = async (files, lastMessage) => {
   let contentParts = typeof lastMessage.content === 'string'
     ? [{ type: 'text', text: lastMessage.content }]
@@ -123,7 +123,7 @@ const processFiles = async (files, lastMessage) => {
   return contentParts;
 };
 
-// ── Auto-generate title + summary ─────────────────────────────────────────────
+// Auto-generate title + summary
 const generateTitleAndSummary = async (fullContent) => {
   try {
     const resp = await openai.chat.completions.create({
@@ -145,7 +145,7 @@ const generateTitleAndSummary = async (fullContent) => {
   }
 };
 
-// ── Main chat handler (streaming SSE) ────────────────────────────────────────
+// Main chat handler (streaming SSE)
 export const grokChat = async (req, res) => {
   let { messages, taskContext, toolId, chatId } = req.body;
 
@@ -240,7 +240,7 @@ export const grokChat = async (req, res) => {
   }
 };
 
-// ── Get chat history ──────────────────────────────────────────────────────────
+// Get chat history
 export const getChatHistory = async (req, res) => {
   try {
     const { toolId, toolIds, search, starred, page = 1, limit = 30 } = req.query;
@@ -268,7 +268,7 @@ export const getChatHistory = async (req, res) => {
   }
 };
 
-// ── Get single chat (with messages) ──────────────────────────────────────────
+// Get single chat (with messages)
 export const getChatById = async (req, res) => {
   try {
     const chat = await GrokChat.findOne({ _id: req.params.chatId, userId: req.user._id });
@@ -279,7 +279,7 @@ export const getChatById = async (req, res) => {
   }
 };
 
-// ── Update chat (title / tags / starred) ──────────────────────────────────────
+// Update chat (title / tags / starred)
 export const updateChat = async (req, res) => {
   try {
     const { title, tags, starred } = req.body;
@@ -300,7 +300,7 @@ export const updateChat = async (req, res) => {
   }
 };
 
-// ── Delete chat ───────────────────────────────────────────────────────────────
+// Delete chat
 export const deleteChat = async (req, res) => {
   try {
     const deleted = await GrokChat.findOneAndDelete({ _id: req.params.chatId, userId: req.user._id });
@@ -311,7 +311,7 @@ export const deleteChat = async (req, res) => {
   }
 };
 
-// ── Delete all chats for a tool ───────────────────────────────────────────────
+// Delete all chats for a tool
 export const clearToolHistory = async (req, res) => {
   try {
     await GrokChat.deleteMany({ userId: req.user._id, toolId: req.params.toolId });
@@ -320,3 +320,6 @@ export const clearToolHistory = async (req, res) => {
     res.status(500).json({ success: false, error: 'Failed to clear history' });
   }
 };
+
+
+

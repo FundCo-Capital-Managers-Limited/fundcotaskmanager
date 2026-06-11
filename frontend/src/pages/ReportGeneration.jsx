@@ -17,7 +17,7 @@ import {
 const API = import.meta.env.VITE_API_URL;
 const headers = () => ({ Authorization: `Bearer ${localStorage.getItem('token')}` });
 
-// ── Shared helpers ────────────────────────────────────────────────────────────
+// Shared helpers
 const REPORT_TYPES = ['daily', 'weekly', 'monthly', 'quarterly', 'yearly', 'custom'];
 const MANUAL_DRAFT_KEY = 'fundco-report-manual-draft-v1';
 const AI_DRAFT_KEY = 'fundco-report-ai-draft-v1';
@@ -204,7 +204,7 @@ const cleanMarkdown = (text) =>
     .replace(/\n{3,}/g, '\n\n')
     .trim();
 
-// ── PDF export via jsPDF ──────────────────────────────────────────────────────
+// PDF export via jsPDF
 const exportPDF = async (title, reportType, content) => {
   const jsPDF = (await import('jspdf')).default;
   const doc   = new jsPDF({ orientation: 'portrait', unit: 'in', format: 'letter' });
@@ -235,7 +235,7 @@ const exportPDF = async (title, reportType, content) => {
   doc.save(`${(title || 'report').replace(/[^a-z0-9]/gi, '_')}.pdf`);
 };
 
-// ── Section heading ───────────────────────────────────────────────────────────
+// Section heading
 const SectionHeading = ({ children, icon: Icon }) => (
   <div className="flex items-center gap-2 mb-5">
     {Icon && <Icon className="w-4 h-4" style={{ color: 'var(--text-muted)' }} />}
@@ -244,7 +244,7 @@ const SectionHeading = ({ children, icon: Icon }) => (
   </div>
 );
 
-// ── Focused input/textarea helper component ───────────────────────────────────
+// Focused input/textarea helper component
 const Field = ({ label, children }) => (
   <div>
     <label className="block text-xs font-bold uppercase tracking-wide mb-1.5" style={{ color: 'var(--text-muted)' }}>
@@ -308,9 +308,9 @@ const SuggestionChips = ({ label = 'Suggestions', items = [], onPick }) => {
   );
 };
 
-// ════════════════════════════════════════════════════════════════════════════
-// ── MANUAL EDITOR ────────────────────────────────────────────────────────────
-// ════════════════════════════════════════════════════════════════════════════
+
+// MANUAL EDITOR
+
 const ManualEditor = ({ user, tasks, editReport = null, onSaved, onCancel }) => {
   const [title,      setTitle]      = useState(editReport?.title || '');
   const [type,       setType]       = useState(editReport?.reportType || 'weekly');
@@ -457,7 +457,7 @@ const ManualEditor = ({ user, tasks, editReport = null, onSaved, onCancel }) => 
   );
 };
 
-// ── Markdown preview (collapsible) ───────────────────────────────────────────
+// Markdown preview (collapsible)
 const MarkdownPreview = ({ content }) => {
   const [open, setOpen] = useState(false);
   return (
@@ -488,9 +488,9 @@ const MarkdownPreview = ({ content }) => {
   );
 };
 
-// ════════════════════════════════════════════════════════════════════════════
-// ── AI GENERATOR ─────────────────────────────────────────────────────────────
-// ════════════════════════════════════════════════════════════════════════════
+
+// AI GENERATOR
+
 const AIGenerator = ({ user, tasks, onSaved }) => {
   const [type,       setType]       = useState('weekly');
   const [start,      setStart]      = useState('');
@@ -795,9 +795,9 @@ const AIGenerator = ({ user, tasks, onSaved }) => {
   );
 };
 
-// ════════════════════════════════════════════════════════════════════════════
-// ── HISTORY ───────────────────────────────────────────────────────────────────
-// ════════════════════════════════════════════════════════════════════════════
+
+// HISTORY
+
 const ReportHistory = ({ user, onEditReport }) => {
   const [reports,   setReports]   = useState([]);
   const [loading,   setLoading]   = useState(false);
@@ -1129,9 +1129,9 @@ const ReportHistory = ({ user, onEditReport }) => {
   );
 };
 
-// ════════════════════════════════════════════════════════════════════════════
-// ── MAIN PAGE ─────────────────────────────────────────────────────────────────
-// ════════════════════════════════════════════════════════════════════════════
+
+// MAIN PAGE
+
 const TABS = [
   { key: 'manual',  label: 'Write Report', icon: FileText  },
   { key: 'ai',      label: 'AI Generate',  icon: Sparkles  },
@@ -1238,3 +1238,6 @@ const ReportGeneration = () => {
 };
 
 export default ReportGeneration;
+
+
+

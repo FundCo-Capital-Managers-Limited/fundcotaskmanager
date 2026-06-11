@@ -2,7 +2,7 @@
 import Folder from '../models/folderModel.js';
 import File   from '../models/fileModel.js';
 
-// ── Recursive delete helper ───────────────────────────────────────────────────
+// Recursive delete helper
 const deleteFolderTree = async (folderId, ownerId) => {
   const children = await Folder.find({ parentId: folderId, owner: ownerId });
   for (const child of children) await deleteFolderTree(child._id, ownerId);
@@ -10,7 +10,7 @@ const deleteFolderTree = async (folderId, ownerId) => {
   await Folder.deleteOne({ _id: folderId, owner: ownerId });
 };
 
-// ── Create folder ─────────────────────────────────────────────────────────────
+// Create folder
 export const createFolder = async (req, res) => {
   try {
     const { name, parentId, color } = req.body;
@@ -43,7 +43,7 @@ export const createFolder = async (req, res) => {
   }
 };
 
-// ── Get folders ───────────────────────────────────────────────────────────────
+// Get folders
 // Returns ALL folders for the user (flat list), client builds tree
 export const getFolders = async (req, res) => {
   try {
@@ -54,7 +54,7 @@ export const getFolders = async (req, res) => {
   }
 };
 
-// ── Rename folder ─────────────────────────────────────────────────────────────
+// Rename folder
 export const renameFolder = async (req, res) => {
   try {
     const { name } = req.body;
@@ -73,7 +73,7 @@ export const renameFolder = async (req, res) => {
   }
 };
 
-// ── Delete folder ─────────────────────────────────────────────────────────────
+// Delete folder
 // Files inside are moved to root, not permanently deleted
 export const deleteFolder = async (req, res) => {
   try {
@@ -86,7 +86,7 @@ export const deleteFolder = async (req, res) => {
   }
 };
 
-// ── Get folder file count (for UI badges) ────────────────────────────────────
+// Get folder file count (for UI badges)
 export const getFolderStats = async (req, res) => {
   try {
     const stats = await File.aggregate([

@@ -33,7 +33,7 @@ const Sidebar = ({ user, isExpanded, onToggle, mobileOpen = false, onCloseMobile
   const reportBadge = counts.reports || 0;
   const fileBadge = counts.files || 0;
 
-  /* ── Fetch unread counts ─────────────────────────────────────────────── */
+  /* Fetch unread counts */
   const fetchUnreadTotal = useCallback(async () => {
     try {
       const token = localStorage.getItem('token');
@@ -106,7 +106,7 @@ const Sidebar = ({ user, isExpanded, onToggle, mobileOpen = false, onCloseMobile
     { text: 'Feedback',       path: '/feedback',           icon: MessageCircle },
   ];
 
-  /* ── Single nav item ─────────────────────────────────────────────────── */
+  /* Single nav item */
   const NavItem = ({ item, isMobile = false }) => {
     const { text, path, icon: Icon, badge } = item;
     const show = isExpanded || isMobile;
@@ -164,7 +164,7 @@ const Sidebar = ({ user, isExpanded, onToggle, mobileOpen = false, onCloseMobile
     );
   };
 
-  /* ── User avatar block ───────────────────────────────────────────────── */
+  /* User avatar block */
   const UserBlock = ({ expanded }) => (
     <div className={`flex ${expanded ? 'items-center gap-3 px-3' : 'justify-center'} py-3 mb-2`}>
       <div
@@ -187,7 +187,7 @@ const Sidebar = ({ user, isExpanded, onToggle, mobileOpen = false, onCloseMobile
     </div>
   );
 
-  /* ── Quick Tip ───────────────────────────────────────────────────────── */
+  /* Quick Tip */
   const QuickTip = () => (
     <div className="mx-3 mt-4 p-3 rounded-xl border" style={{ backgroundColor: 'var(--brand-light)', borderColor: 'var(--border-color)' }}>
       <div className="flex items-start gap-2">
@@ -205,7 +205,7 @@ const Sidebar = ({ user, isExpanded, onToggle, mobileOpen = false, onCloseMobile
 
   return (
     <>
-      {/* ── Desktop Sidebar ────────────────────────────────────────────── */}
+      {/* Desktop Sidebar */}
       <aside
         className="hidden lg:flex flex-col fixed top-14 left-0 z-40 transition-[width] duration-300 overflow-hidden"
         style={{
@@ -228,7 +228,7 @@ const Sidebar = ({ user, isExpanded, onToggle, mobileOpen = false, onCloseMobile
           </ul>
           {isExpanded && <QuickTip />}
         </div>
-        {/* Toggle button — pinned at bottom */}
+        {/* Toggle button pinned at bottom */}
         <button
           onClick={onToggle}
           className="flex items-center justify-center flex-shrink-0 h-10 border-t transition-colors"
@@ -247,28 +247,7 @@ const Sidebar = ({ user, isExpanded, onToggle, mobileOpen = false, onCloseMobile
         </button>
       </aside>
 
-      {/* ── Mobile hamburger ───────────────────────────────────────────── */}
-      {false && !mobileOpen && (
-        <button
-          onClick={() => onCloseMobile?.()}
-          className="lg:hidden fixed top-3.5 left-4 z-[65] p-2 rounded-xl border shadow-sm transition-colors"
-          style={{
-            backgroundColor: 'var(--brand-primary)',
-            borderColor: 'transparent',
-            color: '#fff',
-          }}
-          aria-label="Open menu"
-        >
-          <Menu className="w-5 h-5" />
-          {totalBadge > 0 && (
-            <span className="absolute -top-1 -right-1 w-4 h-4 bg-green-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center">
-              {totalBadge > 9 ? '9+' : totalBadge}
-            </span>
-          )}
-        </button>
-      )}
-
-      {/* ── Mobile Drawer ──────────────────────────────────────────────── */}
+      {/* Mobile Drawer */}
       <div
         className={`lg:hidden fixed inset-0 z-[64] transition-opacity duration-300 ${mobileOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
       >
@@ -316,3 +295,6 @@ const Sidebar = ({ user, isExpanded, onToggle, mobileOpen = false, onCloseMobile
 };
 
 export default Sidebar;
+
+
+

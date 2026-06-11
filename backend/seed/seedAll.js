@@ -12,7 +12,7 @@ dotenv.config({ path: `${__dirname}/../.env` });
 
 console.log('MONGO_URI:', process.env.MONGO_URI ? 'Loaded' : 'Undefined');
 
-// ─── Helper: build full-course exam from module quiz pools ────────────────────
+// Helper: build full-course exam from module quiz pools
 // Shuffles all module quizzes together and picks up to targetCount questions.
 function buildExam(modules, targetCount = 30) {
   const pool = [];
@@ -27,14 +27,14 @@ function buildExam(modules, targetCount = 30) {
   return pool.slice(0, Math.min(targetCount, pool.length));
 }
 
-// =============================================================================
+
 // COURSE DEFINITIONS
-// =============================================================================
 
 
-// =============================================================================
-// COURSES 1-3 (Beginner — General)
-// =============================================================================
+
+
+// COURSES 1-3 (Beginner General)
+
 const course1 = {
   title: 'FundCo Capital Managers – Company Overview',
   description: 'A comprehensive introduction to FundCo Capital Managers, its mission, funds, subsidiaries, leadership, and strategic direction. Required for ALL staff.',
@@ -396,9 +396,9 @@ CEF ORGANIZATIONAL STRUCTURE
 };
 course1.exam = buildExam(course1.modules, 30);
 
-// ─────────────────────────────────────────────────────────────────────────────
+
 // COURSE 2: Key Terms & Acronyms
-// ─────────────────────────────────────────────────────────────────────────────
+
 const course2 = {
   title: 'Key Terms, Acronyms & Technical Definitions',
   description: 'Master all essential financial, technical, and operational terms used across FundCo and its subsidiaries. Required for all staff.',
@@ -753,9 +753,9 @@ DAREs    — Development of Affordable and Rural Electrification (World Bank pro
 };
 course2.exam = buildExam(course2.modules, 25);
 
-// ─────────────────────────────────────────────────────────────────────────────
+
 // COURSE 3: Department Responsibilities
-// ─────────────────────────────────────────────────────────────────────────────
+
 const course3 = {
   title: 'Department Responsibilities & Organizational Structure',
   description: 'Understand every department\'s role, responsibilities, and how teams collaborate across FundCo. Required for all staff.',
@@ -979,13 +979,13 @@ E. TECHNICAL RESEARCH & OPTIMIZATION
 };
 course3.exam = buildExam(course3.modules, 20);
 
-// =============================================================================
-// MAIN SEED FUNCTION — will be extended with remaining courses
-// =============================================================================
 
-// =============================================================================
-// COURSES 4-7 (Intermediate/Expert — EML, GroSolar, SSM, Agronomie)
-// =============================================================================
+// MAIN SEED FUNCTION will be extended with remaining courses
+
+
+
+// COURSES 4-7 (Intermediate/Expert EML, GroSolar, SSM, Agronomie)
+
 const course4 = {
   title: 'EML – Isolated Solar Mini-Grid Installation SOP',
   description: 'Complete Standard Operating Procedure for Electrify MicroGrid Limited: site survey, design, installation specifications, O&M, contractor management, and safety. Required for all EML technical staff.',
@@ -1485,9 +1485,9 @@ EML KEY TEAM MEMBERS
 };
 course4.exam = buildExam(course4.modules, 35);
 
-// ─────────────────────────────────────────────────────────────────────────────
+
 // COURSE 5: GroSolar Client Onboarding SOP
-// ─────────────────────────────────────────────────────────────────────────────
+
 const course5 = {
   title: 'GroSolar AssetCo – Client Onboarding & Operations SOP',
   description: 'Complete Standard Operating Procedure for GroSolar: client onboarding, KYC, credit assessment, technical evaluation, financial structuring, installation, and portfolio monitoring.',
@@ -1719,9 +1719,9 @@ Phase 11: Installation → 14 days`,
 };
 course5.exam = buildExam(course5.modules, 20);
 
-// ─────────────────────────────────────────────────────────────────────────────
+
 // COURSE 6: SSM Swap Station SOP
-// ─────────────────────────────────────────────────────────────────────────────
+
 const course6 = {
   title: 'Swap Station Mobility (SSM) – Operations SOP',
   description: 'Complete Standard Operating Procedure for Swap Station Mobility Limited: station setup, battery charging/swapping, EV bike management, safety, and customer service.',
@@ -1918,9 +1918,9 @@ DOCUMENTATION & COMPLIANCE
 };
 course6.exam = buildExam(course6.modules, 15);
 
-// ─────────────────────────────────────────────────────────────────────────────
-// COURSE 7: Agronomie – Agro-Tech, PuE & Black Soldier Fly
-// ─────────────────────────────────────────────────────────────────────────────
+
+// COURSE 7: Agronomie Agro-Tech, PuE & Black Soldier Fly
+
 const course7 = {
   title: 'Agronomie – Agro-Tech, PuE Projects & Black Soldier Fly Model',
   description: 'Understand Agronomie\'s mandate, Hub & Spoke model, portfolio of projects, BSF sustainable business model, partner network, and key lessons from field deployments.',
@@ -2269,13 +2269,13 @@ The Angwan Rina experience transformed into a GUIDING BEACON — propelling Agro
 };
 course7.exam = buildExam(course7.modules, 25);
 
-// =============================================================================
-// SEED FUNCTION
-// =============================================================================
 
-// =============================================================================
-// COURSES 8-12 (All levels — GreenKiosk, Office, Finance, Procurement, EML Field)
-// =============================================================================
+// SEED FUNCTION
+
+
+
+// COURSES 8-12 (All levels GreenKiosk, Office, Finance, Procurement, EML Field)
+
 const course8 = {
   title: 'GreenKiosk – Accelerating Rural Energy Access',
   description: 'Understand the GreenKiosk concept note: rationale, SDG alignment, implementation strategy, business model, financial plan, scalability, and risk mitigation for rural energy access in Nigeria.',
@@ -2499,9 +2499,9 @@ FLOW DIAGRAM — KEY PLAYERS
 };
 course8.exam = buildExam(course8.modules, 20);
 
-// ─────────────────────────────────────────────────────────────────────────────
+
 // COURSE 9: Microsoft Office Tools
-// ─────────────────────────────────────────────────────────────────────────────
+
 const course9 = {
   title: 'Microsoft Office Tools – Word, Excel & PowerPoint',
   description: 'Comprehensive beginner-to-intermediate Microsoft Office training for all FundCo staff, covering Word, Excel, and PowerPoint with recommended video resources and practical applications.',
@@ -2783,9 +2783,9 @@ COMMON MISTAKES TO AVOID
 };
 course9.exam = buildExam(course9.modules, 18);
 
-// ─────────────────────────────────────────────────────────────────────────────
+
 // COURSE 10: Finance for Clean Energy Professionals (CFI)
-// ─────────────────────────────────────────────────────────────────────────────
+
 const course10 = {
   title: 'Finance for Clean Energy Professionals (CFI)',
   description: 'Practical, job-ready finance skills for FundCo staff. Covers financial modeling, forecasting, NPV/IRR, Excel proficiency, and data-driven decision-making using Corporate Finance Institute (CFI) resources.',
@@ -2908,9 +2908,9 @@ Debt Service Coverage Ratio is critical for CEF's lending decisions:
 };
 course10.exam = buildExam(course10.modules, 15);
 
-// ─────────────────────────────────────────────────────────────────────────────
+
 // COURSE 11: Procurement & Logistics SOP
-// ─────────────────────────────────────────────────────────────────────────────
+
 const course11 = {
   title: 'Procurement & Logistics SOP – GroSolar / FundCo',
   description: 'Standard Operating Procedure for all procurement and logistics activities at GroSolar and FundCo. Covers supplier management, RFQ/RFP processes, purchase order approval, inventory, and delivery verification.',
@@ -3069,9 +3069,9 @@ SOP ENFORCEMENT
 };
 course11.exam = buildExam(course11.modules, 15);
 
-// ─────────────────────────────────────────────────────────────────────────────
+
 // COURSE 12: EML Field Operations & Maintenance Engineering
-// ─────────────────────────────────────────────────────────────────────────────
+
 const course12 = {
   title: 'EML – Field Operations & Maintenance Engineering (O&M)',
   description: 'Detailed field operations training for EML site operators and O&M engineers: LOTO procedures, shutdown and isolation, emergency shutdown, corrective/preventive maintenance, generator maintenance, and RACI responsibilities.',
@@ -3315,17 +3315,17 @@ PERFORMANCE BENCHMARKS
 };
 course12.exam = buildExam(course12.modules, 20);
 
-// =============================================================================
-// COMBINED MASTER SEED — runs all three parts together
-// =============================================================================
 
-// =============================================================================
-// MASTER SEED FUNCTION — seeds all 12 courses in one run
-// =============================================================================
+// COMBINED MASTER SEED runs all three parts together
+
+
+
+// MASTER SEED FUNCTION seeds all 12 courses in one run
+
 const seedAll = async () => {
   try {
     await connectDB();
-    console.log('🌱  Starting master seed — all 12 FundCo courses...');
+    console.log('  Starting master seed  all 12 FundCo courses...');
 
     const allCourses = [
       course1, course2, course3,
@@ -3341,28 +3341,28 @@ const seedAll = async () => {
       if (existing) {
         await LearningCourse.findByIdAndDelete(existing._id);
         replaced++;
-        console.log(`🔄  Replaced: ${course.title}`);
+        console.log(`  Replaced: ${course.title}`);
       }
       const created = await LearningCourse.create(course);
       seeded++;
-      console.log(`✅  ${created.title}`);
+      console.log(`  ${created.title}`);
       console.log(`    Level: ${created.level} | AssetCo: ${created.assetco} | Required: ${created.required}`);
       console.log(`    Modules: ${course.modules.length} | Exam Qs: ${course.exam ? course.exam.length : 0}`);
     }
 
     const total = await LearningCourse.countDocuments();
-    console.log(`\n🎉  Master seed complete!`);
-    console.log(`📚  Courses seeded: ${seeded} (${replaced} replaced)`);
-    console.log(`📊  Total courses in database: ${total}`);
+    console.log(`\n  Master seed complete!`);
+    console.log(`  Courses seeded: ${seeded} (${replaced} replaced)`);
+    console.log(`  Total courses in database: ${total}`);
     console.log(`\n  Breakdown:`);
     const beginner = await LearningCourse.countDocuments({ level: 'beginner' });
     const intermediate = await LearningCourse.countDocuments({ level: 'intermediate' });
     const expert = await LearningCourse.countDocuments({ level: 'expert' });
-    console.log(`  • Beginner:     ${beginner}`);
-    console.log(`  • Intermediate: ${intermediate}`);
-    console.log(`  • Expert:       ${expert}`);
+    console.log(`   Beginner:     ${beginner}`);
+    console.log(`   Intermediate: ${intermediate}`);
+    console.log(`   Expert:       ${expert}`);
   } catch (err) {
-    console.error('❌  Seeding error:', err);
+    console.error('  Seeding error:', err);
   } finally {
     mongoose.connection.close();
     process.exit(0);

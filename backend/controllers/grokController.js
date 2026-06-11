@@ -23,7 +23,7 @@ const openai = new OpenAI({
   baseURL: 'https://api.x.ai/v1',
 });
 
-// ── Company knowledge ─────────────────────────────────────────────────────────
+// Company knowledge
 const COMPANY_KNOWLEDGE = `
 FundCo Capital Managers: Alternative asset manager focusing on sustainable infrastructure.
 Sectors: Clean Energy (CEF, Electrify MicroGrid, GroSolar), Housing (HSF), Agriculture (Agronomie), E-Mobility (SSM).
@@ -54,7 +54,7 @@ Do not use hype, filler, or exaggerated language.
 const withOperatingContext = (specialistPrompt) =>
   `${COMPANY_KNOWLEDGE}\n\n${PLATFORM_KNOWLEDGE}\n\n${OPERATING_STYLE}\n\n${specialistPrompt}`;
 
-// ── Tool system prompts ───────────────────────────────────────────────────────
+// Tool system prompts
 const TOOL_PROMPTS = {
   'general':                   withOperatingContext(`You are FundCo AI, the internal assistant for FundCo Capital Managers. Be concise, accurate, professional, and deeply grounded in FundCo operations. Use Markdown formatting and analyze attached files thoroughly.`),
   'report-generator':          withOperatingContext(`You are a professional report writer. Generate clear, structured progress reports in Markdown using ONLY the tasks provided. Be truthful about completed and incomplete work. Use FundCo terminology.`),
@@ -85,7 +85,7 @@ const TOOL_PROMPTS = {
   'sdg-impact-analyzer':       withOperatingContext(`You are an SDG impact analysis expert. Map project activities to UN Sustainable Development Goals with measurable indicators.`),
 };
 
-// ── File processing helper ─────────────────────────────────────────────────────
+// File processing helper
 const processFiles = async (files, lastMessage) => {
   let contentParts = typeof lastMessage.content === 'string'
     ? [{ type: 'text', text: lastMessage.content }]
@@ -143,7 +143,7 @@ const processFiles = async (files, lastMessage) => {
   return contentParts;
 };
 
-// ── Auto-generate title + summary ─────────────────────────────────────────────
+// Auto-generate title + summary
 const generateTitleAndSummary = async (fullContent) => {
   try {
     const resp = await openai.chat.completions.create({
@@ -195,7 +195,7 @@ const toChatDetail = (chat) => ({
   messages: Array.isArray(chat.messages) ? chat.messages : [],
 });
 
-// ── Main chat handler (streaming SSE) ────────────────────────────────────────
+// Main chat handler (streaming SSE)
 export const grokChat = async (req, res) => {
   let { messages, taskContext, toolId, chatId } = req.body;
 
@@ -307,7 +307,7 @@ export const grokChat = async (req, res) => {
   }
 };
 
-// ── Get chat history ──────────────────────────────────────────────────────────
+// Get chat history
 export const getChatHistory = async (req, res) => {
   try {
     const { toolId, toolIds, search, starred, page = 1, limit = 30 } = req.query;
@@ -340,7 +340,7 @@ export const getChatHistory = async (req, res) => {
   }
 };
 
-// ── Get single chat (with messages) ──────────────────────────────────────────
+// Get single chat (with messages)
 export const getChatById = async (req, res) => {
   try {
     const chat = await GrokChat.findOne(buildActorFilter(req, { _id: req.params.chatId }));
@@ -351,7 +351,7 @@ export const getChatById = async (req, res) => {
   }
 };
 
-// ── Update chat (title / tags / starred) ──────────────────────────────────────
+// Update chat (title / tags / starred)
 export const updateChat = async (req, res) => {
   try {
     const { title, tags, starred } = req.body;
@@ -372,7 +372,7 @@ export const updateChat = async (req, res) => {
   }
 };
 
-// ── Delete chat ───────────────────────────────────────────────────────────────
+// Delete chat
 export const deleteChat = async (req, res) => {
   try {
     const deleted = await GrokChat.findOneAndDelete(buildActorFilter(req, { _id: req.params.chatId }));
@@ -383,7 +383,7 @@ export const deleteChat = async (req, res) => {
   }
 };
 
-// ── Delete all chats for a tool ───────────────────────────────────────────────
+// Delete all chats for a tool
 export const clearToolHistory = async (req, res) => {
   try {
     await GrokChat.deleteMany(buildActorFilter(req, { toolId: req.params.toolId }));
@@ -392,3 +392,6 @@ export const clearToolHistory = async (req, res) => {
     res.status(500).json({ success: false, error: 'Failed to clear history' });
   }
 };
+
+
+

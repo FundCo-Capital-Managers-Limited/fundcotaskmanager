@@ -104,3 +104,6 @@ export const uploadFileToIPFS = async (fileInput, fileName, mimeType, retries = 
   }
   throw new Error(`Failed to upload ${fileName} to Pinata: ${errorDetails}`);
 };
+
+
+

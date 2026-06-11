@@ -60,3 +60,6 @@ export const getGoalProgress = (goal) => {
   const completed = goal.subGoals.filter((item) => item.completed).length;
   return percentOf(completed, goal.subGoals.length);
 };
+
+
+

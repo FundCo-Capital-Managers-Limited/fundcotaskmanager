@@ -9,7 +9,7 @@ import { createNotification } from '../utils/notificationService.js';
 
 const router = express.Router();
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+// Helpers
 const sanitize = (str) => sanitizeHtml(str || '', { allowedTags: [], allowedAttributes: {} }).trim();
 
 const POPULATE_USER = { path: 'user', select: 'firstName lastName otherName _id avatar position role' };
@@ -77,7 +77,7 @@ const emitPostEvent = (req, event, data) => {
   try { req.io?.emit(event, data); } catch {}
 };
 
-// ── CREATE POST (now accepts announcement fields) ─────────────────────────────
+// CREATE POST (now accepts announcement fields)
 router.post('/', authMiddleware, async (req, res) => {
   try {
     const { content, fileUrl, contentType, isAnnouncement, announcementScope } = req.body;
@@ -113,7 +113,7 @@ router.post('/', authMiddleware, async (req, res) => {
   }
 });
 
-// ── Get posts (paginated, with optional search & filter) ─────────────────────
+// Get posts (paginated, with optional search & filter)
 router.get('/', authMiddleware, async (req, res) => {
   try {
     const page     = Math.max(1, parseInt(req.query.page)  || 1);
@@ -173,7 +173,7 @@ router.get('/', authMiddleware, async (req, res) => {
   }
 });
 
-// ── Get single post ───────────────────────────────────────────────────────────
+// Get single post
 router.get('/:id', authMiddleware, async (req, res) => {
   try {
     if (!mongoose.isValidObjectId(req.params.id))
@@ -192,7 +192,7 @@ router.get('/:id', authMiddleware, async (req, res) => {
   }
 });
 
-// ── UPDATE POST (now supports announcement fields) ─────────────────────────────
+// UPDATE POST (now supports announcement fields)
 router.put('/:id', authMiddleware, async (req, res) => {
   try {
     if (!mongoose.isValidObjectId(req.params.id)) {
@@ -231,7 +231,7 @@ router.put('/:id', authMiddleware, async (req, res) => {
     res.status(500).json({ success: false, message: 'Failed to update post' });
   }
 });
-// ── Delete post ───────────────────────────────────────────────────────────────
+// Delete post
 router.delete('/:id', authMiddleware, async (req, res) => {
   try {
     if (!mongoose.isValidObjectId(req.params.id))
@@ -251,7 +251,7 @@ router.delete('/:id', authMiddleware, async (req, res) => {
   }
 });
 
-// ── React to post ─────────────────────────────────────────────────────────────
+// React to post
 // PUT /api/posts/:id/react  { emoji: 'like'|'love'|'haha'|'wow'|'sad'|'fire' }
 // Sending the same emoji again removes it (toggle)
 router.put('/:id/react', authMiddleware, async (req, res) => {
@@ -295,7 +295,7 @@ router.put('/:id/react', authMiddleware, async (req, res) => {
   }
 });
 
-// ── Add comment ───────────────────────────────────────────────────────────────
+// Add comment
 router.post('/:id/comments', authMiddleware, async (req, res) => {
   try {
     if (!mongoose.isValidObjectId(req.params.id))
@@ -327,7 +327,7 @@ router.post('/:id/comments', authMiddleware, async (req, res) => {
   }
 });
 
-// ── Delete comment ────────────────────────────────────────────────────────────
+// Delete comment
 router.delete('/:id/comments/:commentId', authMiddleware, async (req, res) => {
   try {
     const post = await Post.findById(req.params.id);
@@ -351,7 +351,7 @@ router.delete('/:id/comments/:commentId', authMiddleware, async (req, res) => {
   }
 });
 
-// ── Bookmark toggle ───────────────────────────────────────────────────────────
+// Bookmark toggle
 router.put('/:id/bookmark', authMiddleware, async (req, res) => {
   try {
     if (!mongoose.isValidObjectId(req.params.id))
@@ -374,7 +374,7 @@ router.put('/:id/bookmark', authMiddleware, async (req, res) => {
   }
 });
 
-// ── Upload media ──────────────────────────────────────────────────────────────
+// Upload media
 router.post('/upload', authMiddleware, async (req, res) => {
   try {
     if (!req.files?.file) return res.status(400).json({ success: false, message: 'No file uploaded' });
@@ -396,3 +396,6 @@ router.post('/upload', authMiddleware, async (req, res) => {
 });
 
 export default router;
+
+
+

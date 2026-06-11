@@ -1,4 +1,3 @@
-// controllers/taskController.js — UPDATED: populates adminComments and assignedBy
 import Task from '../models/taskModel.js';
 import Reminder from '../models/reminderModel.js';
 import User from '../models/userModel.js';
@@ -251,7 +250,7 @@ export const updateTask = async (req, res) => {
     }
 };
 
-// GET ALL TASKS FOR LOGGED-IN USER — UPDATED: populate admin fields
+// GET ALL TASKS FOR LOGGED-IN USER UPDATED: populate admin fields
 export const getTasks = async (req, res) => {
     try {
         const tasks = await Task.find({ owner: req.user._id })
@@ -265,7 +264,7 @@ export const getTasks = async (req, res) => {
     }
 };
 
-// GET SINGLE TASK BY ID — UPDATED: populate admin fields
+// GET SINGLE TASK BY ID UPDATED: populate admin fields
 export const getTaskById = async (req, res) => {
     try {
         const task = await Task.findOne({ _id: req.params.id, owner: req.user._id })
@@ -369,3 +368,6 @@ export const deleteTask = async (req, res) => {
         res.status(500).json({ success: false, message: err.message });
     }
 };
+
+
+

@@ -263,3 +263,6 @@ export const SegmentedTabs = ({ items, value, onChange }) => (
     ))}
   </div>
 );
+
+
+

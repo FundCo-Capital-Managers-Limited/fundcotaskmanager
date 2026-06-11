@@ -1,5 +1,5 @@
 // backend/seed/learningSeedPart3.js
-// Run AFTER parts 1 and 2 — adds courses 8-12
+// Run AFTER parts 1 and 2 adds courses 8-12
 import dotenv from 'dotenv';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
@@ -23,9 +23,9 @@ function buildExam(modules, targetCount = 30) {
   return pool.slice(0, Math.min(targetCount, pool.length));
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+
 // COURSE 8: Green Kiosk Concept Note
-// ─────────────────────────────────────────────────────────────────────────────
+
 const course8 = {
   title: 'GreenKiosk – Accelerating Rural Energy Access',
   description: 'Understand the GreenKiosk concept note: rationale, SDG alignment, implementation strategy, business model, financial plan, scalability, and risk mitigation for rural energy access in Nigeria.',
@@ -249,9 +249,9 @@ FLOW DIAGRAM — KEY PLAYERS
 };
 course8.exam = buildExam(course8.modules, 20);
 
-// ─────────────────────────────────────────────────────────────────────────────
+
 // COURSE 9: Microsoft Office Tools
-// ─────────────────────────────────────────────────────────────────────────────
+
 const course9 = {
   title: 'Microsoft Office Tools – Word, Excel & PowerPoint',
   description: 'Comprehensive beginner-to-intermediate Microsoft Office training for all FundCo staff, covering Word, Excel, and PowerPoint with recommended video resources and practical applications.',
@@ -533,9 +533,9 @@ COMMON MISTAKES TO AVOID
 };
 course9.exam = buildExam(course9.modules, 18);
 
-// ─────────────────────────────────────────────────────────────────────────────
+
 // COURSE 10: Finance for Clean Energy Professionals (CFI)
-// ─────────────────────────────────────────────────────────────────────────────
+
 const course10 = {
   title: 'Finance for Clean Energy Professionals (CFI)',
   description: 'Practical, job-ready finance skills for FundCo staff. Covers financial modeling, forecasting, NPV/IRR, Excel proficiency, and data-driven decision-making using Corporate Finance Institute (CFI) resources.',
@@ -658,9 +658,9 @@ Debt Service Coverage Ratio is critical for CEF's lending decisions:
 };
 course10.exam = buildExam(course10.modules, 15);
 
-// ─────────────────────────────────────────────────────────────────────────────
+
 // COURSE 11: Procurement & Logistics SOP
-// ─────────────────────────────────────────────────────────────────────────────
+
 const course11 = {
   title: 'Procurement & Logistics SOP – GroSolar / FundCo',
   description: 'Standard Operating Procedure for all procurement and logistics activities at GroSolar and FundCo. Covers supplier management, RFQ/RFP processes, purchase order approval, inventory, and delivery verification.',
@@ -819,9 +819,9 @@ SOP ENFORCEMENT
 };
 course11.exam = buildExam(course11.modules, 15);
 
-// ─────────────────────────────────────────────────────────────────────────────
+
 // COURSE 12: EML Field Operations & Maintenance Engineering
-// ─────────────────────────────────────────────────────────────────────────────
+
 const course12 = {
   title: 'EML – Field Operations & Maintenance Engineering (O&M)',
   description: 'Detailed field operations training for EML site operators and O&M engineers: LOTO procedures, shutdown and isolation, emergency shutdown, corrective/preventive maintenance, generator maintenance, and RACI responsibilities.',
@@ -1065,9 +1065,9 @@ PERFORMANCE BENCHMARKS
 };
 course12.exam = buildExam(course12.modules, 20);
 
-// =============================================================================
-// COMBINED MASTER SEED — runs all three parts together
-// =============================================================================
+
+// COMBINED MASTER SEED runs all three parts together
+
 const seedData = async () => {
   try {
     await connectDB();
@@ -1078,13 +1078,13 @@ const seedData = async () => {
       const existing = await LearningCourse.findOne({ title: course.title });
       if (existing) {
         await LearningCourse.findByIdAndDelete(existing._id);
-        console.log(`🔄  Replaced existing: ${course.title}`);
+        console.log(`  Replaced existing: ${course.title}`);
       }
       const created = await LearningCourse.create(course);
-      console.log(`✅  ${created.title} — ${course.modules.length} modules, ${course.exam.length} exam questions`);
+      console.log(`  ${created.title}  ${course.modules.length} modules, ${course.exam.length} exam questions`);
     }
 
-    console.log('\n🎉  Seed Part 3 complete (5 courses).');
+    console.log('\n  Seed Part 3 complete (5 courses).');
     console.log('All 12 courses are now seeded.');
   } catch (err) {
     console.error('Seeding error:', err);

@@ -1,4 +1,4 @@
-// backend/models/reportModel.js — UPDATED: added adminNotes field
+// backend/models/reportModel.js UPDATED: added adminNotes field
 import mongoose from 'mongoose';
 
 const reportSchema = new mongoose.Schema(
@@ -32,7 +32,7 @@ const reportSchema = new mongoose.Schema(
     submittedAt: Date,
     reviewedBy:  { type: mongoose.Schema.Types.ObjectId, ref: 'user' },
     feedback:    String,
-    // NEW: admin notes on reports — visible to both admin and user
+    // NEW: admin notes on reports visible to both admin and user
     adminNotes: [{
       user: { type: mongoose.Schema.Types.ObjectId, ref: 'user', required: true },
       content: { type: String, required: true, trim: true, maxlength: 2000 },
@@ -55,3 +55,6 @@ reportSchema.index({ title: 'text', content: 'text' });
 
 const Report = mongoose.models.Report || mongoose.model('Report', reportSchema);
 export default Report;
+
+
+

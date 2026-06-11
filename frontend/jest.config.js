@@ -8,6 +8,7 @@ export default {
         '^.+\\.(js|jsx|mjs)$': 'babel-jest'
     },
     moduleNameMapper: {
+        '\\.(css|less|scss|sass)$': '<rootDir>/__tests__/styleMock.js',
         '^(\\.{1,2}/.*)\\.jsx?$': '$1'
     },
     transformIgnorePatterns: [

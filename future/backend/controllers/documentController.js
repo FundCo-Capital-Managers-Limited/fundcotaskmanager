@@ -1022,3 +1022,6 @@ export const deleteDocument = async (req, res) => {
     return sendError(res, error, 'Failed to delete document');
   }
 };
+
+
+

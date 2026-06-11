@@ -116,3 +116,6 @@ const CourseModal = ({ open, onClose, onSubmit }) => {
 };
 
 export default Training;
+
+
+

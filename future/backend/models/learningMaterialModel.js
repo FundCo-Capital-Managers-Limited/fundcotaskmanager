@@ -1,7 +1,7 @@
 // backend/models/learningMaterialModel.js
 import mongoose from 'mongoose';
 
-// ─── Quiz Question (used in both modules and course exam) ─────────────────────
+// Quiz Question (used in both modules and course exam)
 const quizQuestionSchema = new mongoose.Schema({
   question:    { type: String, required: true },
   options:     [{ type: String, required: true }],
@@ -11,7 +11,7 @@ const quizQuestionSchema = new mongoose.Schema({
   moduleRef:   { type: String, default: '' },
 });
 
-// ─── Module ───────────────────────────────────────────────────────────────────
+// Module
 const moduleSchema = new mongoose.Schema({
   title:            { type: String, required: true },
   content:          { type: String, required: true },
@@ -23,7 +23,7 @@ const moduleSchema = new mongoose.Schema({
   estimatedMinutes: { type: Number, default: 15 },
 });
 
-// ─── Course ───────────────────────────────────────────────────────────────────
+// Course
 const courseSchema = new mongoose.Schema({
   title:        { type: String, required: true },
   description:  { type: String, default: '' },
@@ -38,7 +38,7 @@ const courseSchema = new mongoose.Schema({
   updatedAt:    { type: Date, default: Date.now },
 });
 
-// ─── Per-module progress ──────────────────────────────────────────────────────
+// Per-module progress
 const moduleProgressSchema = new mongoose.Schema({
   moduleId:     { type: mongoose.Schema.Types.ObjectId, required: true },
   completed:    { type: Boolean, default: false },
@@ -48,7 +48,7 @@ const moduleProgressSchema = new mongoose.Schema({
   timeSpent:    { type: Number, default: 0 },
 });
 
-// ─── Exam attempt ─────────────────────────────────────────────────────────────
+// Exam attempt
 const examAttemptSchema = new mongoose.Schema({
   score:   { type: Number, required: true },
   passed:  { type: Boolean, required: true },
@@ -65,7 +65,7 @@ const examAttemptSchema = new mongoose.Schema({
   completedAt: { type: Date, default: Date.now },
 });
 
-// ─── User Progress ────────────────────────────────────────────────────────────
+// User Progress
 const userProgressSchema = new mongoose.Schema({
   userId:              { type: mongoose.Schema.Types.ObjectId, ref: 'user', required: true },
   courseId:            { type: mongoose.Schema.Types.ObjectId, ref: 'LearningCourse', required: true },

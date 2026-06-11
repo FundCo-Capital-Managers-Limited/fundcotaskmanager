@@ -1,4 +1,4 @@
-// models/userModel.js — UPDATED: added 'executive' to role enum
+// models/userModel.js UPDATED: added 'executive' to role enum
 import mongoose from 'mongoose';
 import validator from 'validator';
 
@@ -119,3 +119,6 @@ userSchema.set('toObject', { virtuals: true });
 
 const User = mongoose.models.user || mongoose.model('user', userSchema);
 export default User;
+
+
+

@@ -2,7 +2,7 @@ import Report from '../models/reportModel.js';
 import { buildTeamQuery } from '../middleware/teamFilter.js';
 import { createNotification } from '../utils/notificationService.js';
 
-// ── Get all reports (team-filtered, only submitted+) ──────────────────────────
+// Get all reports (team-filtered, only submitted+)
 export const getAllReports = async (req, res) => {
   try {
     const query = buildTeamQuery(req.teamMemberIds, 'user');
@@ -37,7 +37,7 @@ export const getAllReports = async (req, res) => {
   }
 };
 
-// ── Get single report ─────────────────────────────────────────────────────────
+// Get single report
 export const getReportById = async (req, res) => {
   try {
     const report = await Report.findById(req.params.id)
@@ -53,7 +53,7 @@ export const getReportById = async (req, res) => {
   }
 };
 
-// ── Approve or reject report ──────────────────────────────────────────────────
+// Approve or reject report
 export const reviewReport = async (req, res) => {
   try {
     const { action, feedback } = req.body;
@@ -104,7 +104,7 @@ export const reviewReport = async (req, res) => {
   }
 };
 
-// ── Add admin note to report ──────────────────────────────────────────────────
+// Add admin note to report
 export const addReportNote = async (req, res) => {
   try {
     const { content } = req.body;
@@ -140,7 +140,7 @@ export const addReportNote = async (req, res) => {
   }
 };
 
-// ── Report stats ──────────────────────────────────────────────────────────────
+// Report stats
 export const getReportStats = async (req, res) => {
   try {
     const query = buildTeamQuery(req.teamMemberIds, 'user');
@@ -158,3 +158,6 @@ export const getReportStats = async (req, res) => {
     res.status(500).json({ success: false, message: 'Failed to fetch report stats' });
   }
 };
+
+
+

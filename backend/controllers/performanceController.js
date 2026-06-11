@@ -29,7 +29,7 @@ const getFullName = (user) => {
   return user.name?.trim() || 'Unknown User';
 };
 
-// ── Leaderboard ───────────────────────────────────────────────────────────────
+// Leaderboard
 export const getLeaderboard = async (req, res) => {
   try {
     const users    = await User.find({ isActive: true })
@@ -87,7 +87,7 @@ export const getLeaderboard = async (req, res) => {
   }
 };
 
-// ── My Performance ────────────────────────────────────────────────────────────
+// My Performance
 export const getMyPerformance = async (req, res) => {
   try {
     const userId = req.user.id;
@@ -133,7 +133,7 @@ export const getMyPerformance = async (req, res) => {
   }
 };
 
-// ── User Details ──────────────────────────────────────────────────────────────
+// User Details
 export const getUserDetails = async (req, res) => {
   try {
     const { userId } = req.params;
@@ -226,7 +226,7 @@ export const getUserDetails = async (req, res) => {
   }
 };
 
-// ── AI Analysis ───────────────────────────────────────────────────────────────
+// AI Analysis
 export const getUserAIAnalysis = async (req, res) => {
   try {
     const { userId } = req.params;
@@ -295,7 +295,7 @@ Goals completed: ${goals.filter(g => g.subGoals?.every(s => s.completed)).length
   }
 };
 
-// ── Award Bonus ───────────────────────────────────────────────────────────────
+// Award Bonus
 export const awardBonus = async (req, res) => {
   if (req.user.role !== 'admin') return res.status(403).json({ success: false, message: 'Admin only' });
   const { userId, bonusAmount, reason } = req.body;

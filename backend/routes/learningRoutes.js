@@ -18,27 +18,27 @@ import {
 
 const router = express.Router();
 
-// ── Courses ──────────────────────────────────────────────────────────────────
+// Courses
 router.get('/courses',          authMiddleware, getCourses);        // list (lightweight)
 router.get('/courses/:id',      authMiddleware, getCourseById);     // full detail
 
-// ── Progress ─────────────────────────────────────────────────────────────────
+// Progress
 router.get ('/progress',              authMiddleware, getUserProgress);   // all courses
 router.get ('/progress/:courseId',    authMiddleware, getCourseProgress); // single course
 router.post('/progress',             authMiddleware, updateProgress);     // legacy alias
 router.post('/module-progress',       authMiddleware, updateModuleProgress);
 
-// ── Stats ────────────────────────────────────────────────────────────────────
+// Stats
 router.get('/stats',            authMiddleware, getStats);
 
-// ── Enrollment ───────────────────────────────────────────────────────────────
+// Enrollment
 router.post('/enroll',          authMiddleware, enrollCourse);
 
-// ── Exam ─────────────────────────────────────────────────────────────────────
+// Exam
 router.get ('/exam/:courseId',  authMiddleware, getExam);           // get questions
 router.post('/exam/submit',     authMiddleware, submitExam);        // submit answers
 
-// ── AI & Generated Quiz ──────────────────────────────────────────────────────
+// AI & Generated Quiz
 router.post('/ai-query',        authMiddleware, aiQuery);
 router.get ('/quiz/:moduleId',  authMiddleware, generateQuiz);
 

@@ -11,3 +11,6 @@ router.get('/:roomId', getRoomById);
 router.post('/:roomId/end', endRoom);
 
 export default router;
+
+
+

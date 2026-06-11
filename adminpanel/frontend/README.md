@@ -1,16 +1,35 @@
-# React + Vite
+# FundCo AI Admin Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+This package is the current Version 1 admin-facing workspace for FundCo AI. It provides the operational surface used by super admins, executives, team leads, and other privileged roles to manage users, tasks, goals, reminders, learning, projects, reports, and oversight workflows.
 
-Currently, two official plugins are available:
+## Technology
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- React
+- Vite
+- Axios for API transport
+- Socket.IO client for real-time channels
 
-## React Compiler
+## Local development
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+```bash
+npm install
+npm run dev
+```
 
-## Expanding the ESLint configuration
+The frontend expects the admin backend to be running. If `VITE_ADMIN_API_URL` is not set, the client falls back to `http://localhost:4002`.
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+## Build and lint
+
+```bash
+npm run lint
+npm run build
+```
+
+## Responsibilities
+
+This frontend owns:
+
+- admin authentication state and refresh handling
+- user, team, and assignment management surfaces
+- oversight views for goals, reports, reminders, learning, and projects
+- access to shared operational tools exposed through the admin backend

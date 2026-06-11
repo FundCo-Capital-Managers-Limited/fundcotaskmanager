@@ -1,5 +1,5 @@
-﻿// src/pages/AiTools.jsx
-// FundCo AI â€” Complete rebuild: clean layout, working streaming, task context, history
+// src/pages/AiTools.jsx
+// FundCo AI Complete rebuild: clean layout, working streaming, task context, history
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -22,7 +22,7 @@ const API = import.meta.env.VITE_API_URL || 'http://127.0.0.1:4001';
 const authHeaders = () => ({ Authorization: `Bearer ${localStorage.getItem('token')}` });
 const WORKSPACE_SCOPE = 'user';
 
-// â”€â”€ Tool catalog â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Tool catalog
 const CATEGORIES = [
   {
     id: 'general', label: 'General', icon: Brain, color: '#312783',
@@ -83,7 +83,7 @@ const CATEGORIES = [
   },
 ];
 
-// Flat tool lookup â€” legacy aliases keep old history entries readable
+// Flat tool lookup legacy aliases keep old history entries readable
 const ALL_TOOLS   = CATEGORIES.flatMap(c => c.tools.map(t => ({ ...t, categoryId: c.id, categoryColor: c.color })));
 const TOOL_MAP    = Object.fromEntries(ALL_TOOLS.map(t => [t.id, t]));
 // Legacy aliases: old routes set toolId differently (e.g. 'general-ai' not 'general')
@@ -113,7 +113,7 @@ const LEGACY_NAMES = {
 Object.entries(LEGACY_NAMES).forEach(([id, name]) => {
   if (!TOOL_MAP[id]) TOOL_MAP[id] = { id, name };
 });
-// All tool IDs belonging to this section â€” scopes history queries.
+// All tool IDs belonging to this section scopes history queries.
 // Also includes legacy IDs from the old route system (toolId was set
 // differently before the rebuild) so existing history is not lost.
 const LEGACY_TOOL_IDS = ['general-ai', 'general', 'report-generator', 'task-prioritizer',
@@ -289,7 +289,7 @@ const getToolWithCategory = (toolId) => {
   };
 };
 
-// â”€â”€ Helper: stream SSE â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Helper: stream SSE
 const streamChat = async ({ messages, toolId, chatId, taskContext, files, onDelta, onDone, onError }) => {
   const token = localStorage.getItem('token');
   let body;
@@ -362,7 +362,7 @@ const streamChat = async ({ messages, toolId, chatId, taskContext, files, onDelt
   onDone(meta);
 };
 
-// â”€â”€ Small components â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Small components
 const ToolIcon = ({ tool, size = 5, style = {} }) => {
   const Icon = tool?.icon || Brain;
   return <Icon className={`w-${size} h-${size}`} style={style} />;
@@ -387,7 +387,7 @@ const CopyBtn = ({ text }) => {
   );
 };
 
-// â”€â”€ Task context builder â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Task context builder
 const buildTaskContext = (tasks) => (tasks || []).slice(0, 60).map(t => ({
   id:        t._id,
   title:     t.title,
@@ -397,7 +397,7 @@ const buildTaskContext = (tasks) => (tasks || []).slice(0, 60).map(t => ({
   checklist: (t.checklist || []).map(c => ({ item: c.item, done: c.completed })),
 }));
 
-// â”€â”€ Message bubble â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Message bubble
 const MessageBubble = ({ msg, isStreaming }) => {
   const isUser = msg.role === 'user';
   const text   = typeof msg.content === 'string' ? msg.content
@@ -442,7 +442,7 @@ const MessageBubble = ({ msg, isStreaming }) => {
   );
 };
 
-// â”€â”€ Chat panel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Chat panel
 const ChatPanel = ({ tool, tasks, chatId, cachedChat, onChatCreated, onHistoryChanged, onResetChat }) => {
   const [messages,   setMessages]   = useState([]);
   const [input,      setInput]      = useState('');
@@ -749,7 +749,7 @@ const ChatPanel = ({ tool, tasks, chatId, cachedChat, onChatCreated, onHistoryCh
   );
 };
 
-// â”€â”€ Starter prompts per tool â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Starter prompts per tool
 const getStarterPrompts = (toolId) => {
   const MAP = {
     'general':             ['What are FundCo\'s main investment sectors?', 'Summarise my pending tasks', 'What does LCOE mean in FundCo context?'],
@@ -772,7 +772,7 @@ const getStarterPrompts = (toolId) => {
   return MAP[toolId] || MAP['general'];
 };
 
-// â”€â”€ History workspace â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// History workspace
 const HistoryWorkspace = ({ activeTool, chats, loading, onRefresh, onResume, onClose, onToggleStar, onDelete }) => {
   const [search,  setSearch]  = useState('');
   const [scope,   setScope]   = useState('all');
@@ -974,7 +974,7 @@ const HistoryWorkspace = ({ activeTool, chats, loading, onRefresh, onResume, onC
   );
 };
 
-// â”€â”€ Category nav pill â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Category nav pill
 const CategoryPill = ({ cat, isActive, onClick }) => (
   <button onClick={onClick}
     className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold flex-shrink-0 transition-all"
@@ -988,7 +988,7 @@ const CategoryPill = ({ cat, isActive, onClick }) => (
   </button>
 );
 
-// â”€â”€ Tool card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Tool card
 const ToolCard = ({ tool, isActive, onClick, cat }) => (
   <motion.button whileHover={{ y: -1 }} onClick={onClick}
     className="w-full flex items-start gap-3 p-4 rounded-xl border text-left transition-all"
@@ -1008,9 +1008,9 @@ const ToolCard = ({ tool, isActive, onClick, cat }) => (
   </motion.button>
 );
 
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-// â”€â”€ MAIN PAGE â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+
+// MAIN PAGE
+
 const AiTools = () => {
   const { user, tasks = [] } = useOutletContext();
   const restoredSession = React.useMemo(() => readAiToolsSession(), []);
@@ -1168,7 +1168,7 @@ const AiTools = () => {
     <div className="flex h-full overflow-hidden" style={{ height: 'calc(100vh - 80px)' }}>
       <Toaster position="top-right" />
 
-      {/* â”€â”€ Left sidebar â”€â”€ */}
+      {/* Left sidebar */}
       <AnimatePresence>
         {sidebarOpen && (
           <motion.div initial={{ width: 0, opacity: 0 }} animate={{ width: 280, opacity: 1 }}
@@ -1313,7 +1313,7 @@ const AiTools = () => {
         )}
       </AnimatePresence>
 
-      {/* â”€â”€ Main content â”€â”€ */}
+      {/* Main content */}
       <div className="flex-1 flex flex-col overflow-hidden relative">
         {/* Toggle sidebar button */}
         <button onClick={() => setSidebarOpen(p => !p)}
@@ -1356,4 +1356,7 @@ const AiTools = () => {
 };
 
 export default AiTools;
+
+
+
 

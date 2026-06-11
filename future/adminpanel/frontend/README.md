@@ -1,16 +1,51 @@
-# React + Vite
+# FundCo AI Admin Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+This package is the administrative workspace for FundCo AI Version 1. It is the control surface used by admins, executives, and super admins to manage users, tasks, goals, performance, projects, reports, reminders, training, social activity, and team chat from an oversight perspective.
 
-Currently, two official plugins are available:
+## Technology
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- React 19
+- Vite
+- Axios
+- Socket.IO client
 
-## React Compiler
+## Local development
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+```bash
+npm install
+npm run dev
+```
 
-## Expanding the ESLint configuration
+The admin frontend expects the admin backend to be running. If no explicit admin API URL is provided, the client resolves to the current browser origin in production-like environments and `http://127.0.0.1:4002` locally.
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+## Build and lint
+
+```bash
+npm run lint
+npm run build
+```
+
+## Responsibilities
+
+This frontend owns:
+
+- admin session and refresh handling
+- oversight dashboards and operational drill-downs
+- user administration
+- task and goal review flows
+- project and team management views
+- reminder, report, and training administration
+- admin-side team chat and file operations
+
+Business rules are still enforced server-side. The client should be treated as a workflow surface, not a trust boundary.
+
+## Configuration
+
+The frontend reads its API base from runtime configuration when available.
+
+- `VITE_ADMIN_API_URL` - optional explicit admin API origin
+
+## Related documents
+
+- [../backend/README.md](../backend/README.md)
+- [../backend/docs/API.md](../backend/docs/API.md)

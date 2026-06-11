@@ -12,3 +12,6 @@ router.delete('/:id', deletePost);
 router.delete('/:postId/comments/:commentId', deleteComment);
 
 export default router;
+
+
+

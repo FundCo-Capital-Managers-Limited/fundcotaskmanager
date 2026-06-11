@@ -1,4 +1,4 @@
-// backend/models/goalModel.js — UPDATED: added adminComments field
+// backend/models/goalModel.js UPDATED: added adminComments field
 import mongoose from 'mongoose';
 
 const goalSchema = new mongoose.Schema({
@@ -51,7 +51,7 @@ const goalSchema = new mongoose.Schema({
         ref: 'user',
         required: true,
     },
-    // NEW: admin comments on goals — visible to both admin and user
+    // NEW: admin comments on goals visible to both admin and user
     adminComments: [{
         user: { type: mongoose.Schema.Types.ObjectId, ref: 'user', required: true },
         content: { type: String, required: true, trim: true, maxlength: 1000 },
@@ -65,3 +65,6 @@ const goalSchema = new mongoose.Schema({
 
 const Goal = mongoose.models.Goal || mongoose.model('Goal', goalSchema);
 export default Goal;
+
+
+

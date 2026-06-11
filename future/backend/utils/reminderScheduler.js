@@ -1,4 +1,3 @@
-// reminderScheduler.js
 import cron from 'node-cron';
 import Reminder from '../models/reminderModel.js';
 import User from '../models/userModel.js';
@@ -55,11 +54,11 @@ Speak directly to the user. Be warm and encouraging. No emojis, no dashes, no ti
 };
 
 const sendReminder = async (reminder) => {
-    console.log(`🔄 Processing reminder ${reminder._id} for user ${reminder.user}`);
+    console.log(`Processing reminder ${reminder._id} for user ${reminder.user}`);
 
     const user = await User.findById(reminder.user);
     if (!user) {
-        console.error(`❌ User ${reminder.user} not found`);
+        console.error(`User ${reminder.user} not found`);
         return false;
     }
 
@@ -130,7 +129,7 @@ const sendReminder = async (reminder) => {
         global.io.to(`user:${user._id}`).emit('reminderUpdated', reminder);
         return true;
     } catch (error) {
-        console.error(`❌ Error processing reminder ${reminder._id}:`, error.message);
+        console.error(`Error processing reminder ${reminder._id}:`, error.message);
         reminder.status = 'pending';
         await reminder.save();
         return false;
@@ -138,9 +137,9 @@ const sendReminder = async (reminder) => {
 };
 
 const startReminderScheduler = () => {
-    console.log('🚀 Reminder scheduler started (runs every 30 seconds)');
+    console.log('Reminder scheduler started (runs every 30 seconds)');
     cron.schedule('*/30 * * * * *', async () => {
-        console.log(`⏰ Scheduler tick at ${new Date().toISOString()}`);
+        console.log(`Scheduler tick at ${new Date().toISOString()}`);
         try {
             const now = new Date();
             const reminders = await Reminder.find({
@@ -149,7 +148,7 @@ const startReminderScheduler = () => {
                 isActive: true,
             }).limit(100);
 
-            console.log(`📋 Found ${reminders.length} reminders to process`);
+            console.log(`Found ${reminders.length} reminders to process`);
             await Promise.all(reminders.map(reminder => sendReminder(reminder)));
         } catch (error) {
             console.error('Scheduler error:', error.message);
@@ -158,3 +157,6 @@ const startReminderScheduler = () => {
 };
 
 export { startReminderScheduler, sendReminder };
+
+
+

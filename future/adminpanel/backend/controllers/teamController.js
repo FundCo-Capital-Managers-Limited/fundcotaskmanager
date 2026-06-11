@@ -31,7 +31,7 @@ const assertManageableMembers = async (req, memberIds = []) => {
   }
 };
 
-// ── Get my team ───────────────────────────────────────────────────────────────
+// Get my team
 export const getMyTeam = async (req, res) => {
   try {
     let team = await AdminTeam.findOne({ admin: req.user._id })
@@ -49,7 +49,7 @@ export const getMyTeam = async (req, res) => {
   }
 };
 
-// ── Update my team members ────────────────────────────────────────────────────
+// Update my team members
 export const updateMyTeam = async (req, res) => {
   const { members, name } = req.body;
 
@@ -80,7 +80,7 @@ export const updateMyTeam = async (req, res) => {
   }
 };
 
-// ── Add member to team ────────────────────────────────────────────────────────
+// Add member to team
 export const addTeamMember = async (req, res) => {
   const { userId } = req.body;
   if (!userId) return res.status(400).json({ success: false, message: 'userId required' });
@@ -106,7 +106,7 @@ export const addTeamMember = async (req, res) => {
   }
 };
 
-// ── Remove member from team ───────────────────────────────────────────────────
+// Remove member from team
 export const removeTeamMember = async (req, res) => {
   const { userId } = req.params;
   try {
@@ -126,7 +126,7 @@ export const removeTeamMember = async (req, res) => {
   }
 };
 
-// ── Get all available users to add to team ────────────────────────────────────
+// Get all available users to add to team
 export const getAvailableUsers = async (req, res) => {
   try {
     const query = { isActive: true };
@@ -144,3 +144,6 @@ export const getAvailableUsers = async (req, res) => {
     res.status(500).json({ success: false, message: 'Failed to fetch users' });
   }
 };
+
+
+

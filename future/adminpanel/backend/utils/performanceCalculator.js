@@ -1,4 +1,4 @@
-// ── Performance Scoring System (same as user backend) ─────────────────────────
+// Performance Scoring System (same as user backend)
 
 export const PRIORITY_WEIGHTS = { High: 60, Medium: 35, Low: 15 };
 const APPROVAL_MULTIPLIER = 1.5;
@@ -99,3 +99,6 @@ export const getScoreBreakdown = (tasks = [], goals = []) => {
 };
 
 export { LEVELS };
+
+
+

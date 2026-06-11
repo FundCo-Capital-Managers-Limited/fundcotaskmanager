@@ -46,3 +46,6 @@ revenueProjectSchema.index({ name: 'text', description: 'text', clientName: 'tex
 
 const RevenueProject = mongoose.models.RevenueProject || mongoose.model('RevenueProject', revenueProjectSchema);
 export default RevenueProject;
+
+
+

@@ -1,4 +1,3 @@
-// components/TaskModal.jsx
 import React, { useCallback, useEffect, useState } from 'react';
 import { Edit, Calendar, Flag, Save, X, PlusCircle, ListChecks, Trash2 } from 'lucide-react';
 
@@ -369,3 +368,6 @@ const TaskModal = ({ isOpen, onClose, taskToEdit, onSave, onLogout, isReadOnly =
 };
 
 export default TaskModal;
+
+
+

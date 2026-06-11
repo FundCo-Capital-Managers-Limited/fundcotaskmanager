@@ -3,7 +3,7 @@ import { LearningCourse, UserProgress } from '../models/learningMaterialModel.js
 import Joi from 'joi';
 import { grokQuery } from '../services/grokService.js';
 
-// ─── Validation schemas ───────────────────────────────────────────────────────
+// Validation schemas
 const filterSchema = Joi.object({
   level:   Joi.string().optional(),
   assetco: Joi.string().optional(),
@@ -29,7 +29,7 @@ const examSubmitSchema = Joi.object({
   timeSpent: Joi.number().min(0).optional(),
 });
 
-// ─── GET /courses — list with filters ────────────────────────────────────────
+// GET /courses list with filters
 export const getCourses = async (req, res) => {
   const { error } = filterSchema.validate(req.query);
   if (error) return res.status(400).json({ success: false, message: error.details[0].message });
@@ -55,7 +55,7 @@ export const getCourses = async (req, res) => {
       ];
     }
 
-    // Return lightweight list — include counts but exclude heavy content/quiz bodies
+    // Return lightweight list include counts but exclude heavy content/quiz bodies
     const rawCourses = await LearningCourse.find(query, {
       title: 1, description: 1, level: 1, assetco: 1,
       required: 1, tags: 1, passingScore: 1, createdAt: 1,
@@ -85,7 +85,7 @@ export const getCourses = async (req, res) => {
   }
 };
 
-// ─── GET /courses/:id — full course detail ────────────────────────────────────
+// GET /courses/:id full course detail
 export const getCourseById = async (req, res) => {
   try {
     const course = await LearningCourse.findById(req.params.id).lean();
@@ -97,7 +97,7 @@ export const getCourseById = async (req, res) => {
   }
 };
 
-// ─── GET /progress — all user progress ───────────────────────────────────────
+// GET /progress all user progress
 export const getUserProgress = async (req, res) => {
   try {
     const progress = await UserProgress.find({ userId: req.user.id })
@@ -110,7 +110,7 @@ export const getUserProgress = async (req, res) => {
   }
 };
 
-// ─── GET /progress/:courseId — single course progress ────────────────────────
+// GET /progress/:courseId single course progress
 export const getCourseProgress = async (req, res) => {
   try {
     const progress = await UserProgress.findOne({
@@ -124,7 +124,7 @@ export const getCourseProgress = async (req, res) => {
   }
 };
 
-// ─── GET /stats — learner summary stats ──────────────────────────────────────
+// GET /stats learner summary stats
 export const getStats = async (req, res) => {
   try {
     const allProgress = await UserProgress.find({ userId: req.user.id })
@@ -157,13 +157,13 @@ export const getStats = async (req, res) => {
   }
 };
 
-// ─── POST /enroll — enroll in a course ───────────────────────────────────────
+// POST /enroll enroll in a course
 export const enrollCourse = async (req, res) => {
   const { courseId } = req.body;
   if (!courseId) return res.status(400).json({ success: false, message: 'courseId required' });
 
   try {
-    // upsert — safe if already enrolled
+    // upsert safe if already enrolled
     const progress = await UserProgress.findOneAndUpdate(
       { userId: req.user.id, courseId },
       { $setOnInsert: { userId: req.user.id, courseId, enrolledAt: new Date() } },
@@ -172,7 +172,7 @@ export const enrollCourse = async (req, res) => {
     res.json({ success: true, message: 'Enrolled', progress });
   } catch (err) {
     if (err.code === 11000) {
-      // Already enrolled — just return existing
+      // Already enrolled just return existing
       const progress = await UserProgress.findOne({ userId: req.user.id, courseId });
       return res.json({ success: true, message: 'Already enrolled', progress });
     }
@@ -181,7 +181,7 @@ export const enrollCourse = async (req, res) => {
   }
 };
 
-// ─── POST /module-progress — mark module done / record quiz score ─────────────
+// POST /module-progress mark module done / record quiz score
 export const updateModuleProgress = async (req, res) => {
   const { error, value } = moduleProgressSchema.validate(req.body);
   if (error) return res.status(400).json({ success: false, message: error.details[0].message });
@@ -219,7 +219,7 @@ export const updateModuleProgress = async (req, res) => {
       prog.totalTimeSpent  = (prog.totalTimeSpent || 0) + timeSpent;
     }
 
-    // Mark complete (only once — never un-complete a module)
+    // Mark complete (only once never un-complete a module)
     if (!modProg.completed) {
       modProg.completed   = true;
       modProg.completedAt = new Date();
@@ -253,7 +253,7 @@ export const updateModuleProgress = async (req, res) => {
 // Keep legacy alias for backward compatibility
 export const updateProgress = updateModuleProgress;
 
-// ─── POST /exam/submit — submit full course exam ──────────────────────────────
+// POST /exam/submit submit full course exam
 export const submitExam = async (req, res) => {
   const { error, value } = examSubmitSchema.validate(req.body);
   if (error) return res.status(400).json({ success: false, message: error.details[0].message });
@@ -320,7 +320,7 @@ export const submitExam = async (req, res) => {
   }
 };
 
-// ─── GET /exam/:courseId — get exam questions (without answers) ───────────────
+// GET /exam/:courseId get exam questions (without answers)
 export const getExam = async (req, res) => {
   try {
     const course = await LearningCourse.findById(req.params.courseId, { exam: 1, passingScore: 1, title: 1 }).lean();
@@ -352,7 +352,7 @@ export const getExam = async (req, res) => {
   }
 };
 
-// ─── POST /ai-query — AI mentor (Grok, restricted to company content) ─────────
+// POST /ai-query AI mentor (Grok, restricted to company content)
 export const aiQuery = async (req, res) => {
   const { error } = querySchema.validate(req.body);
   if (error) return res.status(400).json({ success: false, message: error.details[0].message });
@@ -379,7 +379,7 @@ export const aiQuery = async (req, res) => {
   }
 };
 
-// ─── GET /quiz/:moduleId — AI-generate a quiz for a module ───────────────────
+// GET /quiz/:moduleId AI-generate a quiz for a module
 export const generateQuiz = async (req, res) => {
   const { moduleId } = req.params;
   try {

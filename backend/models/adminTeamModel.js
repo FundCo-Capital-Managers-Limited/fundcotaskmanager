@@ -24,3 +24,6 @@ const adminTeamSchema = new mongoose.Schema(
 
 const AdminTeam = mongoose.models.AdminTeam || mongoose.model('AdminTeam', adminTeamSchema);
 export default AdminTeam;
+
+
+

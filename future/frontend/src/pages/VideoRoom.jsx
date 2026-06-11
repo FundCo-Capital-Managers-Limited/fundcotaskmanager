@@ -1,5 +1,5 @@
 // src/pages/VideoRoom.jsx
-// WebRTC mesh conference room — all logic preserved, styling uses CSS variables
+// WebRTC mesh conference room all logic preserved, styling uses CSS variables
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useParams, useNavigate, useOutletContext } from 'react-router-dom';
 import {
@@ -29,7 +29,7 @@ const ICE_SERVERS = {
 
 const REACTIONS = ['👍', '❤️', '😂', '🔥', '👏', '😮', '🎉', '💯'];
 
-// ── Local video tile ──────────────────────────────────────────────────────────
+// Local video tile
 const LocalVideoTile = React.memo(({
   localStream, screenStream, isScreenSharing, audioEnabled, videoEnabled,
   user, isPinned, onPin, isLarge,
@@ -104,7 +104,7 @@ const LocalVideoTile = React.memo(({
 });
 LocalVideoTile.displayName = 'LocalVideoTile';
 
-// ── Preview screen ────────────────────────────────────────────────────────────
+// Preview screen
 const PreviewScreen = ({ roomInfo, roomId, user, onJoin, onCancel }) => {
   const [audioOn, setAudioOn] = useState(true);
   const [videoOn, setVideoOn] = useState(true);
@@ -182,7 +182,7 @@ const PreviewScreen = ({ roomInfo, roomId, user, onJoin, onCancel }) => {
   );
 };
 
-// ── Control button ────────────────────────────────────────────────────────────
+// Control button
 const CtrlBtn = ({ onClick, active, offIcon, onIcon, label, redWhenOff = false, badge }) => (
   <button onClick={onClick}
     className="relative flex flex-col items-center gap-1 px-2 sm:px-3 py-2 sm:py-2.5 rounded-xl transition-colors"
@@ -202,7 +202,7 @@ const CtrlBtn = ({ onClick, active, offIcon, onIcon, label, redWhenOff = false, 
   </button>
 );
 
-// ── Main VideoRoom ────────────────────────────────────────────────────────────
+// Main VideoRoom
 const VideoRoom = ({ embeddedUser = null, onLogout: onLogoutProp = null }) => {
   const { roomId } = useParams();
   const navigate = useNavigate();
@@ -211,7 +211,7 @@ const VideoRoom = ({ embeddedUser = null, onLogout: onLogoutProp = null }) => {
   const token = localStorage.getItem('token');
   const { markTypeRead } = useNotifications();
 
-  // ── State ──────────────────────────────────────────────────────────────────
+  // State
   const [phase,          setPhase]          = useState('loading');
   const [errorMsg,       setErrorMsg]       = useState('');
   const [roomInfo,       setRoomInfo]       = useState(null);
@@ -236,7 +236,7 @@ const VideoRoom = ({ embeddedUser = null, onLogout: onLogoutProp = null }) => {
   const [linkCopied,     setLinkCopied]     = useState(false);
   const [isLeaving,      setIsLeaving]      = useState(false);
 
-  // ── Refs ───────────────────────────────────────────────────────────────────
+  // Refs
   const socketRef          = useRef(null);
   const localStreamRef     = useRef(null);
   const peersRef           = useRef({});
@@ -328,12 +328,12 @@ const VideoRoom = ({ embeddedUser = null, onLogout: onLogoutProp = null }) => {
     go();
   }, [cleanupConnections, navigate]);
 
-  // ── Screen share support ───────────────────────────────────────────────────
+  // Screen share support
   useEffect(() => {
     setScreenShareSupported(!!(navigator.mediaDevices?.getDisplayMedia));
   }, []);
 
-  // ── Load room info ─────────────────────────────────────────────────────────
+  // Load room info
   useEffect(() => {
     const load = async () => {
       try {
@@ -350,7 +350,7 @@ const VideoRoom = ({ embeddedUser = null, onLogout: onLogoutProp = null }) => {
     load();
   }, [roomId, token]);
 
-  // ── Create peer connection ─────────────────────────────────────────────────
+  // Create peer connection
   const createPeerConnection = useCallback((targetSocketId, targetUser) => {
     peersRef.current[targetSocketId]?.connection?.close();
     const pc = new RTCPeerConnection(ICE_SERVERS);
@@ -392,7 +392,7 @@ const VideoRoom = ({ embeddedUser = null, onLogout: onLogoutProp = null }) => {
     return pc;
   }, [roomId]);
 
-  // ── Drain ICE queue ────────────────────────────────────────────────────────
+  // Drain ICE queue
   const drainIceQueue = useCallback(async (targetSocketId, pc) => {
     const queue = iceCandidateQueue.current[targetSocketId] || [];
     for (const candidate of queue) {
@@ -401,7 +401,7 @@ const VideoRoom = ({ embeddedUser = null, onLogout: onLogoutProp = null }) => {
     iceCandidateQueue.current[targetSocketId] = [];
   }, []);
 
-  // ── Join room ──────────────────────────────────────────────────────────────
+  // Join room
   const joinRoom = useCallback(async ({ audioOn, videoOn }) => {
     cleanupDoneRef.current = false;
     setIsLeaving(false);
@@ -585,7 +585,7 @@ const VideoRoom = ({ embeddedUser = null, onLogout: onLogoutProp = null }) => {
 
   }, [roomId, token, createPeerConnection, drainIceQueue, exitRoom, cleanupConnections]);
 
-  // ── Cleanup ────────────────────────────────────────────────────────────────
+  // Cleanup
   useEffect(() => {
     return () => {
       if (!cleanupDoneRef.current) {
@@ -594,7 +594,7 @@ const VideoRoom = ({ embeddedUser = null, onLogout: onLogoutProp = null }) => {
     };
   }, [cleanupConnections, isLeaving]);
 
-  // ── Toggle audio ───────────────────────────────────────────────────────────
+  // Toggle audio
   const toggleAudio = useCallback(() => {
     setAudioEnabled(prev => {
       const next = !prev;
@@ -606,7 +606,7 @@ const VideoRoom = ({ embeddedUser = null, onLogout: onLogoutProp = null }) => {
     });
   }, [roomId, videoEnabled, isScreenSharing]);
 
-  // ── Toggle video ───────────────────────────────────────────────────────────
+  // Toggle video
   const toggleVideo = useCallback(() => {
     setVideoEnabled(prev => {
       const next = !prev;
@@ -618,7 +618,7 @@ const VideoRoom = ({ embeddedUser = null, onLogout: onLogoutProp = null }) => {
     });
   }, [roomId, audioEnabled, isScreenSharing]);
 
-  // ── Screen share ───────────────────────────────────────────────────────────
+  // Screen share
   const stopScreenShare = useCallback(() => {
     const ss = screenStreamRef.current;
     ss?.getTracks().forEach(t => t.stop());
@@ -664,13 +664,13 @@ const VideoRoom = ({ embeddedUser = null, onLogout: onLogoutProp = null }) => {
     if (isScreenSharing) stopScreenShare(); else startScreenShare();
   }, [isScreenSharing, startScreenShare, stopScreenShare]);
 
-  // ── Chat ───────────────────────────────────────────────────────────────────
+  // Chat
   const sendChat = useCallback((message) => {
     if (!message.trim() || !socketRef.current) return;
     socketRef.current.emit('roomChat', { roomId, message: message.trim() });
   }, [roomId]);
 
-  // ── Reactions ──────────────────────────────────────────────────────────────
+  // Reactions
   const sendReaction = useCallback((emoji) => {
     socketRef.current?.emit('reaction', { roomId, emoji });
     const id = Date.now();
@@ -678,7 +678,7 @@ const VideoRoom = ({ embeddedUser = null, onLogout: onLogoutProp = null }) => {
     setShowReactions(false);
   }, [roomId, user]);
 
-  // ── Raise hand ─────────────────────────────────────────────────────────────
+  // Raise hand
   const toggleHand = useCallback(() => {
     setHandRaised(p => {
       const raised = !p;
@@ -687,12 +687,12 @@ const VideoRoom = ({ embeddedUser = null, onLogout: onLogoutProp = null }) => {
     });
   }, [roomId]);
 
-  // ── Leave ──────────────────────────────────────────────────────────────────
+  // Leave
   const leaveRoom = useCallback(() => {
     exitRoom('/meetroom', { emitLeave: true });
   }, [exitRoom]);
 
-  // ── Copy link ──────────────────────────────────────────────────────────────
+  // Copy link
   const copyLink = () => {
     navigator.clipboard.writeText(`${window.location.origin}/room/${roomId}`);
     setLinkCopied(true);
@@ -700,7 +700,7 @@ const VideoRoom = ({ embeddedUser = null, onLogout: onLogoutProp = null }) => {
     setTimeout(() => setLinkCopied(false), 2500);
   };
 
-  // ── Fullscreen ─────────────────────────────────────────────────────────────
+  // Fullscreen
   const toggleFullscreen = () => {
     if (!document.fullscreenElement) { containerRef.current?.requestFullscreen?.(); setIsFullscreen(true); }
     else { document.exitFullscreen?.(); setIsFullscreen(false); }
@@ -713,7 +713,7 @@ const VideoRoom = ({ embeddedUser = null, onLogout: onLogoutProp = null }) => {
 
   useEffect(() => { if (showChat) setUnreadChat(0); }, [showChat]);
 
-  // ── Computed ───────────────────────────────────────────────────────────────
+  // Computed
   const peerList   = useMemo(() => Object.entries(peers), [peers]);
   const totalTiles = peerList.length + 1;
 
@@ -727,7 +727,7 @@ const VideoRoom = ({ embeddedUser = null, onLogout: onLogoutProp = null }) => {
 
   const pinnedPeer = pinnedId && pinnedId !== 'local' ? peers[pinnedId] : null;
 
-  // ── Loading / error / ended ────────────────────────────────────────────────
+  // Loading / error / ended
   const darkScreen = (children) => (
     <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: '#030712' }}>
       {children}
@@ -772,7 +772,7 @@ const VideoRoom = ({ embeddedUser = null, onLogout: onLogoutProp = null }) => {
     </div>
   );
 
-  // ── Main room ──────────────────────────────────────────────────────────────
+  // Main room
   return (
     <div ref={containerRef}
       className="h-screen flex flex-col overflow-hidden"
@@ -787,7 +787,7 @@ const VideoRoom = ({ embeddedUser = null, onLogout: onLogoutProp = null }) => {
         ))}
       </AnimatePresence>
 
-      {/* ── Top bar ──────────────────────────────────────────────────────── */}
+      {/* Top bar */}
       <div className="flex items-center justify-between px-4 py-3 border-b flex-shrink-0 z-10"
         style={{ backgroundColor: '#111827', borderColor: '#1f2937' }}>
         <div className="flex items-center gap-3 min-w-0">
@@ -831,7 +831,7 @@ const VideoRoom = ({ embeddedUser = null, onLogout: onLogoutProp = null }) => {
         </div>
       </div>
 
-      {/* ── Main area ────────────────────────────────────────────────────── */}
+      {/* Main area */}
       <div className="flex-1 flex relative overflow-hidden">
         <div className="flex-1 p-2 sm:p-3 overflow-hidden">
           {layout === 'grid' || !pinnedPeer ? (
@@ -888,7 +888,7 @@ const VideoRoom = ({ embeddedUser = null, onLogout: onLogoutProp = null }) => {
         </AnimatePresence>
       </div>
 
-      {/* ── Bottom controls ───────────────────────────────────────────────── */}
+      {/* Bottom controls */}
       <div className="flex-shrink-0 border-t px-3 sm:px-6 py-3"
         style={{ backgroundColor: '#111827', borderColor: '#1f2937' }}>
         <div className="flex items-center justify-between max-w-3xl mx-auto gap-1 sm:gap-2">
@@ -978,3 +978,6 @@ const VideoRoom = ({ embeddedUser = null, onLogout: onLogoutProp = null }) => {
 };
 
 export default VideoRoom;
+
+
+

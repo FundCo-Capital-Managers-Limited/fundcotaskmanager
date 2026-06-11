@@ -14,3 +14,6 @@ const superAdminOnly = (req, res, next) => {
 router.get('/report', authMiddleware, superAdminOnly, getPlatformActivityReport);
 
 export default router;
+
+
+

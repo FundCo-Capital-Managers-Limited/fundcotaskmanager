@@ -28,7 +28,7 @@ const getFullName = (u) => {
   return u.name?.trim() || 'Unknown';
 };
 
-// ── Section heading ─────────────────────────────────────────────────────────
+// Section heading
 const SectionHeading = ({ children, icon: Icon }) => (
   <div className="flex items-center gap-2 mb-4">
     {Icon && <Icon className="w-4 h-4" style={{ color: 'var(--text-muted)' }} />}
@@ -37,7 +37,7 @@ const SectionHeading = ({ children, icon: Icon }) => (
   </div>
 );
 
-// ── Podium card ─────────────────────────────────────────────────────────────
+// Podium card
 const PodiumCard = ({ player, idx, onClick }) => {
   const cfg  = RANK_CONFIG[idx];
   const name = getFullName(player);
@@ -88,7 +88,7 @@ const PodiumCard = ({ player, idx, onClick }) => {
   );
 };
 
-// ── My Performance mini-bar ──────────────────────────────────────────────────
+// My Performance mini-bar
 const MyPerformanceBar = ({ performance, user, onClick }) => {
   if (!performance) return null;
   const name = getFullName(user);
@@ -146,7 +146,7 @@ const MyPerformanceBar = ({ performance, user, onClick }) => {
   );
 };
 
-// ── Main Dashboard ───────────────────────────────────────────────────────────
+// Main Dashboard
 const PerformanceDashboard = () => {
   const { user, onLogout } = useOutletContext();
   const [leaderboardData,      setLeaderboardData]      = useState({ top3: [], rest: [] });
@@ -166,7 +166,7 @@ const PerformanceDashboard = () => {
   const fetchData = async () => {
     const currentUserId = user?._id || user?.id;
 
-    // ← SAFEGUARD: prevent the "undefined" crash
+    // SAFEGUARD: prevent the undefined crash
     if (!currentUserId) {
       console.warn('⚠️ User ID not ready yet – skipping fetch');
       setLoading(false);
@@ -225,7 +225,7 @@ const PerformanceDashboard = () => {
 
   const handleAwardBonus = (targetUser) => { setSelectedBonusUser(targetUser); setShowBonusModal(true); };
 
-  // ── Loading ──────────────────────────────────────────────────────────────
+  // Loading
   if (loading) return (
     <div className="flex items-center justify-center py-24">
       <div className="flex flex-col items-center gap-3">
@@ -239,7 +239,7 @@ const PerformanceDashboard = () => {
   return (
     <div className="space-y-7 py-4">
 
-      {/* ── Page header ───────────────────────────────────────────────────── */}
+      {/* Page header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-black" style={{ color: 'var(--text-primary)' }}>Performance Board</h1>
@@ -265,7 +265,7 @@ const PerformanceDashboard = () => {
         </div>
       </div>
 
-      {/* ── How points work accordion ─────────────────────────────────────── */}
+      {/* How points work accordion */}
       <div className="rounded-xl border overflow-hidden"
         style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border-color)' }}>
         <button onClick={() => setShowPointsCalc(p => !p)}
@@ -308,7 +308,7 @@ const PerformanceDashboard = () => {
         </AnimatePresence>
       </div>
 
-      {/* ── Top 3 Podium ─────────────────────────────────────────────────── */}
+      {/* Top 3 Podium */}
       {leaderboardData.top3.length > 0 && (
         <div>
           <SectionHeading icon={Crown}>Top Performers</SectionHeading>
@@ -320,7 +320,7 @@ const PerformanceDashboard = () => {
         </div>
       )}
 
-      {/* ── My Performance ────────────────────────────────────────────────── */}
+      {/* My Performance */}
       {myPerformance && (
         <div>
           <SectionHeading icon={Star}>Your Performance</SectionHeading>
@@ -333,7 +333,7 @@ const PerformanceDashboard = () => {
         </div>
       )}
 
-      {/* ── Full Leaderboard ──────────────────────────────────────────────── */}
+      {/* Full Leaderboard */}
       <div>
         <SectionHeading icon={Trophy}>Full Leaderboard</SectionHeading>
         <LeaderboardTable
@@ -344,7 +344,7 @@ const PerformanceDashboard = () => {
         />
       </div>
 
-      {/* ── All Participants grid ─────────────────────────────────────────── */}
+      {/* All Participants grid */}
       {allUsers.length > 0 && (
         <div>
           <SectionHeading icon={Users}>All Participants</SectionHeading>
@@ -363,7 +363,7 @@ const PerformanceDashboard = () => {
         </div>
       )}
 
-      {/* ── Modals ────────────────────────────────────────────────────────── */}
+      {/* Modals */}
       <BonusAwardModal
         isOpen={showBonusModal}
         onClose={() => setShowBonusModal(false)}

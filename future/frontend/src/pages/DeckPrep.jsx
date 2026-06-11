@@ -1,5 +1,5 @@
 // src/pages/DeckPrep.jsx
-// Ultimate AI-Powered PDF → PowerPoint Builder
+// Ultimate AI-Powered PDF PowerPoint Builder
 // Two modes: Quick Convert + AI-Guided | Full slide editor | Real PPTX export
 // NEW: Delete button appears on hover for every history card (Recent + full History view)
 import React, { useState, useEffect, useRef, useCallback } from 'react';
@@ -30,7 +30,7 @@ const downloadPlainText = (text, baseName = 'deckprep-text') => {
 };
 const getDocumentFileName = (entry) => entry?.originalFileId?.fileName || entry?.sourceFileName || 'Untitled';
 
-// ── Themes ───────────────────────────────────────────────────────────────────
+// Themes
 const THEMES = {
   consulting: { label: 'Consulting', bg: 'f7f8fa', accent: '12355b', text: '102033', subtext: '5b6b7d', titleText: 'ffffff', sectionBg: 'e7edf4', preview: ['#f7f8fa', '#12355b'] },
   professional: { label: 'Professional', bg: '1e293b', accent: '312783', text: 'f8fafc', subtext: '94a3b8', titleText: 'ffffff', sectionBg: '0f172a', preview: ['#1e293b', '#312783'] },
@@ -93,7 +93,7 @@ const getChartData = (slide) => {
   return null;
 };
 
-// ── SlidePreview ─────────────────────────────────────────────────────────────
+// SlidePreview
 const SlidePreview = ({ slide, theme, scale = 1, isActive = false, onClick }) => {
   const t = THEMES[theme] || THEMES.consulting;
   const W = 640, H = 360;
@@ -253,8 +253,8 @@ const SlidePreview = ({ slide, theme, scale = 1, isActive = false, onClick }) =>
   );
 };
 
-// ── PPTX Export ───────────────────────────────────────────────────────────────
-// Slide canvas: 13.333 × 7.5 in (16:9 wide). All measurements in inches.
+// PPTX Export
+// Slide canvas: 13.333 7.5 in (16:9 wide). All measurements in inches.
 const SLIDE_W = 13.333;
 const SLIDE_H = 7.5;
 const MARGIN_X = 0.7;
@@ -737,7 +737,7 @@ const exportToPPTX = async (pptJson, theme) => {
   await pptx.writeFile({ fileName: `${(pptJson.title || 'Presentation').replace(/[^a-z0-9]/gi, '_')}.pptx` });
 };
 
-// ── Slide Editor Panel ────────────────────────────────────────────────────────
+// Slide Editor Panel
 const SlideEditor = ({ slide, onUpdate, onRegenerate, onDelete, onAddSlide, isRegenerating }) => {
   const [local, setLocal] = useState(slide);
   const [regenPrompt, setRegenPrompt] = useState('');
@@ -846,7 +846,7 @@ const SlideEditor = ({ slide, onUpdate, onRegenerate, onDelete, onAddSlide, isRe
   );
 };
 
-// ── MAIN COMPONENT ────────────────────────────────────────────────────────────
+// MAIN COMPONENT
 const DeckPrep = () => {
   const { user } = useOutletContext();
   const [mode, setMode] = useState('home');
@@ -893,7 +893,7 @@ const DeckPrep = () => {
     }
   }, []);
 
-  // ── NEW: Delete a document from history (called on hover button click) ─────
+  // NEW: Delete a document from history (called on hover button click)
   const handleDelete = useCallback(async (documentId) => {
     if (!window.confirm('Are you sure you want to permanently delete this presentation and all its data? This action cannot be undone.')) {
       return;
@@ -1009,7 +1009,7 @@ const DeckPrep = () => {
     } finally { done(); }
   };
 
-  // From Reader → Quick Convert (re-uses the cached fullText on the server).
+  // From Reader Quick Convert (re-uses the cached fullText on the server).
   const handleReaderToQuick = async () => {
     if (!docId) return toast.error('No document loaded');
     load('Building your presentation from the extracted text…');
@@ -1030,7 +1030,7 @@ const DeckPrep = () => {
     } finally { done(); }
   };
 
-  // From Reader → Guided Builder (skip upload + extract since we already have text).
+  // From Reader Guided Builder (skip upload + extract since we already have text).
   const handleReaderToGuided = () => {
     if (!docId) return toast.error('No document loaded');
     setMode('guided');
@@ -1161,7 +1161,7 @@ const DeckPrep = () => {
     </div>
   ) : null;
 
-  // ── HOME ──────────────────────────────────────────────────────────────────
+  // HOME
   if (mode === 'home') return (
     <div className="space-y-8 py-4">
       <Toaster position="top-right" />
@@ -1211,7 +1211,7 @@ const DeckPrep = () => {
         ))}
       </div>
 
-      {/* Recent Presentations – now with hover delete button */}
+      {/* Recent Presentations now with hover delete button */}
       {history.length > 0 && <>
         <SectionLabel>Recent Presentations</SectionLabel>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -1254,7 +1254,7 @@ const DeckPrep = () => {
     </div>
   );
 
-  // ── QUICK CONVERT ─────────────────────────────────────────────────────────
+  // QUICK CONVERT
   if (mode === 'quick') return (
     <div className="space-y-6 py-4 max-w-2xl mx-auto">
       <Toaster position="top-right" />
@@ -1326,7 +1326,7 @@ const DeckPrep = () => {
     </div>
   );
 
-  // ── PDF READER (UPLOAD) ───────────────────────────────────────────────────
+  // PDF READER (UPLOAD)
   if (mode === 'reader-upload') return (
     <div className="space-y-6 py-4 max-w-2xl mx-auto">
       <Toaster position="top-right" />
@@ -1377,7 +1377,7 @@ const DeckPrep = () => {
     </div>
   );
 
-  // ── PDF READER (STRUCTURED VIEW) ──────────────────────────────────────────
+  // PDF READER (STRUCTURED VIEW)
   if (mode === 'reader') {
     const wordCount = (fullText || '').split(/\s+/).filter(Boolean).length;
     const charCount = (fullText || '').length;
@@ -1476,7 +1476,7 @@ const DeckPrep = () => {
     );
   }
 
-  // ── GUIDED MODE ───────────────────────────────────────────────────────────
+  // GUIDED MODE
   if (mode === 'guided') {
     const steps = [{ n: 1, label: 'Upload' }, { n: 2, label: 'Extract' }, { n: 3, label: 'Review' }, { n: 4, label: 'Structure' }, { n: 5, label: 'Edit' }, { n: 6, label: 'Generate' }];
     return (
@@ -1546,7 +1546,7 @@ const DeckPrep = () => {
               </div>
               <textarea value={fullText} onChange={e => setFullText(e.target.value)} rows={14}
                 className="w-full rounded-xl border px-4 py-3 text-sm focus:outline-none resize-y"
-                style={{ ...inp, fontFamily: 'Georgia, \"Source Serif Pro\", serif', lineHeight: 1.7 }} onFocus={inpFocus} onBlur={inpBlur} />
+                style={{ ...inp, fontFamily: 'Georgia, "Source Serif Pro", serif', lineHeight: 1.7 }} onFocus={inpFocus} onBlur={inpBlur} />
               <button onClick={() => setStep(4)} className="w-full py-3 rounded-xl font-bold text-white flex items-center justify-center gap-2 hover:opacity-90" style={{ backgroundColor: 'var(--brand-primary)' }}>
                 Continue <ArrowRight className="w-4 h-4" />
               </button>
@@ -1598,7 +1598,7 @@ const DeckPrep = () => {
     );
   }
 
-  // ── EDITOR ────────────────────────────────────────────────────────────────
+  // EDITOR
   if (mode === 'editor' && pptJson) {
     const slide = pptJson.slides[activeSlide];
     const SlideIcon = slideIcons[slide?.type] || AlignLeft;
@@ -1716,7 +1716,7 @@ const DeckPrep = () => {
     );
   }
 
-  // ── HISTORY ───────────────────────────────────────────────────────────────
+  // HISTORY
   if (mode === 'history') return (
     <div className="space-y-6 py-4">
       <Toaster position="top-right" />
@@ -1746,7 +1746,7 @@ const DeckPrep = () => {
                 </p>
               </div>
 
-              {/* Hover-only delete button – appears exactly when mouse hovers the card */}
+              {/* Hover-only delete button appears exactly when mouse hovers the card */}
               <button
                 onClick={(e) => {
                   e.stopPropagation();
@@ -1769,3 +1769,6 @@ const DeckPrep = () => {
 };
 
 export default DeckPrep;
+
+
+

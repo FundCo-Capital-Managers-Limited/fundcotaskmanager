@@ -14,7 +14,7 @@ const getFullName = (u) => {
   return `${u.firstName || ''} ${u.lastName || ''} ${u.otherName || ''}`.trim() || 'Unknown';
 };
 
-// ── Leaderboard (team-filtered) ───────────────────────────────────────────────
+// Leaderboard (team-filtered)
 export const getLeaderboard = async (req, res) => {
   try {
     const userQuery = req.teamMemberIds ? { _id: { $in: req.teamMemberIds }, isActive: true } : { isActive: true };
@@ -67,7 +67,7 @@ export const getLeaderboard = async (req, res) => {
   }
 };
 
-// ── User detail (for UserDetailModal) ─────────────────────────────────────────
+// User detail (for UserDetailModal)
 export const getUserDetails = async (req, res) => {
   try {
     const { userId } = req.params;
@@ -120,7 +120,7 @@ export const getUserDetails = async (req, res) => {
   }
 };
 
-// ── Award Bonus ───────────────────────────────────────────────────────────────
+// Award Bonus
 export const awardBonus = async (req, res) => {
   const { userId, bonusAmount, reason } = req.body;
   if (!userId || !bonusAmount || bonusAmount <= 0) {
@@ -153,7 +153,7 @@ export const awardBonus = async (req, res) => {
   }
 };
 
-// ── Dashboard analytics ───────────────────────────────────────────────────────
+// Dashboard analytics
 export const getDashboardAnalytics = async (req, res) => {
   try {
     const userQuery = req.teamMemberIds ? { _id: { $in: req.teamMemberIds }, isActive: true } : { isActive: true };
@@ -182,3 +182,6 @@ export const getDashboardAnalytics = async (req, res) => {
     res.status(500).json({ success: false, message: 'Failed to fetch analytics' });
   }
 };
+
+
+

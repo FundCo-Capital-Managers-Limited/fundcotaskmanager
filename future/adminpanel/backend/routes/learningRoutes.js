@@ -20,3 +20,6 @@ router.get('/stats', teamFilter, getTrainingStats);
 router.post('/enroll', enrollUser);
 
 export default router;
+
+
+

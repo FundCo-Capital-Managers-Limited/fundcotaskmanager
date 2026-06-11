@@ -62,3 +62,6 @@ reminderSchema.index({ user: 1, remindAt: 1, status: 1, isActive: 1 });
 
 const Reminder = mongoose.models.Reminder || mongoose.model('Reminder', reminderSchema);
 export default Reminder;
+
+
+

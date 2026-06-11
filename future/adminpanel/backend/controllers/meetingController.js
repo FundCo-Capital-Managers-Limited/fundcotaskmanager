@@ -2,7 +2,7 @@ import Room from '../models/roomModel.js';
 import { buildTeamQuery } from '../middleware/teamFilter.js';
 import { createNotification } from '../utils/notificationService.js';
 
-// ── Get all rooms (team-filtered) ─────────────────────────────────────────────
+// Get all rooms (team-filtered)
 export const getAllRooms = async (req, res) => {
   try {
     const query = {};
@@ -29,7 +29,7 @@ export const getAllRooms = async (req, res) => {
   }
 };
 
-// ── Get room by ID ────────────────────────────────────────────────────────────
+// Get room by ID
 export const getRoomById = async (req, res) => {
   try {
     const room = await Room.findOne({ roomId: req.params.roomId })
@@ -44,7 +44,7 @@ export const getRoomById = async (req, res) => {
   }
 };
 
-// ── End room (admin override) ─────────────────────────────────────────────────
+// End room (admin override)
 export const endRoom = async (req, res) => {
   try {
     const room = await Room.findOne({ roomId: req.params.roomId });
@@ -79,3 +79,6 @@ export const endRoom = async (req, res) => {
     res.status(500).json({ success: false, message: 'Failed to end room' });
   }
 };
+
+
+

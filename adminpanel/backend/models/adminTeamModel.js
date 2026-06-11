@@ -1,10 +1,10 @@
 import mongoose from 'mongoose';
 
-// ── Admin Team Model ──────────────────────────────────────────────────────────
+// Admin Team Model
 // Stores the "My Team" selection for each admin user.
 // Team Leads and Executives configure which users belong to their team.
 // Super Admin always sees all users, so they don't need this.
-// ──────────────────────────────────────────────────────────────────────────────
+
 const adminTeamSchema = new mongoose.Schema(
   {
     admin: {
@@ -29,3 +29,6 @@ const adminTeamSchema = new mongoose.Schema(
 
 const AdminTeam = mongoose.models.AdminTeam || mongoose.model('AdminTeam', adminTeamSchema);
 export default AdminTeam;
+
+
+

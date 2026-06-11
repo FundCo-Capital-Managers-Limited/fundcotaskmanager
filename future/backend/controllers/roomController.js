@@ -4,7 +4,7 @@ import User from '../models/userModel.js';
 import { createNotification } from '../utils/notificationService.js';
 import { nanoid } from 'nanoid';
 
-// ─── Generate a unique room ID ───────────────────────────────────────────────
+// Generate a unique room ID
 const generateRoomId = () => {
     // Format: xxx-xxxx-xxx (like Google Meet)
     const part1 = nanoid(3).toLowerCase();
@@ -13,7 +13,7 @@ const generateRoomId = () => {
     return `${part1}-${part2}-${part3}`;
 };
 
-// ─── Create a new room ───────────────────────────────────────────────────────
+// Create a new room
 export const createRoom = async (req, res) => {
     try {
         const { name, description, type = 'instant', scheduledFor, maxParticipants, settings, invitedUsers, password } = req.body;
@@ -83,7 +83,7 @@ export const createRoom = async (req, res) => {
     }
 };
 
-// ─── Get room by roomId ──────────────────────────────────────────────────────
+// Get room by roomId
 export const getRoom = async (req, res) => {
     try {
         const { roomId } = req.params;
@@ -103,7 +103,7 @@ export const getRoom = async (req, res) => {
     }
 };
 
-// ─── Get all rooms for current user ─────────────────────────────────────────
+// Get all rooms for current user
 export const getUserRooms = async (req, res) => {
     try {
         const userId = req.user.id;
@@ -131,7 +131,7 @@ export const getUserRooms = async (req, res) => {
     }
 };
 
-// ─── Get active rooms (rooms user can join) ──────────────────────────────────
+// Get active rooms (rooms user can join)
 export const getActiveRooms = async (req, res) => {
     try {
         const rooms = await Room.find({ status: { $in: ['waiting', 'active'] } })
@@ -146,7 +146,7 @@ export const getActiveRooms = async (req, res) => {
     }
 };
 
-// ─── Update room settings ────────────────────────────────────────────────────
+// Update room settings
 export const updateRoom = async (req, res) => {
     try {
         const { roomId } = req.params;
@@ -178,7 +178,7 @@ export const updateRoom = async (req, res) => {
     }
 };
 
-// ─── End room ────────────────────────────────────────────────────────────────
+// End room
 export const endRoom = async (req, res) => {
     try {
         const { roomId } = req.params;
@@ -205,7 +205,7 @@ export const endRoom = async (req, res) => {
     }
 };
 
-// ─── Kick participant ────────────────────────────────────────────────────────
+// Kick participant
 export const kickParticipant = async (req, res) => {
     try {
         const { roomId, userId } = req.params;
@@ -237,7 +237,7 @@ export const kickParticipant = async (req, res) => {
     }
 };
 
-// ─── Send chat message in room ───────────────────────────────────────────────
+// Send chat message in room
 export const sendRoomMessage = async (req, res) => {
     try {
         const { roomId } = req.params;
@@ -276,7 +276,7 @@ export const sendRoomMessage = async (req, res) => {
     }
 };
 
-// ─── Get room chat history ───────────────────────────────────────────────────
+// Get room chat history
 export const getRoomChat = async (req, res) => {
     try {
         const { roomId } = req.params;
@@ -291,7 +291,7 @@ export const getRoomChat = async (req, res) => {
     }
 };
 
-// ─── Invite users to room ────────────────────────────────────────────────────
+// Invite users to room
 export const inviteToRoom = async (req, res) => {
     try {
         const { roomId } = req.params;

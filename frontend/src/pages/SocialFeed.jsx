@@ -1,5 +1,5 @@
 // src/pages/SocialFeed.jsx
-// Complete rebuild — reactions, comments, bookmarks, search, filters, real-time
+// Complete rebuild reactions, comments, bookmarks, search, filters, real-time
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -49,7 +49,7 @@ const extractFirstUrl = (text) => {
   return String(text || '').match(URL_RE)?.[0] || '';
 };
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+// Helpers
 const getFullName = (u) => {
   if (!u) return 'Unknown';
   if (u.fullName) return u.fullName.trim();
@@ -76,7 +76,7 @@ const FILTERS = [
   { key: 'media',      label: 'Media Only' },
 ];
 
-// ── Avatar ────────────────────────────────────────────────────────────────────
+// Avatar
 const Avatar = ({ user, size = 9 }) => (
   <div className={`w-${size} h-${size} rounded-xl flex items-center justify-center text-white font-bold flex-shrink-0`}
     style={{ backgroundColor: 'var(--brand-primary)', fontSize: size <= 8 ? 13 : 16 }}>
@@ -84,7 +84,7 @@ const Avatar = ({ user, size = 9 }) => (
   </div>
 );
 
-// ── Reaction Bar ──────────────────────────────────────────────────────────────
+// Reaction Bar
 const ReactionBar = ({ post, onReact }) => {
   const [show, setShow] = useState(false);
   const ref = useRef();
@@ -143,7 +143,7 @@ const ReactionBar = ({ post, onReact }) => {
   );
 };
 
-// ── Reaction Summary ──────────────────────────────────────────────────────────
+// Reaction Summary
 const ReactionSummary = ({ counts }) => {
   const entries = Object.entries(counts).filter(([, n]) => n > 0).sort(([, a], [, b]) => b - a);
   if (!entries.length) return null;
@@ -160,7 +160,7 @@ const ReactionSummary = ({ counts }) => {
   );
 };
 
-// ── Comment section ───────────────────────────────────────────────────────────
+// Comment section
 const CommentSection = ({ post, currentUser, onAddComment, onDeleteComment }) => {
   const [text, setText] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -228,7 +228,7 @@ const CommentSection = ({ post, currentUser, onAddComment, onDeleteComment }) =>
   );
 };
 
-// ── Post Card ─────────────────────────────────────────────────────────────────
+// Post Card
 const PostCard = ({ post, currentUser, onReact, onEdit, onDelete, onBookmark, onAddComment, onDeleteComment }) => {
   const [showComments, setShowComments] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
@@ -415,7 +415,7 @@ const PostCard = ({ post, currentUser, onReact, onEdit, onDelete, onBookmark, on
   );
 };
 
-// ── Create/Edit Post Composer ──────────────────────────────────────────────────
+// Create/Edit Post Composer
 const PostComposer = ({ user, editPost = null, onSubmit, onCancel, uploading, posting }) => {
   const [content, setContent]     = useState(editPost?.content || '');
   const [file, setFile]           = useState(null);
@@ -563,7 +563,7 @@ const PostComposer = ({ user, editPost = null, onSubmit, onCancel, uploading, po
   );
 };
 
-// ── MAIN ──────────────────────────────────────────────────────────────────────
+// MAIN
 const SocialFeed = () => {
   const { user } = useOutletContext();
   const currentUserId = user?._id || user?.id || '';
@@ -588,7 +588,7 @@ const SocialFeed = () => {
     markTypeRead?.('social');
   }, [markTypeRead]);
 
-  // ── Socket ──────────────────────────────────────────────────────────────
+  // Socket
   useEffect(() => {
     const socket = io(API, {
       auth: (cb) => cb({ token: localStorage.getItem('token') }),
@@ -632,7 +632,7 @@ const SocialFeed = () => {
     return () => { socket.disconnect(); };
   }, [currentUserId]);
 
-  // ── Fetch posts ──────────────────────────────────────────────────────────
+  // Fetch posts
   const fetchPosts = useCallback(async (pg = 1, reset = false) => {
     setLoading(true);
     try {
@@ -651,7 +651,7 @@ const SocialFeed = () => {
 
   useEffect(() => { fetchPosts(1, true); }, [filter, search]);
 
-  // ── Infinite scroll ──────────────────────────────────────────────────────
+  // Infinite scroll
   useEffect(() => {
     const obs = new IntersectionObserver(entries => {
       if (entries[0].isIntersecting && pagination?.hasMore && !loading) {
@@ -662,14 +662,14 @@ const SocialFeed = () => {
     return () => obs.disconnect();
   }, [pagination, loading, page, fetchPosts]);
 
-  // ── Search debounce ──────────────────────────────────────────────────────
+  // Search debounce
   const handleSearchInput = e => {
     setSearchInput(e.target.value);
     clearTimeout(searchTimer.current);
     searchTimer.current = setTimeout(() => setSearch(e.target.value), 500);
   };
 
-  // ── Upload helper ────────────────────────────────────────────────────────
+  // Upload helper
   const uploadFile = async (file) => {
     setUploading(true);
     try {
@@ -681,7 +681,7 @@ const SocialFeed = () => {
     } finally { setUploading(false); }
   };
 
-  // ── Create post ──────────────────────────────────────────────────────────
+  // Create post
   const handleCreate = async ({ content, file }) => {
     setPosting(true);
     try {
@@ -695,7 +695,7 @@ const SocialFeed = () => {
     } finally { setPosting(false); }
   };
 
-  // ── Edit post ────────────────────────────────────────────────────────────
+  // Edit post
   const handleEdit = async ({ content, file, existingFileUrl, existingContentType }) => {
     if (!editPost) return;
     setPosting(true);
@@ -710,7 +710,7 @@ const SocialFeed = () => {
     } finally { setPosting(false); }
   };
 
-  // ── Delete post ──────────────────────────────────────────────────────────
+  // Delete post
   const handleDelete = async () => {
     if (!deleteId) return;
     try {
@@ -722,14 +722,14 @@ const SocialFeed = () => {
     }
   };
 
-  // ── React ────────────────────────────────────────────────────────────────
+  // React
   const handleReact = async (postId, emoji) => {
     try {
       await axios.put(`${API}/api/posts/${postId}/react`, { emoji }, { headers: headers() });
     } catch { toast.error('Failed to react'); }
   };
 
-  // ── Bookmark ─────────────────────────────────────────────────────────────
+  // Bookmark
   const handleBookmark = async (postId) => {
     try {
       const r = await axios.put(`${API}/api/posts/${postId}/bookmark`, {}, { headers: headers() });
@@ -737,7 +737,7 @@ const SocialFeed = () => {
     } catch { toast.error('Failed'); }
   };
 
-  // ── Comment ──────────────────────────────────────────────────────────────
+  // Comment
   const handleAddComment = async (postId, content) => {
     try {
       await axios.post(`${API}/api/posts/${postId}/comments`, { content }, { headers: headers() });
@@ -895,3 +895,6 @@ const SocialFeed = () => {
 };
 
 export default SocialFeed;
+
+
+

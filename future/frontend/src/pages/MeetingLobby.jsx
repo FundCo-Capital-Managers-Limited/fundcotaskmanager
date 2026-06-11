@@ -19,7 +19,7 @@ const getFullName = (user) => {
   return `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'Unknown';
 };
 
-// ── Camera preview ────────────────────────────────────────────────────────────
+// Camera preview
 const CameraPreview = ({ videoEnabled, audioEnabled, onToggleVideo, onToggleAudio }) => {
   const videoRef  = useRef(null);
   const streamRef = useRef(null);
@@ -72,7 +72,7 @@ const CameraPreview = ({ videoEnabled, audioEnabled, onToggleVideo, onToggleAudi
   );
 };
 
-// ── Create Room Modal ─────────────────────────────────────────────────────────
+// Create Room Modal
 const CreateRoomModal = ({ onClose, onCreated, users, token }) => {
   const [name,         setName]         = useState('');
   const [description,  setDescription]  = useState('');
@@ -248,7 +248,7 @@ const CreateRoomModal = ({ onClose, onCreated, users, token }) => {
   );
 };
 
-// ── Room Card ─────────────────────────────────────────────────────────────────
+// Room Card
 const RoomCard = ({ room, onJoin, currentUserId }) => {
   const [copied, setCopied] = useState(false);
   const activePeers = room.participants?.filter(p => p.isActive).length || 0;
@@ -326,7 +326,7 @@ const RoomCard = ({ room, onJoin, currentUserId }) => {
   );
 };
 
-// ── Main Lobby ────────────────────────────────────────────────────────────────
+// Main Lobby
 const MeetingLobby = () => {
   const { user } = useOutletContext();
   const navigate  = useNavigate();
@@ -426,7 +426,7 @@ const MeetingLobby = () => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* ── Left panel ── */}
+        {/* Left panel */}
         <div className="space-y-4">
           <CameraPreview
             videoEnabled={videoEnabled}
@@ -487,7 +487,7 @@ const MeetingLobby = () => {
           </div>
         </div>
 
-        {/* ── Right panel — room list ── */}
+        {/* Right panel room list */}
         <div className="lg:col-span-2 space-y-4">
           {/* Tabs */}
           <div className="flex items-center gap-1 p-1 rounded-xl w-fit"

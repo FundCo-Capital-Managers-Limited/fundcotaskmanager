@@ -1,4 +1,4 @@
-// models/taskModel.js — UPDATED: added assignedBy and adminComments fields
+// models/taskModel.js UPDATED: added assignedBy and adminComments fields
 import mongoose from 'mongoose';
 
 const taskSchema = new mongoose.Schema({
@@ -77,7 +77,7 @@ const taskSchema = new mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId,
         ref: 'File',
     }],
-    // NEW: admin comments on tasks — visible to both admin and user
+    // NEW: admin comments on tasks visible to both admin and user
     adminComments: [{
         user: { type: mongoose.Schema.Types.ObjectId, ref: 'user', required: true },
         content: { type: String, required: true, trim: true, maxlength: 1000 },
@@ -87,3 +87,6 @@ const taskSchema = new mongoose.Schema({
 
 const Task = mongoose.models.Task || mongoose.model('Task', taskSchema);
 export default Task;
+
+
+

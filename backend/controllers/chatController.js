@@ -153,7 +153,7 @@ export const createGroup = async (req, res) => {
         }
         const uniqueMembers = uniqueMemberStrings.map(id => new mongoose.Types.ObjectId(id));
 
-        // Exclude the creator from member validation — they may or may not be in the list
+        // Exclude the creator from member validation they may or may not be in the list
         const nonCreatorIds = uniqueMemberStrings.filter(id => id !== req.user._id.toString());
         const nonCreatorObjectIds = nonCreatorIds.map(id => new mongoose.Types.ObjectId(id));
 
@@ -168,7 +168,7 @@ export const createGroup = async (req, res) => {
             return res.status(400).json({ success: false, message: `Members not found: ${missingIds.join(', ')}` });
         }
 
-        // Build allMembers using string dedup then convert — ObjectId Set dedup is unreliable
+        // Build allMembers using string dedup then convert ObjectId Set dedup is unreliable
         const allMemberStrings = [...new Set([...uniqueMemberStrings, req.user._id.toString()])];
         const allMembers = allMemberStrings.map(id => new mongoose.Types.ObjectId(id));
         const unreadMap = new Map();
@@ -246,7 +246,7 @@ export const addGroupMembers = async (req, res) => {
     }
 };
 
-// getChatMessages — parallel access-check + fetch + count
+// getChatMessages parallel access-check + fetch + count
 export const getChatMessages = async (req, res) => {
     const { chatId } = req.params;
     const { limit = 20, page = 1 } = req.query;
@@ -467,14 +467,14 @@ export const sendMessage = async (req, res) => {
     }
 };
 
-// Mark chat as read — resets unread count for the calling user
+// Mark chat as read resets unread count for the calling user
 export const markChatRead = async (req, res) => {
     const { chatId } = req.params;
     if (!mongoose.isValidObjectId(chatId)) {
         return res.status(400).json({ success: false, message: 'Invalid chat ID' });
     }
     try {
-        // Atomic update — no need to load the whole document
+        // Atomic update no need to load the whole document
         const result = await Chat.findOneAndUpdate(
             { _id: chatId, members: req.user._id },
             { $set: { [`unreadCounts.${req.user._id.toString()}`]: 0 } },
@@ -527,7 +527,7 @@ export const editMessage = async (req, res) => {
     }
 };
 
-// Delete message — WhatsApp-style dual mode
+// Delete message WhatsApp-style dual mode
 // deleteScope: 'everyone' (default, sender only) | 'me' (any participant, hides for caller only)
 export const deleteMessage = async (req, res) => {
     const { messageId } = req.params;
@@ -545,17 +545,17 @@ export const deleteMessage = async (req, res) => {
         if (!chat) return res.status(403).json({ success: false, message: 'Access denied' });
 
         if (deleteScope === 'me') {
-            // ── Delete for me: add caller to deletedFor array ──────────────────
+            // Delete for me: add caller to deletedFor array
             // Any participant can do this, any time, for any message
             if (!message.deletedFor.some((id) => id.toString() === req.user._id.toString())) {
                 message.deletedFor.push(req.user._id);
                 await message.save();
             }
-            // This is a client-side only change — no broadcast needed
+            // This is a client-side only change no broadcast needed
             return res.json({ success: true, messageId, deleteScope: 'me' });
         }
 
-        // ── Delete for everyone ────────────────────────────────────────────────
+        // Delete for everyone
         // Only the sender can delete for everyone
         if (message.sender.toString() !== req.user._id.toString()) {
             return res.status(403).json({ success: false, message: 'Only the sender can delete for everyone' });
@@ -675,7 +675,7 @@ export const uploadChatFile = async (req, res) => {
     }
 };
 
-// Fetch chat timestamps — single aggregate, no sub-queries
+// Fetch chat timestamps single aggregate, no sub-queries
 export const getChatTimestamps = async (req, res) => {
     try {
         // Get all chats in one query, then aggregate messages in one pipeline
@@ -692,7 +692,7 @@ export const getChatTimestamps = async (req, res) => {
         const timestamps = {};
 
         // Only record timestamps for chats that have actual messages.
-        // No updatedAt fallback — that causes empty chats to show fake recent times.
+        // No updatedAt fallback that causes empty chats to show fake recent times.
         lastMsgAgg.forEach((m) => { timestamps[m._id.toString()] = m.createdAt.toISOString(); });
 
         res.json({ success: true, timestamps });
@@ -843,16 +843,16 @@ export const getUserChatMap = async (req, res) => {
     }
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
-// GET /api/chats/init  —  Single endpoint that replaces 5+ separate calls.
+
+// GET /api/chats/init Single endpoint that replaces 5+ separate calls.
 // Returns: users, groups (with unread), individual chat map, last messages
-// per chat, timestamps, and unread counts — all in one round trip.
-// ─────────────────────────────────────────────────────────────────────────────
+// per chat, timestamps, and unread counts all in one round trip.
+
 export const getInitialData = async (req, res) => {
     try {
         const userId = req.user._id;
 
-        // ── 1. Parallel: all users + all chats the caller belongs to ──────────
+        // 1. Parallel: all users + all chats the caller belongs to
         const [allUsers, allChats] = await Promise.all([
             User.find({ _id: { $ne: userId } })
                 .select('firstName lastName otherName avatar online lastActive')
@@ -866,7 +866,7 @@ export const getInitialData = async (req, res) => {
 
         const chatIds = allChats.map((c) => c._id);
 
-        // ── 2. One aggregate: last message per chat (content + sender) ────────
+        // 2. One aggregate: last message per chat (content + sender)
         const lastMessageDocs = await Message.aggregate([
             { $match: { chatId: { $in: chatIds } } },
             { $sort: { createdAt: -1 } },
@@ -897,7 +897,7 @@ export const getInitialData = async (req, res) => {
             { $project: { senderArr: 0 } },
         ]);
 
-        // ── 3. Build response maps ─────────────────────────────────────────────
+        // 3. Build response maps
         const lastMsgMap = {};     // chatId -> last message object
         const timestampMap = {};   // chatId -> ISO string
 
@@ -924,7 +924,7 @@ export const getInitialData = async (req, res) => {
         // lastMessage presence, and we mirror that here for consistency.
         // (Groups/chats with no messages will sort alphabetically on the frontend.)
 
-        // ── 4. Split chats into groups vs individual, build chat map ──────────
+        // 4. Split chats into groups vs individual, build chat map
         const groups = [];
         const userChatMap = {};   // otherId -> chatId (for individual chats)
         const unreadCounts = {};  // chatId -> count
@@ -939,7 +939,7 @@ export const getInitialData = async (req, res) => {
             if (chat.type === 'group') {
                 groups.push({ ...chat, myUnreadCount: myUnread });
             } else {
-                // individual — find the other member
+                // individual find the other member
                 const other = chat.members.find(
                     (m) => m._id.toString() !== userId.toString()
                 );
@@ -962,7 +962,7 @@ export const getInitialData = async (req, res) => {
     }
 };
 
-// ── Pin message ───────────────────────────────────────────────────────────────
+// Pin message
 // Any member can pin. Max 3 pinned messages per chat (oldest replaced).
 export const pinMessage = async (req, res) => {
     const { messageId } = req.params;
@@ -979,7 +979,7 @@ export const pinMessage = async (req, res) => {
         const already = chat.pinnedMessages.some((id) => id.toString() === messageId);
         if (already) return res.json({ success: true, pinnedMessages: chat.pinnedMessages });
 
-        // Keep max 3 — remove oldest if full
+        // Keep max 3 remove oldest if full
         if (chat.pinnedMessages.length >= 3) chat.pinnedMessages.shift();
         chat.pinnedMessages.push(messageId);
         await chat.save();
@@ -992,7 +992,7 @@ export const pinMessage = async (req, res) => {
     }
 };
 
-// ── Unpin message ─────────────────────────────────────────────────────────────
+// Unpin message
 export const unpinMessage = async (req, res) => {
     const { messageId } = req.params;
     if (!mongoose.isValidObjectId(messageId)) {
@@ -1016,7 +1016,7 @@ export const unpinMessage = async (req, res) => {
     }
 };
 
-// ── Get pinned messages (full objects) ────────────────────────────────────────
+// Get pinned messages (full objects)
 export const getPinnedMessages = async (req, res) => {
     const { chatId } = req.params;
     if (!mongoose.isValidObjectId(chatId)) {
@@ -1039,7 +1039,7 @@ export const getPinnedMessages = async (req, res) => {
     }
 };
 
-// ── Forward message ───────────────────────────────────────────────────────────
+// Forward message
 // Copies message content into one or more target chats, tagging it as forwarded.
 export const forwardMessage = async (req, res) => {
     const { messageId } = req.params;
@@ -1153,3 +1153,6 @@ export default {
     getPinnedMessages,
     forwardMessage
 };
+
+
+

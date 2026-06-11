@@ -68,7 +68,7 @@ const getGenerationLabel = (entry) => {
   return 'Draft';
 };
 
-// ── Themes ───────────────────────────────────────────────────────────────────
+// Themes
 const THEMES = {
   consulting: { label: 'Consulting', bg: 'f7f8fa', accent: '12355b', text: '102033', subtext: '5b6b7d', titleText: 'ffffff', sectionBg: 'e7edf4', preview: ['#f7f8fa', '#12355b'] },
   professional: { label: 'Professional', bg: '1e293b', accent: '312783', text: 'f8fafc', subtext: '94a3b8', titleText: 'ffffff', sectionBg: '0f172a', preview: ['#1e293b', '#312783'] },
@@ -131,7 +131,7 @@ const getChartData = (slide) => {
   return null;
 };
 
-// ── SlidePreview ─────────────────────────────────────────────────────────────
+// SlidePreview
 const SlidePreview = ({ slide, theme, scale = 1, isActive = false, onClick }) => {
   const t = THEMES[theme] || THEMES.consulting;
   const W = 640, H = 360;
@@ -291,7 +291,7 @@ const SlidePreview = ({ slide, theme, scale = 1, isActive = false, onClick }) =>
   );
 };
 
-// ── PPTX Export ───────────────────────────────────────────────────────────────
+// PPTX Export
 // Slide canvas: 13.333 x 7.5 in (16:9 wide). All measurements in inches.
 const SLIDE_W = 13.333;
 const SLIDE_H = 7.5;
@@ -775,7 +775,7 @@ const exportToPPTX = async (pptJson, theme) => {
   await pptx.writeFile({ fileName: `${(pptJson.title || 'Presentation').replace(/[^a-z0-9]/gi, '_')}.pptx` });
 };
 
-// ── Slide Editor Panel ────────────────────────────────────────────────────────
+// Slide Editor Panel
 const SlideEditor = ({ slide, onUpdate, onRegenerate, onDelete, onAddSlide, isRegenerating }) => {
   const [local, setLocal] = useState(slide);
   const [regenPrompt, setRegenPrompt] = useState('');
@@ -884,7 +884,7 @@ const SlideEditor = ({ slide, onUpdate, onRegenerate, onDelete, onAddSlide, isRe
   );
 };
 
-// ── MAIN COMPONENT ────────────────────────────────────────────────────────────
+// MAIN COMPONENT
 const DeckPrep = () => {
   const outlet = useOutletContext();
   const { user = null } = outlet || {};
@@ -958,7 +958,7 @@ const DeckPrep = () => {
     }
   }, []);
 
-  // ── NEW: Delete a document from history (called on hover button click) ─────
+  // NEW: Delete a document from history (called on hover button click)
   const handleDelete = useCallback(async (documentId) => {
     if (!window.confirm('Are you sure you want to permanently delete this presentation and all its data? This action cannot be undone.')) {
       return;
@@ -1341,7 +1341,7 @@ const DeckPrep = () => {
     </div>
   ) : null;
 
-  // ── HOME ──────────────────────────────────────────────────────────────────
+  // HOME
   if (mode === 'home') return (
     <div className="space-y-8 py-4">
       <Toaster position="top-right" />
@@ -1434,7 +1434,7 @@ const DeckPrep = () => {
     </div>
   );
 
-  // ── QUICK CONVERT ─────────────────────────────────────────────────────────
+  // QUICK CONVERT
   if (mode === 'quick') return (
     <div className="space-y-6 py-4 max-w-2xl mx-auto">
       <Toaster position="top-right" />
@@ -1522,7 +1522,7 @@ const DeckPrep = () => {
     </div>
   );
 
-  // ── PDF READER (UPLOAD) ───────────────────────────────────────────────────
+  // PDF READER (UPLOAD)
   if (mode === 'reader-upload') return (
     <div className="space-y-6 py-4 max-w-2xl mx-auto">
       <Toaster position="top-right" />
@@ -1573,7 +1573,7 @@ const DeckPrep = () => {
     </div>
   );
 
-  // ── PDF READER (STRUCTURED VIEW) ──────────────────────────────────────────
+  // PDF READER (STRUCTURED VIEW)
   if (mode === 'reader') {
     const wordCount = (fullText || '').split(/\s+/).filter(Boolean).length;
     const charCount = (fullText || '').length;
@@ -1672,7 +1672,7 @@ const DeckPrep = () => {
     );
   }
 
-  // ── GUIDED MODE ───────────────────────────────────────────────────────────
+  // GUIDED MODE
   if (mode === 'guided') {
     const steps = [{ n: 1, label: 'Upload' }, { n: 2, label: 'Extract' }, { n: 3, label: 'Review' }, { n: 4, label: 'Structure' }, { n: 5, label: 'Edit' }, { n: 6, label: 'Generate' }];
     return (
@@ -1742,7 +1742,7 @@ const DeckPrep = () => {
               </div>
               <textarea value={fullText} onChange={e => setFullText(e.target.value)} rows={14}
                 className="w-full rounded-xl border px-4 py-3 text-sm focus:outline-none resize-y"
-                style={{ ...inp, fontFamily: 'Georgia, \"Source Serif Pro\", serif', lineHeight: 1.7 }} onFocus={inpFocus} onBlur={inpBlur} />
+                style={{ ...inp, fontFamily: 'Georgia, "Source Serif Pro", serif', lineHeight: 1.7 }} onFocus={inpFocus} onBlur={inpBlur} />
               <button onClick={() => setStep(4)} className="w-full py-3 rounded-xl font-bold text-white flex items-center justify-center gap-2 hover:opacity-90" style={{ backgroundColor: 'var(--brand-primary)' }}>
                 Continue <ArrowRight className="w-4 h-4" />
               </button>
@@ -1803,7 +1803,7 @@ const DeckPrep = () => {
     );
   }
 
-  // ── EDITOR ────────────────────────────────────────────────────────────────
+  // EDITOR
   if (mode === 'editor' && pptJson) {
     const slide = pptJson.slides[activeSlide];
     const SlideIcon = slideIcons[slide?.type] || AlignLeft;
@@ -1958,7 +1958,7 @@ const DeckPrep = () => {
     );
   }
 
-  // ── HISTORY ───────────────────────────────────────────────────────────────
+  // HISTORY
   if (mode === 'history') return (
     <div className="space-y-6 py-4">
       <Toaster position="top-right" />
@@ -2019,5 +2019,8 @@ const DeckPrep = () => {
 };
 
 export default DeckPrep;
+
+
+
 
 

@@ -22,3 +22,6 @@ router.delete('/:id', superAdminOnly, deleteUser);
 router.delete('/:id/purge', superAdminOnly, purgeUser);
 
 export default router;
+
+
+

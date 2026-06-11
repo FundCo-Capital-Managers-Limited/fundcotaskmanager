@@ -12,7 +12,7 @@ const TOTAL_STORAGE  = 2   * 1024 * 1024 * 1024; // 2 GB per user
 const FILE_GATEWAY_BASE = String(process.env.FILE_GATEWAY_URL || 'https://gateway.pinata.cloud/ipfs').trim().replace(/\/+$/, '');
 const createShareTokenHash = (value) => crypto.createHash('sha256').update(String(value)).digest('hex');
 
-// ── Storage guard ─────────────────────────────────────────────────────────────
+// Storage guard
 const checkStorage = async (userId, addBytes) => {
   const agg = await File.aggregate([
     { $match: { owner: new mongoose.Types.ObjectId(userId), deleted: false } },
@@ -25,7 +25,7 @@ const checkStorage = async (userId, addBytes) => {
   return used;
 };
 
-// ── Upload files ──────────────────────────────────────────────────────────────
+// Upload files
 export const uploadFiles = async (req, res) => {
   try {
     if (!req.files?.length) return res.status(400).json({ success: false, message: 'No files provided' });
@@ -91,7 +91,7 @@ export const uploadFiles = async (req, res) => {
   }
 };
 
-// ── Get files ─────────────────────────────────────────────────────────────────
+// Get files
 export const getFiles = async (req, res) => {
   try {
     const { page = 1, limit = 30, search, type, folderId, trashed, starred, taskId, tags, sort = 'createdAt' } = req.query;
@@ -135,7 +135,7 @@ export const getFiles = async (req, res) => {
   }
 };
 
-// ── Soft delete ───────────────────────────────────────────────────────────────
+// Soft delete
 export const deleteFile = async (req, res) => {
   try {
     const file = await File.findOneAndUpdate(
@@ -148,7 +148,7 @@ export const deleteFile = async (req, res) => {
   } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 };
 
-// ── Permanent delete ──────────────────────────────────────────────────────────
+// Permanent delete
 export const permanentDeleteFile = async (req, res) => {
   try {
     const file = await File.findOneAndDelete({ _id: req.params.id, owner: req.user._id });
@@ -158,7 +158,7 @@ export const permanentDeleteFile = async (req, res) => {
   } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 };
 
-// ── Restore ───────────────────────────────────────────────────────────────────
+// Restore
 export const restoreFile = async (req, res) => {
   try {
     const file = await File.findOneAndUpdate(
@@ -171,7 +171,7 @@ export const restoreFile = async (req, res) => {
   } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 };
 
-// ── Clear trash ───────────────────────────────────────────────────────────────
+// Clear trash
 export const clearTrash = async (req, res) => {
   try {
     const trashed = await File.find({ owner: req.user._id, deleted: true });
@@ -183,7 +183,7 @@ export const clearTrash = async (req, res) => {
   } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 };
 
-// ── Star / unstar ─────────────────────────────────────────────────────────────
+// Star / unstar
 export const toggleStar = async (req, res) => {
   try {
     const file = await File.findOne({ _id: req.params.id, owner: req.user._id });
@@ -194,7 +194,7 @@ export const toggleStar = async (req, res) => {
   } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 };
 
-// ── Rename ────────────────────────────────────────────────────────────────────
+// Rename
 export const renameFile = async (req, res) => {
   try {
     const { fileName } = req.body;
@@ -209,7 +209,7 @@ export const renameFile = async (req, res) => {
   } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 };
 
-// ── Move files to folder ──────────────────────────────────────────────────────
+// Move files to folder
 export const moveFiles = async (req, res) => {
   try {
     const { fileIds, folderId } = req.body;
@@ -225,7 +225,7 @@ export const moveFiles = async (req, res) => {
   } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 };
 
-// ── Share file ────────────────────────────────────────────────────────────────
+// Share file
 export const shareFile = async (req, res) => {
   try {
     const requestedDays = Number(req.body?.expiresInDays || 7);
@@ -268,7 +268,7 @@ export const getSharedFile = async (req, res) => {
   }
 };
 
-// ── Update tags ───────────────────────────────────────────────────────────────
+// Update tags
 export const updateTags = async (req, res) => {
   try {
     const { tags } = req.body; // full replacement array
@@ -284,7 +284,7 @@ export const updateTags = async (req, res) => {
   } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 };
 
-// ── Associate task ────────────────────────────────────────────────────────────
+// Associate task
 export const associateTask = async (req, res) => {
   try {
     const { taskId } = req.body;
@@ -310,7 +310,7 @@ export const associateTask = async (req, res) => {
   } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 };
 
-// ── Storage usage ─────────────────────────────────────────────────────────────
+// Storage usage
 export const getStorageUsage = async (req, res) => {
   try {
     const agg = await File.aggregate([
@@ -322,3 +322,6 @@ export const getStorageUsage = async (req, res) => {
     res.json({ success: true, used, total: TOTAL_STORAGE, count });
   } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 };
+
+
+

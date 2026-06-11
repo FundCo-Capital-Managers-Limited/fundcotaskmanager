@@ -18,7 +18,7 @@ import { useNotifications } from '../context/NotificationContext.jsx';
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:4001';
 const SOCKET_URL = API_BASE_URL;
 const TZ = 'Africa/Lagos';
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// Helpers
 const getFullName = (user) => {
     if (!user) return 'Unknown';
     if (user.fullName) return user.fullName.trim();
@@ -144,7 +144,7 @@ const renderMentionContent = (message, sender) => {
     );
 };
 
-// ─── Avatar ───────────────────────────────────────────────────────────────────
+// Avatar
 const Avatar = ({ user, size = 10, showOnline = false }) => {
     const sz = `w-${size} h-${size}`;
     return (
@@ -166,7 +166,7 @@ const Avatar = ({ user, size = 10, showOnline = false }) => {
         </div>
     );
 };
-// ─── Date separator ───────────────────────────────────────────────────────────
+// Date separator
 const DateSeparator = ({ date }) => (
     <div className="flex items-center gap-3 my-4">
         <div className="flex-1 h-px" style={{ backgroundColor: 'var(--border-color)' }} />
@@ -179,7 +179,7 @@ const DateSeparator = ({ date }) => (
         <div className="flex-1 h-px" style={{ backgroundColor: 'var(--border-color)' }} />
     </div>
 );
-// ─── Typing bubble ────────────────────────────────────────────────────────────
+// Typing bubble
 const TypingBubble = ({ name }) => (
     <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
         className="flex items-end gap-2 my-1">
@@ -197,7 +197,7 @@ const TypingBubble = ({ name }) => (
         <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{name}</span>
     </motion.div>
 );
-// ─── WhatsApp-style Message Context Menu ─────────────────────────────────────
+// WhatsApp-style Message Context Menu
 const MessageContextMenu = ({ msg, isSender, isPinned, position, onClose, onReply, onForward, onPin, onEdit, onCopy, onDeleteForMe, onDeleteForEveryone }) => {
     const menuRef = useRef(null);
     useEffect(() => {
@@ -263,7 +263,7 @@ const MessageContextMenu = ({ msg, isSender, isPinned, position, onClose, onRepl
         </motion.div>
     );
 };
-// ─── Delete confirmation modal ────────────────────────────────────────────────
+// Delete confirmation modal
 const DeleteConfirmModal = ({ msg, isSender, onDeleteForMe, onDeleteForEveryone, onCancel }) => (
     <motion.div
         initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
@@ -316,7 +316,7 @@ const DeleteConfirmModal = ({ msg, isSender, onDeleteForMe, onDeleteForEveryone,
         </motion.div>
     </motion.div>
 );
-// ─── Forward Message Modal ─────────────────────────────────────────────────────
+// Forward Message Modal
 const ForwardModal = ({ msg, allUsers, groups, userChatMap, currentUserId, onForward, onClose }) => {
     const [selected, setSelected] = useState([]);
     const [search, setSearch] = useState('');
@@ -422,7 +422,7 @@ const ForwardModal = ({ msg, allUsers, groups, userChatMap, currentUserId, onFor
         </motion.div>
     );
 };
-// ─── Group Modal ──────────────────────────────────────────────────────────────
+// Group Modal
 const GroupModal = ({ isAddMode, selectedChat, users, onClose, onCreateGroup, onAddMembers }) => {
     const [groupName, setGroupName] = useState('');
     const [selectedUsers, setSelectedUsers] = useState([]);
@@ -586,9 +586,9 @@ const GroupModal = ({ isAddMode, selectedChat, users, onClose, onCreateGroup, on
         </motion.div>
     );
 };
-// ═══════════════════════════════════════════════════════════════════════════════
+
 // MAIN COMPONENT
-// ═══════════════════════════════════════════════════════════════════════════════
+
 const TeamChat = () => {
     const { user, onLogout } = useOutletContext();
     const navigate = useNavigate();
@@ -743,7 +743,7 @@ const TeamChat = () => {
             highlightTimerRef.current = setTimeout(() => setHighlightedMsgId(null), 1500);
         }
     }, []);
-    // ─── Socket ───────────────────────────────────────────────────────────────
+    // Socket
     useEffect(() => {
         if (!user) return;
         socket.current = io(SOCKET_URL, {
@@ -2327,3 +2327,6 @@ const TeamChat = () => {
     );
 };
 export default TeamChat;
+
+
+

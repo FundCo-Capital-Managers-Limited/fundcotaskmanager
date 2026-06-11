@@ -1,7 +1,7 @@
 import { LearningCourse, UserProgress } from '../models/learningMaterialModel.js';
 import { buildTeamQuery } from '../middleware/teamFilter.js';
 
-// ── Get all courses ───────────────────────────────────────────────────────────
+// Get all courses
 export const getCourses = async (req, res) => {
   try {
     const courses = await LearningCourse.find({})
@@ -13,7 +13,7 @@ export const getCourses = async (req, res) => {
   }
 };
 
-// ── Get course by ID ──────────────────────────────────────────────────────────
+// Get course by ID
 export const getCourseById = async (req, res) => {
   try {
     const course = await LearningCourse.findById(req.params.id).lean();
@@ -24,7 +24,7 @@ export const getCourseById = async (req, res) => {
   }
 };
 
-// ── Create course (Super Admin) ───────────────────────────────────────────────
+// Create course (Super Admin)
 export const createCourse = async (req, res) => {
   try {
     const { title, description, level, assetco, modules, exam, required, tags, passingScore } = req.body;
@@ -45,7 +45,7 @@ export const createCourse = async (req, res) => {
   }
 };
 
-// ── Update course (Super Admin) ───────────────────────────────────────────────
+// Update course (Super Admin)
 export const updateCourse = async (req, res) => {
   try {
     const updated = await LearningCourse.findByIdAndUpdate(req.params.id, {
@@ -58,7 +58,7 @@ export const updateCourse = async (req, res) => {
   }
 };
 
-// ── Delete course (Super Admin) ───────────────────────────────────────────────
+// Delete course (Super Admin)
 export const deleteCourse = async (req, res) => {
   try {
     await LearningCourse.findByIdAndDelete(req.params.id);
@@ -69,7 +69,7 @@ export const deleteCourse = async (req, res) => {
   }
 };
 
-// ── Get all progress (team-filtered) ──────────────────────────────────────────
+// Get all progress (team-filtered)
 export const getAllProgress = async (req, res) => {
   try {
     const query = buildTeamQuery(req.teamMemberIds, 'userId');
@@ -83,7 +83,7 @@ export const getAllProgress = async (req, res) => {
   }
 };
 
-// ── Training stats ────────────────────────────────────────────────────────────
+// Training stats
 export const getTrainingStats = async (req, res) => {
   try {
     const query = buildTeamQuery(req.teamMemberIds, 'userId');
@@ -106,7 +106,7 @@ export const getTrainingStats = async (req, res) => {
   }
 };
 
-// ── Enroll user in course ─────────────────────────────────────────────────────
+// Enroll user in course
 export const enrollUser = async (req, res) => {
   const { userId, courseId } = req.body;
   if (!userId || !courseId) return res.status(400).json({ success: false, message: 'userId and courseId required' });
@@ -122,3 +122,6 @@ export const enrollUser = async (req, res) => {
     res.status(500).json({ success: false, message: 'Failed to enroll user' });
   }
 };
+
+
+

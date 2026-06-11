@@ -3,7 +3,7 @@ import bcrypt from 'bcryptjs';
 import validator from 'validator';
 import { buildTeamQuery } from '../middleware/teamFilter.js';
 
-// ── Get all users (team-filtered) ─────────────────────────────────────────────
+// Get all users (team-filtered)
 export const getAllUsers = async (req, res) => {
   try {
     const query = req.teamMemberIds ? { _id: { $in: req.teamMemberIds } } : {};
@@ -32,7 +32,7 @@ export const getAllUsers = async (req, res) => {
   }
 };
 
-// ── Get user by ID ────────────────────────────────────────────────────────────
+// Get user by ID
 export const getUserById = async (req, res) => {
   try {
     const user = await User.findById(req.params.id).select('-password').lean();
@@ -43,7 +43,7 @@ export const getUserById = async (req, res) => {
   }
 };
 
-// ── Create user (Super Admin only) ────────────────────────────────────────────
+// Create user (Super Admin only)
 export const createUser = async (req, res) => {
   const { firstName, lastName, otherName, position, unitSector, email, password, role } = req.body;
   if (!firstName || !lastName || !email || !password) {
@@ -80,7 +80,7 @@ export const createUser = async (req, res) => {
   }
 };
 
-// ── Update user (Super Admin only) ────────────────────────────────────────────
+// Update user (Super Admin only)
 export const updateUser = async (req, res) => {
   const { firstName, lastName, otherName, position, unitSector, email, role, isActive } = req.body;
   try {
@@ -110,7 +110,7 @@ export const updateUser = async (req, res) => {
   }
 };
 
-// ── Reset password (Super Admin only) ─────────────────────────────────────────
+// Reset password (Super Admin only)
 export const resetUserPassword = async (req, res) => {
   const { newPassword } = req.body;
   if (!newPassword || newPassword.length < 8) {
@@ -128,7 +128,7 @@ export const resetUserPassword = async (req, res) => {
   }
 };
 
-// ── Delete user (Super Admin only) ────────────────────────────────────────────
+// Delete user (Super Admin only)
 export const deleteUser = async (req, res) => {
   try {
     const user = await User.findById(req.params.id);
@@ -146,7 +146,7 @@ export const deleteUser = async (req, res) => {
   }
 };
 
-// ── Get user activity logs ────────────────────────────────────────────────────
+// Get user activity logs
 export const getUserActivityLogs = async (req, res) => {
   try {
     const user = await User.findById(req.params.id).select('activityLogs firstName lastName').lean();
@@ -156,3 +156,6 @@ export const getUserActivityLogs = async (req, res) => {
     res.status(500).json({ success: false, message: 'Failed to fetch activity logs' });
   }
 };
+
+
+

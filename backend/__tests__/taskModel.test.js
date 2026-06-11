@@ -1,53 +1,38 @@
-import { jest } from '@jest/globals';
-import mongoose from 'mongoose';
-import Task from '../models/taskModel.js';
+const mongoose = require('mongoose');
+const Task = require('../models/taskModel.js').default;
 
-describe('Task Model', () => {
-    beforeAll(async () => {
-        await mongoose.connect('mongodb://localhost/test', { useNewUrlParser: true, useUnifiedTopology: true });
+describe('task model', () => {
+  it('accepts the current minimum valid task payload', () => {
+    const task = new Task({
+      title: 'Inspect inverter output',
+      owner: new mongoose.Types.ObjectId(),
     });
 
-    afterAll(async () => {
-        await mongoose.connection.close();
+    const validationError = task.validateSync();
+
+    expect(validationError).toBeUndefined();
+    expect(task.priority).toBe('Low');
+    expect(task.submissionStatus).toBe('not_submitted');
+    expect(task.appealStatus).toBe('not_appealed');
+  });
+
+  it('requires both title and owner', () => {
+    const task = new Task({});
+    const validationError = task.validateSync();
+
+    expect(validationError.errors.title).toBeDefined();
+    expect(validationError.errors.owner).toBeDefined();
+  });
+
+  it('enforces the current priority enum', () => {
+    const task = new Task({
+      title: 'Inspect inverter output',
+      owner: new mongoose.Types.ObjectId(),
+      priority: 'Urgent',
     });
 
-    afterEach(async () => {
-        await Task.deleteMany({});
-    });
+    const validationError = task.validateSync();
 
-    it('should create a task with valid data', async () => {
-        const taskData = {
-            title: 'Test Task',
-            description: 'Test Description',
-            userId: 'user123',
-            status: 'pending',
-        };
-
-        const task = new Task(taskData);
-        const savedTask = await task.save();
-
-        expect(savedTask._id).toBeDefined();
-        expect(savedTask.title).toBe(taskData.title);
-        expect(savedTask.description).toBe(taskData.description);
-        expect(savedTask.userId).toBe(taskData.userId);
-        expect(savedTask.status).toBe(taskData.status);
-    });
-
-    it('should not create a task without required fields', async () => {
-        const task = new Task({});
-
-        await expect(task.save()).rejects.toThrow();
-    });
-
-    it('should enforce status enum', async () => {
-        const taskData = {
-            title: 'Test Task',
-            userId: 'user123',
-            status: 'invalid',
-        };
-
-        const task = new Task(taskData);
-
-        await expect(task.save()).rejects.toThrow();
-    });
+    expect(validationError.errors.priority).toBeDefined();
+  });
 });

@@ -25,7 +25,7 @@ const messageSchema = new mongoose.Schema(
         },
         isDeleted:  { type: Boolean, default: false },
         isEdited:   { type: Boolean, default: false },
-        // Per-user soft delete — message stays in DB, hidden only for this user
+        // Per-user soft delete message stays in DB, hidden only for this user
         deletedFor: [{ type: mongoose.Schema.Types.ObjectId, ref: 'user' }],
         // Reply-to: stores a snapshot so the preview is always available even if original is deleted
         replyTo: {

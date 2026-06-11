@@ -22,7 +22,7 @@ router.post('/:chatId/messages', authMiddleware, chatController.sendMessage);
 router.get('/:chatId/pinned', authMiddleware, chatController.getPinnedMessages);
 
 router.put('/messages/:messageId', authMiddleware, chatController.editMessage);
-// DELETE with body for deleteScope — use POST alias for "delete for me"
+// DELETE with body for deleteScope use POST alias for delete for me
 router.delete('/messages/:messageId', authMiddleware, chatController.deleteMessage);
 router.post('/messages/:messageId/delete', authMiddleware, chatController.deleteMessage);
 
@@ -40,3 +40,6 @@ router.get('/timestamps', authMiddleware, chatController.getChatTimestamps);
 router.get('/unread-total', authMiddleware, chatController.getUnreadTotal);
 
 export default router;
+
+
+

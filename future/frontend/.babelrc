@@ -16,6 +16,7 @@
         ]
     ],
     "plugins": [
-        "babel-plugin-transform-import-meta"
+        "babel-plugin-transform-import-meta",
+        "./babel-plugin-transform-import-meta-env.cjs"
     ]
 }

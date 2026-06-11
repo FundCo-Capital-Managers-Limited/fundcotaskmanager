@@ -1,12 +1,39 @@
-# React + Vite
+# FundCo AI User Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+This package is the current Version 1 user-facing workspace for FundCo AI. It covers the day-to-day operating surface used by standard users: tasks, goals, meetings, reminders, team chat, learning, reports, projects, AI tools, performance views, and file access.
 
-Currently, two official plugins are available:
+## Technology
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- React
+- Vite
+- Axios for API transport
+- Socket.IO client for real-time channels
+- Jest and Testing Library for component and session-path tests
 
-## Expanding the ESLint configuration
+## Local development
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+```bash
+npm install
+npm run dev
+```
+
+The frontend expects the user backend to be running. If `VITE_API_URL` is not set, the client falls back to `http://localhost:4001`.
+
+## Build, lint, and test
+
+```bash
+npm run lint
+npm test -- --runInBand
+npm run build
+```
+
+## Responsibilities
+
+This frontend owns:
+
+- user authentication state and refresh handling
+- task, goal, and reminder interaction flows
+- team chat, meeting, social, and project surfaces
+- AI tool orchestration from the user side
+- report drafting and submission
+- learning and performance views

@@ -47,7 +47,7 @@ const normalizeExamQuestion = (question, index = 0) => ({
   explanation: normalizeTrainingText(question?.explanation),
 });
 
-// ─── content renderer ─────────────────────────────────────────────────────────
+// content renderer
 function renderContent(raw) {
   const text = (raw != null ? String(raw) : '').trim();
   if (!text) return <p className="text-sm italic" style={{ color: 'var(--text-muted)' }}>No content available for this module.</p>;
@@ -68,7 +68,7 @@ function renderContent(raw) {
   });
 }
 
-// ─── AI Mentor Panel ──────────────────────────────────────────────────────────
+// AI Mentor Panel
 function AIMentorPanel({ courseId = null, moduleId = null }) {
   const [open,    setOpen]    = useState(false);
   const [msgs,    setMsgs]    = useState([]);
@@ -197,7 +197,7 @@ function AIMentorPanel({ courseId = null, moduleId = null }) {
   );
 }
 
-// ─── Certificate Modal ────────────────────────────────────────────────────────
+// Certificate Modal
 function CertModal({ course, user, onClose }) {
   const date = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
   const name = user?.fullName || user?.name || 'Staff Member';
@@ -240,7 +240,7 @@ function CertModal({ course, user, onClose }) {
   );
 }
 
-// ─── Quiz Component ───────────────────────────────────────────────────────────
+// Quiz Component
 function QuizComponent({ quiz, moduleTitle, previousScore, onComplete }) {
   const [phase,  setPhase]  = useState('intro');
   const [cur,    setCur]    = useState(0);
@@ -397,7 +397,7 @@ function QuizComponent({ quiz, moduleTitle, previousScore, onComplete }) {
   );
 }
 
-// ─── Course Card ──────────────────────────────────────────────────────────────
+// Course Card
 function CourseCard({ course, prog, onSelect, i }) {
   const p        = prog?.progress || 0;
   const lm       = LVL[course.level] || LVL.beginner;
@@ -461,7 +461,7 @@ function CourseCard({ course, prog, onSelect, i }) {
   );
 }
 
-// ─── Course Grid ──────────────────────────────────────────────────────────────
+// Course Grid
 function CourseGrid({ courses, progressMap, loading, onSelect }) {
   if (loading) return (
     <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -511,7 +511,7 @@ function CourseGrid({ courses, progressMap, loading, onSelect }) {
   );
 }
 
-// ─── Course Viewer ────────────────────────────────────────────────────────────
+// Course Viewer
 function CourseViewer({ courseId, progress, onBack, onProgressUpdate, user }) {
   const [course,   setCourse]   = useState(null);
   const [loading,  setLoading]  = useState(true);
@@ -944,7 +944,7 @@ function CourseViewer({ courseId, progress, onBack, onProgressUpdate, user }) {
   );
 }
 
-// ─── Exam View ────────────────────────────────────────────────────────────────
+// Exam View
 function ExamView({ course, onBack, onComplete }) {
   const [phase,   setPhase]   = useState('loading');
   const [qs,      setQs]      = useState([]);
@@ -1221,7 +1221,7 @@ function ExamView({ course, onBack, onComplete }) {
   );
 }
 
-// ─── Main Training Page ───────────────────────────────────────────────────────
+// Main Training Page
 const Training = () => {
   const { user } = useOutletContext();
 
@@ -1283,7 +1283,7 @@ const Training = () => {
     return true;
   });
 
-  // ── Course viewer ──
+  // Course viewer
   if (activeCourse) return (
     <div className="space-y-5 py-4">
       <Toaster position="top-right" />
@@ -1301,7 +1301,7 @@ const Training = () => {
     </div>
   );
 
-  // ── Catalog ──
+  // Catalog
   return (
     <div className="space-y-5 py-4">
       <Toaster position="top-right" />
@@ -1482,3 +1482,6 @@ const Training = () => {
 };
 
 export default Training;
+
+
+

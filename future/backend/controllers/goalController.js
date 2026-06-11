@@ -1,4 +1,4 @@
-// backend/controllers/goalController.js — UPDATED: populates adminComments
+// backend/controllers/goalController.js UPDATED: populates adminComments
 import Goal from '../models/goalModel.js';
 import Reminder from '../models/reminderModel.js';
 import User from '../models/userModel.js';
@@ -105,7 +105,7 @@ export const createGoal = async (req, res) => {
     }
 };
 
-// GET ALL GOALS — UPDATED: populate adminComments
+// GET ALL GOALS UPDATED: populate adminComments
 export const getGoals = async (req, res) => {
     try {
         const goals = await Goal.find({ owner: req.user._id })
@@ -119,7 +119,7 @@ export const getGoals = async (req, res) => {
     }
 };
 
-// GET SINGLE GOAL — UPDATED: populate adminComments
+// GET SINGLE GOAL UPDATED: populate adminComments
 export const getGoalById = async (req, res) => {
     try {
         const goal = await Goal.findOne({ _id: req.params.id, owner: req.user._id })
@@ -175,3 +175,6 @@ export const deleteGoal = async (req, res) => {
         res.status(500).json({ success: false, message: err.message });
     }
 };
+
+
+

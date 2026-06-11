@@ -84,7 +84,7 @@ const Reminders = () => {
         fetchTasks();
     }, [fetchReminders, fetchTasks]);
 
-    // ==================== FRESH CREATE MODAL ====================
+    // FRESH CREATE MODAL
     const openCreateModal = () => {
         setFormData({
             type: 'custom',
@@ -252,7 +252,7 @@ const Reminders = () => {
                 )}
             </div>
 
-            {/* ==================== CREATE / EDIT MODAL (shared) ==================== */}
+            {/* CREATE / EDIT MODAL (shared) */}
             <AnimatePresence>
                 {(showCreate || (showDetails && isEditing)) && (
                     <motion.div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[9999]" onClick={closeModal}>
@@ -340,3 +340,6 @@ const Reminders = () => {
 };
 
 export default Reminders;
+
+
+

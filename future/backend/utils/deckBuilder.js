@@ -558,3 +558,6 @@ export const buildFallbackSlide = ({ currentSlide, sourceText, instruction = '' 
     note: note || currentSlide?.note || '',
   }, currentSlide?.id || 1);
 };
+
+
+

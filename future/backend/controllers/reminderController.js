@@ -314,3 +314,6 @@ export const updatePreferences = async (req, res) => {
         res.status(500).json({ success: false, message: 'Failed to update preferences' });
     }
 };
+
+
+

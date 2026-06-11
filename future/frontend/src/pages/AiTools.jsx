@@ -1,5 +1,5 @@
 // src/pages/AiTools.jsx
-// FundCo AI — Complete rebuild: clean layout, working streaming, task context, history
+// FundCo AI Complete rebuild: clean layout, working streaming, task context, history
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -21,7 +21,7 @@ import { format } from 'date-fns';
 const API = import.meta.env.VITE_API_URL;
 const authHeaders = () => ({ Authorization: `Bearer ${localStorage.getItem('token')}` });
 
-// ── Tool catalog ──────────────────────────────────────────────────────────────
+// Tool catalog
 const CATEGORIES = [
   {
     id: 'general', label: 'General', icon: Brain, color: '#312783',
@@ -82,7 +82,7 @@ const CATEGORIES = [
   },
 ];
 
-// Flat tool lookup — legacy aliases keep old history entries readable
+// Flat tool lookup legacy aliases keep old history entries readable
 const ALL_TOOLS   = CATEGORIES.flatMap(c => c.tools.map(t => ({ ...t, categoryId: c.id, categoryColor: c.color })));
 const TOOL_MAP    = Object.fromEntries(ALL_TOOLS.map(t => [t.id, t]));
 // Legacy aliases: old routes set toolId differently (e.g. 'general-ai' not 'general')
@@ -112,7 +112,7 @@ const LEGACY_NAMES = {
 Object.entries(LEGACY_NAMES).forEach(([id, name]) => {
   if (!TOOL_MAP[id]) TOOL_MAP[id] = { id, name };
 });
-// All tool IDs belonging to this section — scopes history queries.
+// All tool IDs belonging to this section scopes history queries.
 // Also includes legacy IDs from the old route system (toolId was set
 // differently before the rebuild) so existing history is not lost.
 const LEGACY_TOOL_IDS = ['general-ai', 'general', 'report-generator', 'task-prioritizer',
@@ -136,7 +136,7 @@ const LEGACY_TOOL_IDS = ['general-ai', 'general', 'report-generator', 'task-prio
 ];
 const AI_TOOL_IDS = [...new Set([...ALL_TOOLS.map(t => t.id), ...LEGACY_TOOL_IDS])];
 
-// ── Helper: stream SSE ────────────────────────────────────────────────────────
+// Helper: stream SSE
 const streamChat = async ({ messages, toolId, chatId, taskContext, files, onDelta, onDone, onError }) => {
   const token = localStorage.getItem('token');
   let body;
@@ -182,7 +182,7 @@ const streamChat = async ({ messages, toolId, chatId, taskContext, files, onDelt
   onDone(meta);
 };
 
-// ── Small components ──────────────────────────────────────────────────────────
+// Small components
 const ToolIcon = ({ tool, size = 5, style = {} }) => {
   const Icon = tool?.icon || Brain;
   return <Icon className={`w-${size} h-${size}`} style={style} />;
@@ -207,7 +207,7 @@ const CopyBtn = ({ text }) => {
   );
 };
 
-// ── Task context builder ──────────────────────────────────────────────────────
+// Task context builder
 const buildTaskContext = (tasks) => (tasks || []).slice(0, 60).map(t => ({
   id:        t._id,
   title:     t.title,
@@ -217,7 +217,7 @@ const buildTaskContext = (tasks) => (tasks || []).slice(0, 60).map(t => ({
   checklist: (t.checklist || []).map(c => ({ item: c.item, done: c.completed })),
 }));
 
-// ── Message bubble ────────────────────────────────────────────────────────────
+// Message bubble
 const MessageBubble = ({ msg, isStreaming }) => {
   const isUser = msg.role === 'user';
   const text   = typeof msg.content === 'string' ? msg.content
@@ -262,7 +262,7 @@ const MessageBubble = ({ msg, isStreaming }) => {
   );
 };
 
-// ── Chat panel ────────────────────────────────────────────────────────────────
+// Chat panel
 const ChatPanel = ({ tool, tasks, chatId, onChatCreated }) => {
   const [messages,   setMessages]   = useState([]);
   const [input,      setInput]      = useState('');
@@ -516,7 +516,7 @@ const ChatPanel = ({ tool, tasks, chatId, onChatCreated }) => {
   );
 };
 
-// ── Starter prompts per tool ─────────────────────────────────────────────────
+// Starter prompts per tool
 const getStarterPrompts = (toolId) => {
   const MAP = {
     'general':             ['What are FundCo\'s main investment sectors?', 'Summarise my pending tasks', 'What does LCOE mean in FundCo context?'],
@@ -539,7 +539,7 @@ const getStarterPrompts = (toolId) => {
   return MAP[toolId] || MAP['general'];
 };
 
-// ── History panel ─────────────────────────────────────────────────────────────
+// History panel
 const HistoryPanel = ({ toolId, onResume, onClose }) => {
   const [chats,   setChats]   = useState([]);
   const [search,  setSearch]  = useState('');
@@ -551,7 +551,7 @@ const HistoryPanel = ({ toolId, onResume, onClose }) => {
       // Only return chats whose toolId belongs to the AI Tools catalog
       // Other parts of the app (Training LMS, DeckPrep, Reports) use
       // toolIds like 'pdf-extractor', 'ppt-generator', 'report-generator'
-      // via their own controllers — those should not appear here
+      // via their own controllers those should not appear here
       const r = await axios.get(`${API}/api/grok/history`, {
         headers: authHeaders(),
         params: { toolIds: AI_TOOL_IDS.join(','), limit: 100 },
@@ -655,7 +655,7 @@ const HistoryPanel = ({ toolId, onResume, onClose }) => {
   );
 };
 
-// ── Category nav pill ────────────────────────────────────────────────────────
+// Category nav pill
 const CategoryPill = ({ cat, isActive, onClick }) => (
   <button onClick={onClick}
     className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold flex-shrink-0 transition-all"
@@ -669,7 +669,7 @@ const CategoryPill = ({ cat, isActive, onClick }) => (
   </button>
 );
 
-// ── Tool card ────────────────────────────────────────────────────────────────
+// Tool card
 const ToolCard = ({ tool, isActive, onClick, cat }) => (
   <motion.button whileHover={{ y: -1 }} onClick={onClick}
     className="w-full flex items-start gap-3 p-4 rounded-xl border text-left transition-all"
@@ -689,9 +689,9 @@ const ToolCard = ({ tool, isActive, onClick, cat }) => (
   </motion.button>
 );
 
-// ════════════════════════════════════════════════════════════════════════════
-// ── MAIN PAGE ─────────────────────────────────────────────────────────────────
-// ════════════════════════════════════════════════════════════════════════════
+
+// MAIN PAGE
+
 const AiTools = () => {
   const { user, tasks = [] } = useOutletContext();
 
@@ -742,7 +742,7 @@ const AiTools = () => {
     <div className="flex h-full overflow-hidden" style={{ height: 'calc(100vh - 80px)' }}>
       <Toaster position="top-right" />
 
-      {/* ── Left sidebar ── */}
+      {/* Left sidebar */}
       <AnimatePresence>
         {sidebarOpen && (
           <motion.div initial={{ width: 0, opacity: 0 }} animate={{ width: 280, opacity: 1 }}
@@ -845,7 +845,7 @@ const AiTools = () => {
         )}
       </AnimatePresence>
 
-      {/* ── Main content ── */}
+      {/* Main content */}
       <div className="flex-1 flex flex-col overflow-hidden relative">
         {/* Toggle sidebar button */}
         <button onClick={() => setSidebarOpen(p => !p)}

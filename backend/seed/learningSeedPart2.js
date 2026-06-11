@@ -1,5 +1,5 @@
 // backend/seed/learningSeedPart2.js
-// Run AFTER learningSeed.js — adds courses 4-7
+// Run AFTER learningSeed.js adds courses 4-7
 import dotenv from 'dotenv';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
@@ -23,9 +23,9 @@ function buildExam(modules, targetCount = 30) {
   return pool.slice(0, Math.min(targetCount, pool.length));
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// COURSE 4: EML Mini-Grid Installation SOP (Expert — required for EML staff)
-// ─────────────────────────────────────────────────────────────────────────────
+
+// COURSE 4: EML Mini-Grid Installation SOP (Expert required for EML staff)
+
 const course4 = {
   title: 'EML – Isolated Solar Mini-Grid Installation SOP',
   description: 'Complete Standard Operating Procedure for Electrify MicroGrid Limited: site survey, design, installation specifications, O&M, contractor management, and safety. Required for all EML technical staff.',
@@ -525,9 +525,9 @@ EML KEY TEAM MEMBERS
 };
 course4.exam = buildExam(course4.modules, 35);
 
-// ─────────────────────────────────────────────────────────────────────────────
+
 // COURSE 5: GroSolar Client Onboarding SOP
-// ─────────────────────────────────────────────────────────────────────────────
+
 const course5 = {
   title: 'GroSolar AssetCo – Client Onboarding & Operations SOP',
   description: 'Complete Standard Operating Procedure for GroSolar: client onboarding, KYC, credit assessment, technical evaluation, financial structuring, installation, and portfolio monitoring.',
@@ -759,9 +759,9 @@ Phase 11: Installation → 14 days`,
 };
 course5.exam = buildExam(course5.modules, 20);
 
-// ─────────────────────────────────────────────────────────────────────────────
+
 // COURSE 6: SSM Swap Station SOP
-// ─────────────────────────────────────────────────────────────────────────────
+
 const course6 = {
   title: 'Swap Station Mobility (SSM) – Operations SOP',
   description: 'Complete Standard Operating Procedure for Swap Station Mobility Limited: station setup, battery charging/swapping, EV bike management, safety, and customer service.',
@@ -958,9 +958,9 @@ DOCUMENTATION & COMPLIANCE
 };
 course6.exam = buildExam(course6.modules, 15);
 
-// ─────────────────────────────────────────────────────────────────────────────
-// COURSE 7: Agronomie – Agro-Tech, PuE & Black Soldier Fly
-// ─────────────────────────────────────────────────────────────────────────────
+
+// COURSE 7: Agronomie Agro-Tech, PuE & Black Soldier Fly
+
 const course7 = {
   title: 'Agronomie – Agro-Tech, PuE Projects & Black Soldier Fly Model',
   description: 'Understand Agronomie\'s mandate, Hub & Spoke model, portfolio of projects, BSF sustainable business model, partner network, and key lessons from field deployments.',
@@ -1309,9 +1309,9 @@ The Angwan Rina experience transformed into a GUIDING BEACON — propelling Agro
 };
 course7.exam = buildExam(course7.modules, 25);
 
-// =============================================================================
+
 // SEED FUNCTION
-// =============================================================================
+
 const seedData = async () => {
   try {
     await connectDB();
@@ -1319,17 +1319,17 @@ const seedData = async () => {
     const courses = [course4, course5, course6, course7];
 
     for (const course of courses) {
-      // Insert fresh (don't delete — additive to part 1)
+      // Insert fresh (don't delete additive to part 1)
       const existing = await LearningCourse.findOne({ title: course.title });
       if (existing) {
         await LearningCourse.findByIdAndDelete(existing._id);
-        console.log(`🔄  Replaced existing: ${course.title}`);
+        console.log(`  Replaced existing: ${course.title}`);
       }
       const created = await LearningCourse.create(course);
-      console.log(`✅  ${created.title} — ${course.modules.length} modules, ${course.exam.length} exam questions`);
+      console.log(`  ${created.title}  ${course.modules.length} modules, ${course.exam.length} exam questions`);
     }
 
-    console.log('\n🎉  Seed Part 2 complete (4 courses).');
+    console.log('\n  Seed Part 2 complete (4 courses).');
   } catch (err) {
     console.error('Seeding error:', err);
   } finally {

@@ -1,4 +1,3 @@
-// controllers/userController.js — UPDATED: accepts 'executive' role
 import User from '../models/userModel.js';
 import validator from 'validator';
 import bcrypt from 'bcryptjs';
@@ -179,3 +178,6 @@ export async function logoutUser(req, res) {
     clearRefreshCookie(res);
     res.json({ success: true, message: 'Logged out' });
 }
+
+
+

@@ -434,3 +434,6 @@ export const extractNumericHighlights = (rawText, limit = 4) => {
 
   return highlights;
 };
+
+
+

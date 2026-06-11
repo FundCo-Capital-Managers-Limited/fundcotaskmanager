@@ -1,5 +1,5 @@
 // src/pages/FileStorage.jsx
-// FundCo Cloud Storage — Complete rebuild
+// FundCo Cloud Storage Complete rebuild
 // Features: folder tree, grid/list, preview (pdf/image/video/docx),
 //           drag-to-move, bulk ops, tags, share links, trash, storage bar
 import React, {
@@ -34,7 +34,7 @@ const fmtSize = (b) => {
 };
 const fmtDate = (d) => d ? new Date(d).toLocaleDateString('en-GB', { day:'numeric', month:'short', year:'numeric' }) : '—';
 
-// ── File type helpers ─────────────────────────────────────────────────────────
+// File type helpers
 const EXT_GROUPS = {
   image:  ['jpg','jpeg','png','gif','webp'],
   video:  ['mp4','webm','mov'],
@@ -65,7 +65,7 @@ const FileTypeIcon = ({ type, size = 5 }) => {
   return <Icon className={`w-${size} h-${size}`} style={{ color: EXT_COLORS[g] }} />;
 };
 
-// ── Modal shell ───────────────────────────────────────────────────────────────
+// Modal shell
 const Modal = ({ open, onClose, title, width = 'max-w-lg', children }) => (
   <AnimatePresence>
     {open && (
@@ -94,7 +94,7 @@ const Modal = ({ open, onClose, title, width = 'max-w-lg', children }) => (
   </AnimatePresence>
 );
 
-// ── Field helper ──────────────────────────────────────────────────────────────
+// Field helper
 const Field = ({ label, children }) => (
   <div>
     <label className="block text-xs font-bold uppercase tracking-wide mb-1.5"
@@ -104,7 +104,7 @@ const Field = ({ label, children }) => (
 );
 const inp = { backgroundColor:'var(--input-bg)', color:'var(--text-primary)', border:'1px solid var(--input-border)', borderRadius:10, padding:'8px 12px', width:'100%', fontSize:13, outline:'none' };
 
-// ── Storage bar ───────────────────────────────────────────────────────────────
+// Storage bar
 const StorageBar = ({ used, total }) => {
   const pct = Math.min((used / total) * 100, 100);
   const color = pct > 90 ? '#ef4444' : pct > 70 ? '#f59e0b' : 'var(--brand-primary)';
@@ -125,7 +125,7 @@ const StorageBar = ({ used, total }) => {
   );
 };
 
-// ── Folder tree node ──────────────────────────────────────────────────────────
+// Folder tree node
 const FolderTreeNode = ({ folder, allFolders, activeId, onSelect, depth = 0 }) => {
   const [open, setOpen] = useState(false);
   const children = allFolders.filter(f => f.parentId === folder._id);
@@ -164,7 +164,7 @@ const FolderTreeNode = ({ folder, allFolders, activeId, onSelect, depth = 0 }) =
   );
 };
 
-// ── Upload zone ───────────────────────────────────────────────────────────────
+// Upload zone
 const UploadModal = ({ open, onClose, folderId, tasks, onDone }) => {
   const [files,     setFiles]     = useState([]);
   const [taskId,    setTaskId]    = useState('');
@@ -273,14 +273,14 @@ const UploadModal = ({ open, onClose, folderId, tasks, onDone }) => {
   );
 };
 
-// ── Universal File Viewer ────────────────────────────────────────────────────
+// Universal File Viewer
 // Handles: PDF, DOCX/DOC, XLSX/XLS/CSV, PPTX/PPT, images, video, TXT/CSV plain,
 //          ZIP (shows contents), and any unknown type via Google Docs Viewer fallback.
 
-// ── PDF viewer — Google Docs Viewer iframe (no worker, no CORS issues) ─────────
+// PDF viewer Google Docs Viewer iframe (no worker, no CORS issues)
 // react-pdf requires a worker script which gets blocked by MIME/CORS in many
 // hosting environments. Google Docs Viewer is dependency-free and handles PDFs,
-// DOCX, XLSX, PPTX natively via a simple iframe — no installation needed.
+// DOCX, XLSX, PPTX natively via a simple iframe no installation needed.
 const PDFViewer = ({ url }) => (
   <iframe
     src={`https://docs.google.com/gview?url=${encodeURIComponent(url)}&embedded=true`}
@@ -290,7 +290,7 @@ const PDFViewer = ({ url }) => (
   />
 );
 
-// ── Word doc viewer (mammoth DOCX → HTML, DOC → Google Viewer) ───────────────
+// Word doc viewer (mammoth DOCX HTML, DOC Google Viewer)
 const DocViewer = ({ url, ext }) => {
   const [text,    setText]    = useState('');
   const [loading, setLoading] = useState(true);
@@ -308,7 +308,7 @@ const DocViewer = ({ url, ext }) => {
         finally { setLoading(false); }
       }).catch(() => { setError('mammoth not installed.'); setLoading(false); });
     } else {
-      // .doc — old binary format, use Google Docs viewer iframe
+      // .doc old binary format, use Google Docs viewer iframe
       setLoading(false);
     }
   }, [url, ext]);
@@ -332,7 +332,7 @@ const DocViewer = ({ url, ext }) => {
   );
 };
 
-// ── Spreadsheet viewer (SheetJS) ──────────────────────────────────────────────
+// Spreadsheet viewer (SheetJS)
 const SheetViewer = ({ url, ext }) => {
   const [sheets,   setSheets]   = useState([]);   // [{ name, rows }]
   const [active,   setActive]   = useState(0);
@@ -418,7 +418,7 @@ const SheetViewer = ({ url, ext }) => {
 };
 
 
-// ── PPT/PPTX Viewer — Simple & Reliable (Google Docs Viewer) ─────────────────
+// PPT/PPTX Viewer Simple & Reliable (Google Docs Viewer)
 const SlideViewer = ({ url, ext }) => (
   <div className="space-y-2">
     <iframe
@@ -433,7 +433,7 @@ const SlideViewer = ({ url, ext }) => (
   </div>
 );
 
-// ── Plain text / CSV viewer ───────────────────────────────────────────────────
+// Plain text / CSV viewer
 const TextViewer = ({ url, ext }) => {
   const [text,    setText]    = useState('');
   const [loading, setLoading] = useState(true);
@@ -460,7 +460,7 @@ const TextViewer = ({ url, ext }) => {
   );
 };
 
-// ── Fallback: Google Docs Viewer (handles most office formats when lib missing) ─
+// Fallback: Google Docs Viewer (handles most office formats when lib missing)
 const GoogleDocsViewer = ({ url }) => (
   <iframe
     src={`https://docs.google.com/gview?url=${encodeURIComponent(url)}&embedded=true`}
@@ -469,7 +469,7 @@ const GoogleDocsViewer = ({ url }) => (
     title="File preview" />
 );
 
-// ── Generic fallback ──────────────────────────────────────────────────────────
+// Generic fallback
 const FallbackViewer = ({ url, message }) => (
   <div className="flex flex-col items-center justify-center py-10 rounded-xl border gap-3"
     style={{ borderColor:'var(--border-color)', backgroundColor:'var(--bg-subtle)' }}>
@@ -489,7 +489,7 @@ const FallbackViewer = ({ url, message }) => (
   </div>
 );
 
-// ── PreviewModal — orchestrates all viewers ───────────────────────────────────
+// PreviewModal orchestrates all viewers
 const PreviewModal = ({ file, onClose }) => {
   const url   = file ? `${IPFS}/${file.cid}` : '';
   const ext   = (file?.type || '').toLowerCase();
@@ -498,7 +498,7 @@ const PreviewModal = ({ file, onClose }) => {
   const renderViewer = () => {
     if (!file) return null;
 
-    // ── Image ──────────────────────────────────────────────────────────────
+    // Image
     if (group === 'image') return (
       <div className="flex items-center justify-center max-h-[70vh] overflow-auto rounded-xl"
         style={{ backgroundColor:'var(--bg-subtle)' }}>
@@ -507,7 +507,7 @@ const PreviewModal = ({ file, onClose }) => {
       </div>
     );
 
-    // ── Video ──────────────────────────────────────────────────────────────
+    // Video
     if (group === 'video') return (
       <video controls autoPlay muted playsInline className="w-full max-h-[70vh] rounded-xl bg-black">
         <source src={url} type={ext === 'webm' ? 'video/webm' : 'video/mp4'} />
@@ -515,22 +515,22 @@ const PreviewModal = ({ file, onClose }) => {
       </video>
     );
 
-    // ── PDF ────────────────────────────────────────────────────────────────
+    // PDF
     if (group === 'pdf') return <PDFViewer url={url} />;
 
-    // ── Word (DOCX / DOC) ──────────────────────────────────────────────────
+    // Word (DOCX / DOC)
     if (group === 'doc') return <DocViewer url={url} ext={ext} />;
 
-    // ── Spreadsheet (XLSX / XLS / CSV) ─────────────────────────────────────
+    // Spreadsheet (XLSX / XLS / CSV)
     if (group === 'sheet' || ext === 'csv') return <SheetViewer url={url} ext={ext} />;
 
-    // ── Presentation (PPTX / PPT) ──────────────────────────────────────────
+    // Presentation (PPTX / PPT)
     if (group === 'slide') return <SlideViewer url={url} ext={ext} />;
 
-    // ── Plain text ─────────────────────────────────────────────────────────
+    // Plain text
     if (group === 'text') return <TextViewer url={url} ext={ext} />;
 
-    // ── Unknown — try Google Docs Viewer first, then fallback ───────────────
+    // Unknown try Google Docs Viewer first, then fallback
     return (
       <div className="space-y-3">
         <GoogleDocsViewer url={url} />
@@ -593,7 +593,7 @@ const PreviewModal = ({ file, onClose }) => {
   );
 };
 
-// ── Move modal ────────────────────────────────────────────────────────────────
+// Move modal
 const MoveModal = ({ open, onClose, folders, onMove }) => {
   const [dest, setDest] = useState('');
   const roots = folders.filter(f => !f.parentId);
@@ -625,7 +625,7 @@ const MoveModal = ({ open, onClose, folders, onMove }) => {
   );
 };
 
-// ── Details panel ─────────────────────────────────────────────────────────────
+// Details panel
 const DetailsPanel = ({ file, folders, tasks, onClose, onRefresh }) => {
   const [tagInput, setTagInput] = useState('');
   const [taskId,   setTaskId]   = useState(file?.taskId || '');
@@ -804,7 +804,7 @@ const DetailsPanel = ({ file, folders, tasks, onClose, onRefresh }) => {
   );
 };
 
-// ── File card (grid) ──────────────────────────────────────────────────────────
+// File card (grid)
 const FileCard = ({ file, selected, onSelect, onPreview, onDetails, onDelete, onStar }) => {
   const isImg = ['jpg','jpeg','png'].includes(file.type);
   const url   = `${IPFS}/${file.cid}`;
@@ -881,7 +881,7 @@ const FileCard = ({ file, selected, onSelect, onPreview, onDetails, onDelete, on
   );
 };
 
-// ── File row (list) ───────────────────────────────────────────────────────────
+// File row (list)
 const FileRow = ({ file, selected, onSelect, onPreview, onDetails, onDelete, onStar }) => (
   <div className="group flex items-center gap-3 px-4 py-2.5 rounded-xl border transition-all cursor-pointer"
     style={{
@@ -942,7 +942,7 @@ const FileRow = ({ file, selected, onSelect, onPreview, onDetails, onDelete, onS
   </div>
 );
 
-// ── Folder card ───────────────────────────────────────────────────────────────
+// Folder card
 const FolderCard = ({ folder, onOpen, onDelete, onRename, viewMode }) => {
   const [renaming, setRenaming] = useState(false);
   const [name, setName] = useState(folder.name);
@@ -1016,14 +1016,14 @@ const FolderCard = ({ folder, onOpen, onDelete, onRename, viewMode }) => {
   );
 };
 
-// ════════════════════════════════════════════════════════════════════════════
-// ── MAIN PAGE ─────────────────────────────────────────────────────────────────
-// ════════════════════════════════════════════════════════════════════════════
+
+// MAIN PAGE
+
 const FileStorage = () => {
   const { user, tasks = [], onLogout } = useOutletContext();
   const fetchAllRef = useRef(null);
 
-  // ── State ────────────────────────────────────────────────────────────────
+  // State
   const [files,       setFiles]       = useState([]);
   const [folders,     setFolders]     = useState([]);
   const [currentFolderId, setCurrent] = useState(null); // null = root
@@ -1049,7 +1049,7 @@ const FileStorage = () => {
 
   const bottomRef = useRef();
 
-  // ── Fetch ────────────────────────────────────────────────────────────────
+  // Fetch
   const fetchAll = useCallback(async (pg = 1, reset = true) => {
     setLoading(true);
     try {
@@ -1113,7 +1113,7 @@ const FileStorage = () => {
     return () => ob.disconnect();
   }, [hasMore, files]);
 
-  // ── Actions ──────────────────────────────────────────────────────────────
+  // Actions
   const softDelete = async (id) => {
     try {
       await axios.patch(`${API}/api/files/${id}/soft-delete`, {}, { headers: auth() });
@@ -1201,7 +1201,7 @@ const FileStorage = () => {
       .then(() => setSelected(new Set()));
   };
 
-  // ── Computed ─────────────────────────────────────────────────────────────
+  // Computed
   const currentFolders = useMemo(() =>
     folders.filter(f => (f.parentId || null) === (currentFolderId || null)),
     [folders, currentFolderId]);
@@ -1216,12 +1216,12 @@ const FileStorage = () => {
 
   const TYPE_FILTERS = ['all','pdf','docx','jpg','png','mp4','xlsx','pptx','zip'];
 
-  // ── Render ────────────────────────────────────────────────────────────────
+  // Render
   return (
     <div className="flex h-full overflow-hidden" style={{ height: 'calc(100vh - 80px)' }}>
       <Toaster position="top-right" />
 
-      {/* ── Sidebar ── */}
+      {/* Sidebar */}
       <AnimatePresence>
         {sidebarOpen && (
           <motion.aside initial={{ width:0, opacity:0 }} animate={{ width:256, opacity:1 }}
@@ -1299,7 +1299,7 @@ const FileStorage = () => {
         )}
       </AnimatePresence>
 
-      {/* ── Main ── */}
+      {/* Main */}
       <div className="flex-1 flex flex-col overflow-hidden">
 
         {/* Toolbar */}
@@ -1549,7 +1549,7 @@ const FileStorage = () => {
         </div>
       </div>
 
-      {/* ── Modals ── */}
+      {/* Modals */}
       <UploadModal open={uploadOpen} onClose={() => setUploadOpen(false)}
         folderId={currentFolderId} tasks={tasks}
         onDone={() => fetchAll(1, true)} />
@@ -1584,3 +1584,6 @@ const FileStorage = () => {
 };
 
 export default FileStorage;
+
+
+

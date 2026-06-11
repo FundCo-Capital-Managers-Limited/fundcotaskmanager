@@ -1,4 +1,3 @@
-// Dashboard.jsx
 import React, { useCallback, useMemo, useState, useEffect } from 'react';
 import {
   Flag, Clock, CheckSquare, Filter, Plus, Rocket,
@@ -27,7 +26,7 @@ const SORT_OPTIONS = [
   { value: 'title', label: 'Title' },
 ];
 
-/* ── Skeleton ──────────────────────────────────────────────────────────────── */
+/* Skeleton */
 const SkeletonCard = () => (
   <div className="rounded-xl border p-4 animate-pulse"
     style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border-color)' }}>
@@ -42,7 +41,7 @@ const SkeletonCard = () => (
   </div>
 );
 
-/* ── Task Action Modal ─────────────────────────────────────────────────────── */
+/* Task Action Modal */
 const TaskActionModal = ({ isOpen, onClose, onAction, task }) => {
   if (!isOpen || !task) return null;
   const isComp = task.completed === true || task.completed === 1 || (typeof task.completed === 'string' && task.completed.toLowerCase() === 'yes');
@@ -103,7 +102,7 @@ const TaskActionModal = ({ isOpen, onClose, onAction, task }) => {
   );
 };
 
-/* ── Delete Confirm ───────────────────────────────────────────────────────── */
+/* Delete Confirm */
 const DeleteModal = ({ isOpen, onConfirm, onCancel }) => {
   if (!isOpen) return null;
   return (
@@ -134,7 +133,7 @@ const DeleteModal = ({ isOpen, onConfirm, onCancel }) => {
   );
 };
 
-/* ── Stat Card ────────────────────────────────────────────────────────────── */
+/* Stat Card */
 const StatCard = ({ label, value, icon: Icon, bg, color }) => (
   <div className="rounded-xl border p-4 flex items-center gap-3"
     style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border-color)' }}>
@@ -148,7 +147,7 @@ const StatCard = ({ label, value, icon: Icon, bg, color }) => (
   </div>
 );
 
-/* ── Dashboard ────────────────────────────────────────────────────────────── */
+/* Dashboard */
 const Dashboard = () => {
   const { user, tasks, tasksLoading, fetchTasks: refreshTasks, onLogout } = useOutletContext();
   const [showModal, setShowModal] = useState(false);
@@ -432,3 +431,6 @@ const Dashboard = () => {
 };
 
 export default Dashboard;
+
+
+

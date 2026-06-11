@@ -36,21 +36,21 @@ const router = express.Router();
 router.get('/share/:token', getSharedFile);
 router.use(authMiddleware);
 
-// ── Static / specific routes first ───────────────────────────────────────────
+// Static / specific routes first
 router.get( '/storage',          getStorageUsage);   // GET /api/files/storage
 router.post('/upload',           upload.array('files'), uploadFiles); // POST /api/files/upload
 router.get( '/',                 getFiles);          // GET /api/files
 router.post('/move',             moveFiles);         // POST /api/files/move
 router.delete('/trash/clear',    clearTrash);        // DELETE /api/files/trash/clear
 
-// ── Folder routes ─────────────────────────────────────────────────────────────
+// Folder routes
 router.get(   '/folders',        getFolders);
 router.post(  '/folders',        createFolder);
 router.get(   '/folders/stats',  getFolderStats);
 router.patch( '/folders/:id',    renameFolder);
 router.delete('/folders/:id',    deleteFolder);
 
-// ── Param routes last ─────────────────────────────────────────────────────────
+// Param routes last
 router.patch( '/:id/soft-delete',  deleteFile);        // soft delete → trash
 router.patch( '/:id/restore',      restoreFile);
 router.patch( '/:id/star',         toggleStar);
@@ -61,3 +61,6 @@ router.post(  '/:id/share',        shareFile);
 router.delete('/:id',              permanentDeleteFile);
 
 export default router;
+
+
+

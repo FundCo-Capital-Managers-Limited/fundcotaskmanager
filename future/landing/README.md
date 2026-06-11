@@ -1,30 +1,26 @@
-# Future Landing
+# FundCo AI Landing
 
-This folder contains the rebuilt future-facing landing experience for FundCo AI.
+This folder contains the standalone landing experience used to route people into the user and admin workspaces.
 
-Files:
+## Runtime model
 
-- `index.html` - main future landing page
-- `platforms.html` - platform directory page
-- `styles.css` - shared styling for both pages
-- `app.js` - theme handling and platform link configuration
+The landing page is static. There is no build step and no backend dependency.
 
-## Platform links
+- open `index.html` directly, or
+- serve the directory from any static host
 
-By default, the landing uses:
+## Link targets
 
-- User workspace: `https://www.fundcoai.com`
-- Admin workspace: `https://admin.fundcoai.com`
-- Finance platform: `https://finance.fundcoai.com`
+The current default entry targets are defined in `app.js`:
 
-These can be overridden with query parameters:
+- user workspace: `https://www.fundcoai.com`
+- admin workspace: `https://admin.fundcoai.com`
 
-- `?user=...`
-- `?admin=...`
-- `?finance=...`
+Local overrides can be supplied through query parameters:
 
-Example:
+- `?user=<url>`
+- `?admin=<url>`
 
-`platforms.html?user=http://127.0.0.1:5173&admin=http://127.0.0.1:5174&finance=http://127.0.0.1:5175`
+## Maintenance note
 
-The same query parameters are preserved when navigating between the landing page and the platform directory.
+This page is intentionally self-contained. If the platform URLs or positioning change, update the static assets here rather than coupling the page to one of the application builds.

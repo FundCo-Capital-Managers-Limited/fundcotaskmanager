@@ -1,4 +1,4 @@
-// backend/controllers/reportController.js — UPDATED: populates adminNotes
+// backend/controllers/reportController.js UPDATED: populates adminNotes
 import Report from '../models/reportModel.js';
 import Task   from '../models/taskModel.js';
 import OpenAI from 'openai';
@@ -146,7 +146,7 @@ export const saveAIReport = async (req, res) => {
   }
 };
 
-// Get user's reports — UPDATED: populate adminNotes
+// Get user's reports UPDATED: populate adminNotes
 export const getMyReports = async (req, res) => {
   try {
     const { status, type, search, page = 1, limit = 20 } = req.query;
@@ -179,7 +179,7 @@ export const getMyReports = async (req, res) => {
   }
 };
 
-// Get single report — UPDATED: populate adminNotes
+// Get single report UPDATED: populate adminNotes
 export const getReportById = async (req, res) => {
   try {
     const report = await Report.findOne({ _id: req.params.id, user: req.user._id })
@@ -255,3 +255,6 @@ export const deleteReport = async (req, res) => {
     res.status(500).json({ success: false, message: err.message });
   }
 };
+
+
+

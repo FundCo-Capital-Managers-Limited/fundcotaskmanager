@@ -1,6 +1,6 @@
 // utils/performanceCalculator.js
-// ─────────────────────────────────────────────────────────────────────────────
-// FundCo Performance Scoring System — v2
+
+// FundCo Performance Scoring System v2
 //
 // DESIGN PRINCIPLES
 // 1. Completing tasks earns base points weighted by priority.
@@ -10,9 +10,9 @@
 // 4. Goals earn up to 100 pts each; partial progress is rewarded proportionally.
 // 5. Total Score = Task Points + Goal Points + Bonus Points (admin-awarded).
 // 6. Levels gate at natural milestone scores.
-// ─────────────────────────────────────────────────────────────────────────────
 
-// ── Base points per completed task ───────────────────────────────────────────
+
+// Base points per completed task
 // Priority reflects effort and business impact.
 export const PRIORITY_WEIGHTS = {
   High:   60,   // High-impact work; biggest reward
@@ -20,7 +20,7 @@ export const PRIORITY_WEIGHTS = {
   Low:    15,   // Routine / minor tasks
 };
 
-// ── Multipliers applied on top of base ────────────────────────────────────────
+// Multipliers applied on top of base
 // Applied multiplicatively against the base weight.
 const APPROVAL_MULTIPLIER   = 1.5;  // Task was submitted AND approved by admin
 const SUBMITTED_MULTIPLIER  = 1.2;  // Task submitted but not yet reviewed
@@ -28,11 +28,11 @@ const ON_TIME_BONUS         = 10;   // Flat bonus for completing before/on dueDa
 const OVERDUE_PENALTY       = -5;   // Per day overdue when task is incomplete (max -30)
 const CHECKLIST_MAX_BONUS   = 20;   // Full checklist = +20 pts; partial = pro-rated
 
-// ── Goal scoring ───────────────────────────────────────────────────────────────
+// Goal scoring
 const GOAL_COMPLETE_BONUS   = 20;   // Extra bonus for 100% sub-goal completion
 const GOAL_BASE_MAX         = 100;  // Max base points per goal (at 100% progress)
 
-// ── Level thresholds ──────────────────────────────────────────────────────────
+// Level thresholds
 // Deliberately spaced so each level feels earned.
 const LEVELS = [
   { name: 'Novice',       min:    0 },
@@ -44,7 +44,7 @@ const LEVELS = [
   { name: 'Master',       min: 3500 },
 ];
 
-// ── Calculate score for a single task ────────────────────────────────────────
+// Calculate score for a single task
 export const calculateTaskScore = (task) => {
   // Only completed tasks earn base points
   if (!task.completed) {
@@ -60,7 +60,7 @@ export const calculateTaskScore = (task) => {
 
   const base = PRIORITY_WEIGHTS[task.priority] || PRIORITY_WEIGHTS.Low;
 
-  // ── Approval multiplier ──────────────────────────────────────────────────
+  // Approval multiplier
   let score = base;
   if (task.submissionStatus === 'approved') {
     score = base * APPROVAL_MULTIPLIER;
@@ -68,14 +68,14 @@ export const calculateTaskScore = (task) => {
     score = base * SUBMITTED_MULTIPLIER;
   }
 
-  // ── On-time bonus ────────────────────────────────────────────────────────
+  // On-time bonus
   // Only applies if task has a dueDate and was completed (we use today as
   // completion proxy since completedAt isn't stored on the model)
   if (task.dueDate && new Date() <= new Date(task.dueDate)) {
     score += ON_TIME_BONUS;
   }
 
-  // ── Checklist bonus ──────────────────────────────────────────────────────
+  // Checklist bonus
   // Rewards thoroughness: finishing all checklist items earns the full bonus.
   if (task.checklist?.length) {
     const done  = task.checklist.filter(c => c.completed).length;
@@ -86,7 +86,7 @@ export const calculateTaskScore = (task) => {
   return Math.round(score);
 };
 
-// ── Calculate score for a single goal ────────────────────────────────────────
+// Calculate score for a single goal
 export const calculateGoalScore = (goal) => {
   if (!goal.subGoals?.length) return 0;
   const completed  = goal.subGoals.filter(s => s.completed).length;
@@ -96,32 +96,32 @@ export const calculateGoalScore = (goal) => {
   return basePoints + bonus;
 };
 
-// ── Calculate total task score for a user ─────────────────────────────────────
+// Calculate total task score for a user
 export const calculateUserTaskScore = (tasks = []) => {
   return tasks.reduce((sum, t) => sum + calculateTaskScore(t), 0);
 };
 
-// ── Calculate total goal score for a user ─────────────────────────────────────
+// Calculate total goal score for a user
 export const calculateUserGoalScore = (goals = []) => {
   return goals.reduce((sum, g) => sum + calculateGoalScore(g), 0);
 };
 
-// ── Total combined score ──────────────────────────────────────────────────────
+// Total combined score
 export const calculateUserTotalScore = (tasks = [], goals = []) => {
   const taskScore = calculateUserTaskScore(tasks);
   const goalScore = calculateUserGoalScore(goals);
   return Math.max(0, taskScore + goalScore); // floor at 0 (penalties don't go negative overall)
 };
 
-// ── Completion rate ────────────────────────────────────────────────────────────
-// % of tasks marked completed (0–100, integer)
+// Completion rate
+// of tasks marked completed (0 100, integer)
 export const calculateCompletionRate = (tasks = []) => {
   if (!tasks.length) return 0;
   const done = tasks.filter(t => t.completed).length;
   return Math.round((done / tasks.length) * 100);
 };
 
-// ── Overdue rate ───────────────────────────────────────────────────────────────
+// Overdue rate
 export const calculateOverdueRate = (tasks = []) => {
   const withDue  = tasks.filter(t => t.dueDate);
   if (!withDue.length) return 0;
@@ -129,13 +129,13 @@ export const calculateOverdueRate = (tasks = []) => {
   return Math.round((overdue / withDue.length) * 100);
 };
 
-// ── User level ────────────────────────────────────────────────────────────────
+// User level
 export const getUserLevel = (totalScore) => {
   const lvl = [...LEVELS].reverse().find(l => totalScore >= l.min);
   return lvl?.name || 'Novice';
 };
 
-// ── Next level info (for UI progress bars) ────────────────────────────────────
+// Next level info (for UI progress bars)
 export const getNextLevel = (totalScore) => {
   const currentIdx = LEVELS.findLastIndex(l => totalScore >= l.min);
   const next       = LEVELS[currentIdx + 1];
@@ -146,7 +146,7 @@ export const getNextLevel = (totalScore) => {
   return { name: next.name, progress: Math.min(progress, 99), pointsNeeded };
 };
 
-// ── Score breakdown (for UserDetailModal) ─────────────────────────────────────
+// Score breakdown (for UserDetailModal)
 export const getScoreBreakdown = (tasks = [], goals = []) => {
   let basePoints       = 0;
   let approvalBonus    = 0;

@@ -1,4 +1,3 @@
-// backend/server.js - FULLY CLEANED & PRODUCTION-READY
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
@@ -70,11 +69,11 @@ const httpServer = createServer(app);
 assertFutureBackendSecurityEnv();
 app.set('trust proxy', 1);
 
-// ─────────────────────────────────────────────────────────────
-// PORT — comes ONLY from .env
+
+// Read PORT from the environment.
 const port = parseInt(process.env.PORT, 10);
 if (!port) {
-    console.error('❌ PORT is not defined in your .env file');
+    console.error('PORT is not defined in the environment configuration.');
     process.exit(1);
 }
 console.log(`Starting server on port: ${port}`);
@@ -109,7 +108,7 @@ const corsOrigin = (origin, callback) => {
     return callback(new Error(`Origin not allowed by CORS: ${origin}`));
 };
 
-// ─────────────────────────────────────────────────────────────
+
 // Socket.IO
 const io = new Server(httpServer, {
     cors: {
@@ -222,7 +221,7 @@ io.use(async (socket, next) => {
     }
 });
 
-// ─────────────────────────────────────────────────────────────
+
 // Socket.IO Events
 const activeUserSockets = new Map();
 const pendingOfflineTimers = new Map();
@@ -233,7 +232,7 @@ const logSocketLifecycle = (message) => {
 };
 
 io.on('connection', async (socket) => {
-    logSocketLifecycle(`✅ Socket connected: ${socket.id} | User: ${socket.user?.id || 'unknown'}`);
+    logSocketLifecycle(`Socket connected: ${socket.id} | User: ${socket.user?.id || 'unknown'}`);
 
     const userId = String(socket.user.id);
     const connectedAt = new Date();
@@ -259,26 +258,26 @@ io.on('connection', async (socket) => {
 
     socket.join(`user:${userId}`);
 
-    // ── Chat ──────────────────────────────────────────────────
+    // Chat
     socket.on('joinChat',  (chatId) => { if (chatId) socket.join(chatId); });
     socket.on('leaveChat', (chatId) => { if (chatId) socket.leave(chatId); });
     socket.on('typing', ({ chatId, userId, isTyping }) => {
         if (chatId && userId) socket.to(chatId).emit('typing', { chatId, userId, isTyping });
     });
 
-    // ── Reminders ─────────────────────────────────────────────
+    // Reminders
     socket.on('newReminder',      (r) => io.to(`user:${socket.user.id}`).emit('newReminder', r));
     socket.on('reminderUpdated',  (r) => io.to(`user:${socket.user.id}`).emit('reminderUpdated', r));
     socket.on('reminderTriggered',(r) => io.to(`user:${socket.user.id}`).emit('reminderTriggered', r));
 
-    // ── Goals ─────────────────────────────────────────────────
+    // Goals
     socket.on('newGoal',     (g) => io.to(`user:${socket.user.id}`).emit('newGoal', g));
     socket.on('goalUpdated', (g) => io.to(`user:${socket.user.id}`).emit('goalUpdated', g));
     socket.on('goalDeleted', (id)=> io.to(`user:${socket.user.id}`).emit('goalDeleted', id));
 
     socket.on('error',      (err)    => console.error('Socket error:', err.message));
     socket.on('disconnect', async (reason) => {
-        logSocketLifecycle(`❌ Socket disconnected: ${socket.id} | ${reason}`);
+        logSocketLifecycle(`Socket disconnected: ${socket.id} | ${reason}`);
         const sockets = activeUserSockets.get(userId);
         if (!sockets) return;
         sockets.delete(socket.id);
@@ -306,7 +305,7 @@ io.on('connection', async (socket) => {
     });
 });
 
-// ─────────────────────────────────────────────────────────────
+
 // Health check
 app.get('/', (req, res) => res.json({
     success: true, message: 'API is running', port,
@@ -364,10 +363,10 @@ cron.schedule('*/5 * * * *', async () => {
 async function startServer() {
     try {
         await connectDB();
-        console.log('✅ MongoDB connected successfully');
+        console.log('MongoDB connected successfully');
         httpServer.listen(port, '0.0.0.0', () => {
-            console.log(`🚀 Server running on port ${port}`);
-            console.log(`📡 Socket.IO ready on ws://localhost:${port}/socket.io`);
+            console.log(`Server running on port ${port}`);
+            console.log(`Socket.IO ready on ws://localhost:${port}/socket.io`);
             console.log(`Frontend URL: ${process.env.FRONTEND_URL}`);
             console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
             startReminderScheduler();
@@ -380,6 +379,9 @@ async function startServer() {
 
 export { app, io };
 if (process.env.NODE_ENV !== 'test') startServer();
+
+
+
 
 
 

@@ -78,3 +78,6 @@ documentSchema.index({ userId: 1, createdAt: -1 });
 
 const Document = mongoose.models.Document || mongoose.model('Document', documentSchema);
 export default Document;
+
+
+

@@ -63,7 +63,7 @@ const buildDeliveryChannels = (deliveryChannels = {}) => ({
   push: deliveryChannels?.push ?? false,
 });
 
-// ── Get all reminders (team-filtered) ─────────────────────────────────────────
+// Get all reminders (team-filtered)
 export const getAllReminders = async (req, res) => {
   try {
     const query = buildTeamQuery(req.teamMemberIds, 'user');
@@ -89,7 +89,7 @@ export const getAllReminders = async (req, res) => {
   }
 };
 
-// ── Create reminder for user ──────────────────────────────────────────────────
+// Create reminder for user
 export const createReminderForUser = async (req, res) => {
   try {
     const { userId, userIds, type, message, remindAt, deliveryChannels, repeatInterval, recurrence } = req.body;
@@ -136,7 +136,7 @@ export const createReminderForUser = async (req, res) => {
   }
 };
 
-// ── Delete reminder ───────────────────────────────────────────────────────────
+// Delete reminder
 export const deleteReminder = async (req, res) => {
   try {
     const reminder = await Reminder.findByIdAndDelete(req.params.id);
@@ -147,3 +147,6 @@ export const deleteReminder = async (req, res) => {
     res.status(500).json({ success: false, message: 'Failed to delete reminder' });
   }
 };
+
+
+

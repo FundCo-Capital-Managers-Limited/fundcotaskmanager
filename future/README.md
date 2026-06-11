@@ -1,12 +1,48 @@
-# FundCo AI Future Workspace
+# FundCo AI Workspace
 
-This folder is the fork point for the next stage of the platform.
+This directory contains the active multi-application platform used to operate FundCo AI today and to stage controlled follow-on work. It is the part of the repository that should be treated as the live engineering surface.
 
-- `frontend/` is a copy of the current user application source
-- `backend/` is a copy of the current user backend source
-- `adminpanel/` is a copy of the current admin workspace source
-- `landing/` is the new future-facing landing experience
+## Layout
 
-This workspace was created from the V1 state of the platform on 2026-04-17.
+- `frontend/` - user-facing React application
+- `backend/` - user platform API, file handling, document tooling, AI services, reminders, and user real-time channels
+- `adminpanel/frontend/` - admin React application
+- `adminpanel/backend/` - admin API, oversight workflows, and admin real-time channels
+- `landing/` - standalone marketing and access page
 
-The intent is to preserve V1 as the stable operating baseline while new product and platform work continues inside this `future/` workspace.
+## Execution model
+
+The system is split into two application planes:
+
+1. User plane
+   - browser client in `frontend/`
+   - API and Socket.IO service in `backend/`
+2. Admin plane
+   - browser client in `adminpanel/frontend/`
+   - API and Socket.IO service in `adminpanel/backend/`
+
+The admin backend can also proxy selected calls into the user backend for shared operational services.
+
+## Local run order
+
+Bring the services up in this order when you need the full platform:
+
+1. `backend/`
+2. `adminpanel/backend/`
+3. `frontend/`
+4. `adminpanel/frontend/`
+5. `landing/` if needed
+
+## Documentation
+
+- [frontend/README.md](frontend/README.md)
+- [backend/README.md](backend/README.md)
+- [backend/docs/API.md](backend/docs/API.md)
+- [adminpanel/frontend/README.md](adminpanel/frontend/README.md)
+- [adminpanel/backend/README.md](adminpanel/backend/README.md)
+- [adminpanel/backend/docs/API.md](adminpanel/backend/docs/API.md)
+- [landing/README.md](landing/README.md)
+
+## Scope note
+
+This workspace began as a V1 fork, but it is no longer just a branch point. It now contains the maintained runtime code paths. Treat the documentation here as the source of truth for current platform behavior.

@@ -53,7 +53,7 @@ const Layout = ({ onLogout, user: initialUser }) => {
     return () => window.removeEventListener('resize', syncViewport);
   }, []);
 
-  /* ── User ──────────────────────────────────────────────────────────────── */
+  /* User */
   const fetchCurrentUser = useCallback(async () => {
     const token = localStorage.getItem('token');
     if (!token) return;
@@ -64,7 +64,7 @@ const Layout = ({ onLogout, user: initialUser }) => {
   }, []);
   useEffect(() => { fetchCurrentUser(); }, [fetchCurrentUser]);
 
-  /* ── Tasks ─────────────────────────────────────────────────────────────── */
+  /* Tasks */
   const fetchTasks = useCallback(async () => {
     setTasksLoading(true);
     setError(null);
@@ -139,7 +139,7 @@ const Layout = ({ onLogout, user: initialUser }) => {
     };
   }, []);
 
-  /* ── Chat ──────────────────────────────────────────────────────────────── */
+  /* Chat */
   const fetchChatHistory = useCallback(async () => {
     try {
       const token = localStorage.getItem('token');
@@ -219,7 +219,7 @@ const Layout = ({ onLogout, user: initialUser }) => {
         </main>
       </div>
 
-      {/* ── Sticky Note Modal ──────────────────────────────────────────────── */}
+      {/* Sticky Note Modal */}
       <AnimatePresence>
         {isNoteOpen && (
           <motion.div
@@ -276,7 +276,7 @@ const Layout = ({ onLogout, user: initialUser }) => {
         )}
       </AnimatePresence>
 
-      {/* ── Chat Panel ────────────────────────────────────────────────────── */}
+      {/* Chat Panel */}
       <AnimatePresence>
         {isChatOpen && (
           <motion.div
@@ -373,7 +373,7 @@ const Layout = ({ onLogout, user: initialUser }) => {
         )}
       </AnimatePresence>
 
-      {/* ── FABs ──────────────────────────────────────────────────────────── */}
+      {/* FABs */}
       <button
         onClick={() => setIsNoteOpen(true)}
         className="fixed bottom-20 right-6 sm:bottom-6 sm:right-20 w-11 h-11 rounded-2xl flex items-center justify-center text-white shadow-lg hover:shadow-xl hover:scale-105 transition-all z-[999]"
@@ -398,3 +398,6 @@ const Layout = ({ onLogout, user: initialUser }) => {
 };
 
 export default Layout;
+
+
+

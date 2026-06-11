@@ -21,7 +21,7 @@ const computeGoalStats = (goals = []) => {
   return { total, completed, active, avgProgress };
 };
 
-// ── Get all goals (team-filtered) ─────────────────────────────────────────────
+// Get all goals (team-filtered)
 export const getAllGoals = async (req, res) => {
   try {
     const query = buildTeamQuery(req.teamMemberIds, 'owner');
@@ -68,7 +68,7 @@ export const getAllGoals = async (req, res) => {
   }
 };
 
-// ── Get goal by ID ────────────────────────────────────────────────────────────
+// Get goal by ID
 export const getGoalById = async (req, res) => {
   try {
     const goal = await Goal.findById(req.params.id)
@@ -83,7 +83,7 @@ export const getGoalById = async (req, res) => {
   }
 };
 
-// ── Create goal for user ──────────────────────────────────────────────────────
+// Create goal for user
 export const createGoalForUser = async (req, res) => {
   try {
     const { title, subGoals, type, timeframe, startDate, endDate, ownerId, associatedTasks } = req.body;
@@ -113,7 +113,7 @@ export const createGoalForUser = async (req, res) => {
   }
 };
 
-// ── Update goal ───────────────────────────────────────────────────────────────
+// Update goal
 export const updateGoal = async (req, res) => {
   try {
     const data = { ...req.body };
@@ -134,7 +134,7 @@ export const updateGoal = async (req, res) => {
   }
 };
 
-// ── Delete goal ───────────────────────────────────────────────────────────────
+// Delete goal
 export const deleteGoal = async (req, res) => {
   try {
     const goal = await Goal.findById(req.params.id);
@@ -150,7 +150,7 @@ export const deleteGoal = async (req, res) => {
   }
 };
 
-// ── Add admin comment ─────────────────────────────────────────────────────────
+// Add admin comment
 export const addGoalComment = async (req, res) => {
   try {
     const { content } = req.body;
@@ -186,7 +186,7 @@ export const addGoalComment = async (req, res) => {
   }
 };
 
-// ── Goal stats ────────────────────────────────────────────────────────────────
+// Goal stats
 export const getGoalStats = async (req, res) => {
   try {
     const query = buildTeamQuery(req.teamMemberIds, 'owner');
@@ -347,3 +347,6 @@ export const deleteMyGoal = async (req, res) => {
     res.status(500).json({ success: false, message: 'Failed to delete goal' });
   }
 };
+
+
+

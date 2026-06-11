@@ -8,7 +8,7 @@ import {
   rotateAdminRefreshSession,
 } from '../utils/authSession.js';
 
-// ── Admin Login ───────────────────────────────────────────────────────────────
+// Admin Login
 export const adminLogin = async (req, res) => {
   const { email, password } = req.body;
   if (!email || !password) return res.status(400).json({ success: false, message: 'Email and password required' });
@@ -57,7 +57,7 @@ export const adminLogin = async (req, res) => {
   }
 };
 
-// ── Get current admin user ────────────────────────────────────────────────────
+// Get current admin user
 export const getAdminMe = async (req, res) => {
   try {
     res.json({
@@ -147,3 +147,6 @@ export const adminLogout = async (req, res) => {
   clearRefreshCookie(res);
   res.json({ success: true, message: 'Logged out' });
 };
+
+
+

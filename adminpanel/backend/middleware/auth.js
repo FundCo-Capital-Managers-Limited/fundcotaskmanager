@@ -4,7 +4,7 @@ import { ADMIN_JWT_SECRET } from '../config/security.js';
 
 const LAST_ACTIVE_TOUCH_WINDOW_MS = 2 * 60 * 1000;
 
-// ── Base auth: verifies token and attaches user to req ────────────────────────
+// Base auth: verifies token and attaches user to req
 export const authMiddleware = async (req, res, next) => {
   try {
     const token = req.headers.authorization?.split(' ')[1];
@@ -29,7 +29,7 @@ export const authMiddleware = async (req, res, next) => {
   }
 };
 
-// ── Admin-only: requires team-lead, executive, or admin role ──────────────────
+// Admin-only: requires team-lead, executive, or admin role
 export const adminOnly = (req, res, next) => {
   const allowed = ['team-lead', 'executive', 'admin'];
   if (!allowed.includes(req.user.role)) {
@@ -38,7 +38,7 @@ export const adminOnly = (req, res, next) => {
   next();
 };
 
-// ── Role check middleware factory ─────────────────────────────────────────────
+// Role check middleware factory
 // Usage: requireRole('admin') or requireRole('executive', 'admin')
 export const requireRole = (...roles) => (req, res, next) => {
   if (!roles.includes(req.user.role)) {
@@ -50,7 +50,7 @@ export const requireRole = (...roles) => (req, res, next) => {
   next();
 };
 
-// ── Super Admin only ──────────────────────────────────────────────────────────
+// Super Admin only
 export const superAdminOnly = (req, res, next) => {
   if (req.user.role !== 'admin') {
     return res.status(403).json({ success: false, message: 'Super Admin access required' });
@@ -58,7 +58,7 @@ export const superAdminOnly = (req, res, next) => {
   next();
 };
 
-// ── Executive or above ────────────────────────────────────────────────────────
+// Executive or above
 export const executiveOrAbove = (req, res, next) => {
   const allowed = ['executive', 'admin'];
   if (!allowed.includes(req.user.role)) {
@@ -68,3 +68,6 @@ export const executiveOrAbove = (req, res, next) => {
 };
 
 export default authMiddleware;
+
+
+

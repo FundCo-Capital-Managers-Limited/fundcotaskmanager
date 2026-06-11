@@ -12,7 +12,7 @@ dotenv.config({ path: `${__dirname}/../.env` });
 
 console.log('MONGO_URI:', process.env.MONGO_URI ? 'Loaded' : 'Undefined');
 
-// ─── Helper: build full-course exam from module quiz pools ────────────────────
+// Helper: build full-course exam from module quiz pools
 // Shuffles all module quizzes together and picks up to targetCount questions.
 function buildExam(modules, targetCount = 30) {
   const pool = [];
@@ -27,13 +27,13 @@ function buildExam(modules, targetCount = 30) {
   return pool.slice(0, Math.min(targetCount, pool.length));
 }
 
-// =============================================================================
-// COURSE DEFINITIONS
-// =============================================================================
 
-// ─────────────────────────────────────────────────────────────────────────────
+// COURSE DEFINITIONS
+
+
+
 // COURSE 1: FundCo Company Overview (required for all staff)
-// ─────────────────────────────────────────────────────────────────────────────
+
 const course1 = {
   title: 'FundCo Capital Managers – Company Overview',
   description: 'A comprehensive introduction to FundCo Capital Managers, its mission, funds, subsidiaries, leadership, and strategic direction. Required for ALL staff.',
@@ -395,9 +395,9 @@ CEF ORGANIZATIONAL STRUCTURE
 };
 course1.exam = buildExam(course1.modules, 30);
 
-// ─────────────────────────────────────────────────────────────────────────────
+
 // COURSE 2: Key Terms & Acronyms
-// ─────────────────────────────────────────────────────────────────────────────
+
 const course2 = {
   title: 'Key Terms, Acronyms & Technical Definitions',
   description: 'Master all essential financial, technical, and operational terms used across FundCo and its subsidiaries. Required for all staff.',
@@ -752,9 +752,9 @@ DAREs    — Development of Affordable and Rural Electrification (World Bank pro
 };
 course2.exam = buildExam(course2.modules, 25);
 
-// ─────────────────────────────────────────────────────────────────────────────
+
 // COURSE 3: Department Responsibilities
-// ─────────────────────────────────────────────────────────────────────────────
+
 const course3 = {
   title: 'Department Responsibilities & Organizational Structure',
   description: 'Understand every department\'s role, responsibilities, and how teams collaborate across FundCo. Required for all staff.',
@@ -978,30 +978,30 @@ E. TECHNICAL RESEARCH & OPTIMIZATION
 };
 course3.exam = buildExam(course3.modules, 20);
 
-// =============================================================================
-// MAIN SEED FUNCTION — will be extended with remaining courses
-// =============================================================================
+
+// MAIN SEED FUNCTION will be extended with remaining courses
+
 const seedData = async () => {
   try {
     await connectDB();
 
     const courses = [course1, course2, course3];
 
-    // Use upsert — safe to run multiple times and with other seed parts
+    // Use upsert safe to run multiple times and with other seed parts
     for (const course of courses) {
       const existing = await LearningCourse.findOne({ title: course.title });
       if (existing) {
         await LearningCourse.findByIdAndDelete(existing._id);
-        console.log(`🔄  Replaced: ${course.title}`);
+        console.log(`  Replaced: ${course.title}`);
       }
       const created = await LearningCourse.create(course);
       const moduleCount = course.modules.length;
       const examCount   = course.exam ? course.exam.length : 0;
-      console.log(`✅  ${created.title} — ${moduleCount} modules, ${examCount} exam questions`);
+      console.log(`  ${created.title}  ${moduleCount} modules, ${examCount} exam questions`);
     }
 
     const total = await LearningCourse.countDocuments();
-    console.log(`\n🎉  Seed Part 1 complete. Total courses in DB: ${total}`);
+    console.log(`\n  Seed Part 1 complete. Total courses in DB: ${total}`);
   } catch (err) {
     console.error('Seeding error:', err);
   } finally {

@@ -37,3 +37,6 @@ test('buildOutlineFromBlocks produces deck-ready sections', () => {
   assert.match(outline, /Executive Summary/);
   assert.match(outline, /- Revenue increased by 25% year on year across/);
 });
+
+
+

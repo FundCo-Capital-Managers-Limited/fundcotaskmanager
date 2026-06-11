@@ -1,10 +1,10 @@
 import AdminTeam from '../models/adminTeamModel.js';
 
-// ── Team filter middleware ─────────────────────────────────────────────────────
-// Attaches req.teamMemberIds — the array of user IDs this admin can see.
+// Team filter middleware
+// Attaches req.teamMemberIds the array of user IDs this admin can see.
 // Super Admins see everything (teamMemberIds = null means "no filter").
 // Team Leads and Executives see only their configured team.
-// ──────────────────────────────────────────────────────────────────────────────
+
 export const teamFilter = async (req, res, next) => {
   try {
     // Super Admin sees everything
@@ -16,7 +16,7 @@ export const teamFilter = async (req, res, next) => {
     // For team-lead and executive, find their configured team
     const team = await AdminTeam.findOne({ admin: req.user._id });
     if (!team || !team.members.length) {
-      // No team configured — they can only see their own data
+      // No team configured they can only see their own data
       req.teamMemberIds = [req.user._id];
     } else {
       // Include admin themselves plus their team members
@@ -40,3 +40,6 @@ export const buildTeamQuery = (teamMemberIds, ownerField = 'owner') => {
   if (teamMemberIds === null) return {}; // Super Admin — no filter
   return { [ownerField]: { $in: teamMemberIds } };
 };
+
+
+

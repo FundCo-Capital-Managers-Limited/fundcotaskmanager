@@ -41,7 +41,7 @@ import {
   userAuthEvents,
 } from './security/authClient.js';
 
-// ← NEW: Lazy load the heavy report page
+// NEW: Lazy load the heavy report page
 const ReportGeneration = lazy(() => import('./pages/ReportGeneration'));
 
 const hasKnownUserSession = () => Boolean(
@@ -233,7 +233,7 @@ const App = () => {
           <Route path="/deck-prep" element={<DeckPrep />} />
           <Route path="/document-converter" element={<Navigate to="/deck-prep" replace />} />
 
-          {/* ← LAZY LOADED + Suspense (this fixes the huge chunk) */}
+          {/* LAZY LOADED + Suspense (this fixes the huge chunk) */}
           <Route
             path="/reports"
             element={
@@ -260,3 +260,6 @@ const App = () => {
 };
 
 export default App;
+
+
+

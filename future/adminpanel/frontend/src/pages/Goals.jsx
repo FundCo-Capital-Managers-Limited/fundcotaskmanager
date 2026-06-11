@@ -278,7 +278,7 @@ const Goals = () => {
   );
 };
 
-/* ====================== GOAL FORM MODAL ====================== */
+/* GOAL FORM MODAL */
 const GoalFormModal = ({ open, goal, users, onClose, onSave }) => {
   const isEdit = !!goal;
   const [form, setForm] = useState({
@@ -413,7 +413,7 @@ const GoalFormModal = ({ open, goal, users, onClose, onSave }) => {
   );
 };
 
-/* ====================== GOAL DETAIL MODAL ====================== */
+/* GOAL DETAIL MODAL */
 const GoalDetailModal = ({ open, goal, onClose, onComment, onEdit, onDelete, canEdit }) => {
   const [comment, setComment] = useState('');
   if (!goal) return null;
@@ -517,3 +517,6 @@ const GoalDetailModal = ({ open, goal, onClose, onComment, onEdit, onDelete, can
 };
 
 export default Goals;
+
+
+

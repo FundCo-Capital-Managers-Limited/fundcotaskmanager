@@ -1,5 +1,5 @@
 // src/pages/PerformanceDashboard.jsx
-// FundCo Performance Analytics — Professional rebuild
+// FundCo Performance Analytics Professional rebuild
 // Design: Data-dense command-centre aesthetic. Dark metric cards, sharp contrast,
 //         animated progress rings, sparklines, heatmap, velocity bars.
 //         CSS variables throughout. No hardcoded dark: Tailwind classes.
@@ -23,7 +23,7 @@ ChartJS.register(
   PointElement, ArcElement, Title, Tooltip, Legend, Filler
 );
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+// Helpers
 const isCompleted = (t) =>
   t.completed === true || t.completed === 1 ||
   (typeof t.completed === 'string' && t.completed.toLowerCase() === 'yes');
@@ -42,7 +42,7 @@ const PRIORITY_COLORS = {
   low:    { solid:'#22c55e', soft:'rgba(34,197,94,.15)'  },
 };
 
-// ── Chart default options ─────────────────────────────────────────────────────
+// Chart default options
 const chartDefaults = {
   responsive: true,
   maintainAspectRatio: false,
@@ -71,7 +71,7 @@ const chartDefaults = {
   },
 };
 
-// ── SVG progress ring ─────────────────────────────────────────────────────────
+// SVG progress ring
 const Ring = ({ pct, size = 80, stroke = 7, color = 'var(--brand-primary)', label }) => {
   const r = (size - stroke) / 2;
   const circ = 2 * Math.PI * r;
@@ -96,7 +96,7 @@ const Ring = ({ pct, size = 80, stroke = 7, color = 'var(--brand-primary)', labe
   );
 };
 
-// ── Sparkline (inline mini chart) ─────────────────────────────────────────────
+// Sparkline (inline mini chart)
 const Sparkline = ({ data = [], color = '#36a9e1', height = 36, width = 100 }) => {
   if (data.length < 2) return <div style={{ width, height }} />;
   const max = Math.max(...data) || 1;
@@ -112,7 +112,7 @@ const Sparkline = ({ data = [], color = '#36a9e1', height = 36, width = 100 }) =
   );
 };
 
-// ── KPI card ──────────────────────────────────────────────────────────────────
+// KPI card
 const KPICard = ({ label, value, sub, trend, trendLabel, icon: Icon, color, spark = [], delay = 0 }) => {
   const trendUp = trend > 0;
   const trendNeutral = trend === 0;
@@ -151,7 +151,7 @@ const KPICard = ({ label, value, sub, trend, trendLabel, icon: Icon, color, spar
   );
 };
 
-// ── Section heading ───────────────────────────────────────────────────────────
+// Section heading
 const Section = ({ title, icon: Icon, children, delay = 0 }) => (
   <motion.div initial={{ opacity:0, y:8 }} animate={{ opacity:1, y:0 }} transition={{ delay, duration:.35 }}
     className="space-y-4">
@@ -164,7 +164,7 @@ const Section = ({ title, icon: Icon, children, delay = 0 }) => (
   </motion.div>
 );
 
-// ── Filter pill ───────────────────────────────────────────────────────────────
+// Filter pill
 const Pill = ({ label, active, onClick }) => (
   <button onClick={onClick}
     className="px-3 py-1.5 rounded-xl text-xs font-bold transition-all"
@@ -177,7 +177,7 @@ const Pill = ({ label, active, onClick }) => (
   </button>
 );
 
-// ── Activity heatmap ──────────────────────────────────────────────────────────
+// Activity heatmap
 const Heatmap = ({ data }) => {
   // data: { days, hours, grid } where grid[day][hour] = count
   const { days, hours, grid } = data;
@@ -221,7 +221,7 @@ const Heatmap = ({ data }) => {
   );
 };
 
-// ── Priority bar ──────────────────────────────────────────────────────────────
+// Priority bar
 const PriorityBar = ({ label, count, total, color }) => {
   const pct = total ? (count / total) * 100 : 0;
   return (
@@ -241,7 +241,7 @@ const PriorityBar = ({ label, count, total, color }) => {
   );
 };
 
-// ── Task row (timeline) ───────────────────────────────────────────────────────
+// Task row (timeline)
 const TaskRow = ({ task, index }) => {
   const done = isCompleted(task);
   const over = isOverdue(task);
@@ -277,7 +277,7 @@ const TaskRow = ({ task, index }) => {
   );
 };
 
-// ── Badge card ────────────────────────────────────────────────────────────────
+// Badge card
 const Badge = ({ name, desc, icon: Icon, color, earned }) => (
   <div className="flex items-center gap-3 p-3 rounded-xl border transition-all"
     style={{
@@ -297,9 +297,9 @@ const Badge = ({ name, desc, icon: Icon, color, earned }) => (
   </div>
 );
 
-// ════════════════════════════════════════════════════════════════════════════
-// ── MAIN COMPONENT ────────────────────────────────────────────────────────────
-// ════════════════════════════════════════════════════════════════════════════
+
+// MAIN COMPONENT
+
 const PerformanceAnalytics = () => {
   const { user, tasks = [] } = useOutletContext();
   const [period,   setPeriod]   = useState('30');   // '7' | '30' | '90' | 'all'
@@ -307,7 +307,7 @@ const PerformanceAnalytics = () => {
   const [status,   setStatus]   = useState('all');
   const [exporting,setExporting]= useState(false);
 
-  // ── Date range ───────────────────────────────────────────────────────────
+  // Date range
   const periodDays = period === 'all' ? Infinity : parseInt(period);
   const startDate  = useMemo(() => {
     if (period === 'all') return new Date(0);
@@ -316,7 +316,7 @@ const PerformanceAnalytics = () => {
     return d;
   }, [period, periodDays]);
 
-  // ── Filtered tasks ───────────────────────────────────────────────────────
+  // Filtered tasks
   const filtered = useMemo(() => {
     return tasks.filter(t => {
       const d = t.createdAt ? new Date(t.createdAt) : new Date();
@@ -328,7 +328,7 @@ const PerformanceAnalytics = () => {
     });
   }, [tasks, startDate, priority, status]);
 
-  // ── Core KPIs ────────────────────────────────────────────────────────────
+  // Core KPIs
   const kpis = useMemo(() => {
     const total     = filtered.length;
     const done      = filtered.filter(isCompleted).length;
@@ -349,7 +349,7 @@ const PerformanceAnalytics = () => {
     return { total, done, pending: total - done, overdue, compRate, score, prevRate };
   }, [filtered, tasks, startDate, period, periodDays]);
 
-  // ── Sparkline data (last 14 days) ─────────────────────────────────────────
+  // Sparkline data (last 14 days)
   const sparklines = useMemo(() => {
     const days = 14;
     const now  = new Date();
@@ -365,7 +365,7 @@ const PerformanceAnalytics = () => {
     return series;
   }, [tasks]);
 
-  // ── Trend chart data (completion vs created by day) ───────────────────────
+  // Trend chart data (completion vs created by day)
   const trendData = useMemo(() => {
     const days = Math.min(periodDays === Infinity ? 30 : periodDays, 60);
     const now  = new Date();
@@ -407,7 +407,7 @@ const PerformanceAnalytics = () => {
     };
   }, [filtered, periodDays]);
 
-  // ── Weekly bar ────────────────────────────────────────────────────────────
+  // Weekly bar
   const weeklyData = useMemo(() => ({
     labels: DAYS_ABBR,
     datasets: [{
@@ -420,7 +420,7 @@ const PerformanceAnalytics = () => {
     }],
   }), [filtered]);
 
-  // ── Priority breakdown doughnut ───────────────────────────────────────────
+  // Priority breakdown doughnut
   const priorityData = useMemo(() => {
     const h = filtered.filter(t => (t.priority||'low').toLowerCase() === 'high').length;
     const m = filtered.filter(t => (t.priority||'low').toLowerCase() === 'medium').length;
@@ -436,7 +436,7 @@ const PerformanceAnalytics = () => {
     };
   }, [filtered]);
 
-  // ── Monthly tasks created ─────────────────────────────────────────────────
+  // Monthly tasks created
   const monthlyData = useMemo(() => {
     const now = new Date();
     const labels = [], counts = [], dones = [];
@@ -460,7 +460,7 @@ const PerformanceAnalytics = () => {
     };
   }, [tasks]);
 
-  // ── Heatmap data ──────────────────────────────────────────────────────────
+  // Heatmap data
   const heatmapData = useMemo(() => {
     const hours = Array.from({ length: 24 }, (_, i) => `${i}:00`);
     const grid  = DAYS_ABBR.map(() => Array(24).fill(0));
@@ -472,7 +472,7 @@ const PerformanceAnalytics = () => {
     return { days: DAYS_ABBR, hours, grid };
   }, [filtered]);
 
-  // ── Priority bars ─────────────────────────────────────────────────────────
+  // Priority bars
   const priorityStats = useMemo(() => {
     const total = filtered.length || 1;
     return ['high','medium','low'].map(p => ({
@@ -483,7 +483,7 @@ const PerformanceAnalytics = () => {
     }));
   }, [filtered]);
 
-  // ── Insights ──────────────────────────────────────────────────────────────
+  // Insights
   const insights = useMemo(() => {
     const msgs = [];
     if (kpis.compRate > 80)   msgs.push({ text:'Completion rate is excellent — above 80%.', type:'success' });
@@ -500,7 +500,7 @@ const PerformanceAnalytics = () => {
     return msgs;
   }, [kpis, heatmapData, filtered]);
 
-  // ── Badges ────────────────────────────────────────────────────────────────
+  // Badges
   const badges = useMemo(() => [
     { name:'Velocity Pro',   desc:'50+ tasks completed',  icon:Zap,         color:'#f59e0b', earned: kpis.done >= 50   },
     { name:'Precision',      desc:'80%+ completion rate',  icon:Target,      color:'#22c55e', earned: kpis.compRate >= 80 },
@@ -517,7 +517,7 @@ const PerformanceAnalytics = () => {
     { name:'Planner',        desc:'100+ tasks created',   icon:Calendar,    color:'#312783', earned: tasks.length >= 100 },
   ], [kpis, filtered, tasks]);
 
-  // ── Export CSV ────────────────────────────────────────────────────────────
+  // Export CSV
   const exportCSV = useCallback(() => {
     setExporting(true);
     const hdrs = ['Title','Priority','Status','Created','Due'];
@@ -537,7 +537,7 @@ const PerformanceAnalytics = () => {
     setTimeout(() => setExporting(false), 600);
   }, [filtered]);
 
-  // ── Chart theme override ──────────────────────────────────────────────────
+  // Chart theme override
   const cOpts = (overrides = {}) => ({
     ...chartDefaults,
     plugins: { ...chartDefaults.plugins, ...overrides.plugins },
@@ -550,7 +550,7 @@ const PerformanceAnalytics = () => {
   return (
     <div className="space-y-6 py-4">
 
-      {/* ── Header ── */}
+      {/* Header */}
       <motion.div initial={{ opacity:0, y:-8 }} animate={{ opacity:1, y:0 }}
         className="flex items-center justify-between flex-wrap gap-3">
         <div>
@@ -572,7 +572,7 @@ const PerformanceAnalytics = () => {
         </div>
       </motion.div>
 
-      {/* ── Filters ── */}
+      {/* Filters */}
       <motion.div initial={{ opacity:0 }} animate={{ opacity:1 }} transition={{ delay:.1 }}
         className="flex flex-wrap gap-4 items-center p-4 rounded-2xl border"
         style={{ backgroundColor:'var(--bg-surface)', borderColor:'var(--border-color)' }}>
@@ -599,7 +599,7 @@ const PerformanceAnalytics = () => {
         </div>
       </motion.div>
 
-      {/* ── KPI row ── */}
+      {/* KPI row */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         <KPICard label="Total Tasks"   value={fmtNum(kpis.total)}   icon={BarChart2}    color="#312783"  spark={sparklines.created} delay={0}   />
         <KPICard label="Completed"     value={fmtNum(kpis.done)}    icon={CheckCircle2} color="#22c55e"  spark={sparklines.done}    delay={.05} trend={trendRate} />
@@ -609,7 +609,7 @@ const PerformanceAnalytics = () => {
         <KPICard label="Perf. Score"   value={fmtPct(kpis.score)}   icon={Zap}          color="#a855f7"  delay={.25} />
       </div>
 
-      {/* ── Completion rate rings ── */}
+      {/* Completion rate rings */}
       <motion.div initial={{ opacity:0, y:8 }} animate={{ opacity:1, y:0 }} transition={{ delay:.3 }}
         className="rounded-2xl border p-5"
         style={{ backgroundColor:'var(--bg-surface)', borderColor:'var(--border-color)' }}>
@@ -642,7 +642,7 @@ const PerformanceAnalytics = () => {
         </div>
       </motion.div>
 
-      {/* ── Charts row 1: Trend + Weekly ── */}
+      {/* Charts row 1: Trend + Weekly */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <motion.div initial={{ opacity:0, y:8 }} animate={{ opacity:1, y:0 }} transition={{ delay:.35 }}
           className="lg:col-span-2 rounded-2xl border p-5"
@@ -677,7 +677,7 @@ const PerformanceAnalytics = () => {
         </motion.div>
       </div>
 
-      {/* ── Charts row 2: Monthly + Priority doughnut + Priority bars ── */}
+      {/* Charts row 2: Monthly + Priority doughnut + Priority bars */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <motion.div initial={{ opacity:0, y:8 }} animate={{ opacity:1, y:0 }} transition={{ delay:.45 }}
           className="lg:col-span-2 rounded-2xl border p-5"
@@ -723,7 +723,7 @@ const PerformanceAnalytics = () => {
         </motion.div>
       </div>
 
-      {/* ── Heatmap ── */}
+      {/* Heatmap */}
       <Section title="Activity Heatmap" icon={Activity} delay={.55}>
         <div className="rounded-2xl border p-5"
           style={{ backgroundColor:'var(--bg-surface)', borderColor:'var(--border-color)' }}>
@@ -734,7 +734,7 @@ const PerformanceAnalytics = () => {
         </div>
       </Section>
 
-      {/* ── Insights + Badges ── */}
+      {/* Insights + Badges */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <Section title="AI Insights" icon={TrendingUp} delay={.6}>
           <div className="rounded-2xl border p-5 space-y-3"
@@ -757,7 +757,7 @@ const PerformanceAnalytics = () => {
         </Section>
       </div>
 
-      {/* ── Task history ── */}
+      {/* Task history */}
       <Section title="Recent Tasks" icon={Calendar} delay={.7}>
         <div className="rounded-2xl border p-5"
           style={{ backgroundColor:'var(--bg-surface)', borderColor:'var(--border-color)' }}>

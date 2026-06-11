@@ -8,7 +8,7 @@ dotenv.config();
 const seedVivian = async () => {
   try {
     await mongoose.connect(process.env.MONGO_URI);
-    console.log('✅ Connected to MongoDB');
+    console.log(' Connected to MongoDB');
 
     const data = {
       firstName: 'Vivian',
@@ -22,7 +22,7 @@ const seedVivian = async () => {
 
     // Delete any existing record with this email
     await User.deleteOne({ email: data.email.toLowerCase().trim() });
-    console.log('🗑️  Old record deleted (if existed)');
+    console.log('  Old record deleted (if existed)');
 
     // Hash password
     const hashedPassword = await bcrypt.hash(data.password, 10);
@@ -43,15 +43,15 @@ const seedVivian = async () => {
     await vivian.save();
 
     console.log('\n VIVIAN UMEAKU CREATED SUCCESSFULLY');
-    console.log('══════════════════════════════════════');
+    console.log('');
     console.log('Email:    ', data.email);
     console.log('Password: ', data.password);
     console.log('Role:     ', data.role);
     console.log('Unit:     ', data.unitSector);
-    console.log('══════════════════════════════════════');
+    console.log('');
 
   } catch (err) {
-    console.error('❌ Seed error:', err.message);
+    console.error(' Seed error:', err.message);
   } finally {
     await mongoose.disconnect();
     process.exit(0);

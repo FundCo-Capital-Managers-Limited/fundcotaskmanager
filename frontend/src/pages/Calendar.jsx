@@ -1,4 +1,3 @@
-// src/pages/CalendarView.jsx
 import React, { useState, useEffect, useMemo } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { Clock, Plus, ChevronLeft, ChevronRight, CalendarDays, CheckCircle2, Video } from 'lucide-react';
@@ -6,19 +5,20 @@ import { motion, AnimatePresence } from 'framer-motion';
 import TaskItem from '../components/TaskItem';
 import TaskModal from '../components/TaskModal';
 import axios from 'axios';
+import { format } from 'date-fns';
 import { io } from 'socket.io-client';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:4001';
 const API_BASE_URL = `${API_BASE}/api/tasks`;
 
-// ── Priority colours ──────────────────────────────────────────────────────────
+// Priority colours
 const PRIORITY_COLOR = {
   high:   { dot: '#ef4444', bg: 'rgba(239,68,68,.12)',   text: '#ef4444'  },
   medium: { dot: '#f59e0b', bg: 'rgba(245,158,11,.12)',  text: '#d97706'  },
   low:    { dot: '#22c55e', bg: 'rgba(34,197,94,.12)',   text: '#16a34a'  },
 };
 
-// ── Mini calendar ─────────────────────────────────────────────────────────────
+// Mini calendar
 const MiniCalendar = ({ value, onChange, tasksByDate, meetingsByDate }) => {
   const [view, setView] = useState(new Date(value.getFullYear(), value.getMonth(), 1));
   const DAYS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
@@ -129,7 +129,7 @@ const MiniCalendar = ({ value, onChange, tasksByDate, meetingsByDate }) => {
   );
 };
 
-// ── Month strip (mini month overview) ────────────────────────────────────────
+// Month strip (mini month overview)
 const MonthStrip = ({ tasksByDate, meetingsByDate, selectedDate, onSelect }) => {
   const year  = selectedDate.getFullYear();
   const month = selectedDate.getMonth();
@@ -172,7 +172,7 @@ const MonthStrip = ({ tasksByDate, meetingsByDate, selectedDate, onSelect }) => 
   );
 };
 
-// ── Task card ─────────────────────────────────────────────────────────────────
+// Task card
 const TaskCard = ({ task, onClick, onRefresh, onLogout }) => {
   const p    = (task.priority || 'low').toLowerCase();
   const pc   = PRIORITY_COLOR[p] || PRIORITY_COLOR.low;
@@ -230,7 +230,7 @@ const TaskCard = ({ task, onClick, onRefresh, onLogout }) => {
   );
 };
 
-// ── Main page ─────────────────────────────────────────────────────────────────
+// Main page
 const CalendarView = () => {
   const { user, tasks, fetchTasks, onLogout } = useOutletContext();
   const [selectedDate, setSelectedDate] = useState(new Date());
@@ -393,7 +393,7 @@ const CalendarView = () => {
 
   return (
     <div className="space-y-5 py-4">
-      {/* ── Page header ── */}
+      {/* Page header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-black flex items-center gap-3" style={{ color: 'var(--text-primary)' }}>
@@ -419,7 +419,7 @@ const CalendarView = () => {
         </div>
       </div>
 
-      {/* ── Main grid ── */}
+      {/* Main grid */}
       <div className="grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-6">
 
         {/* Left: mini calendar + stats */}
@@ -586,3 +586,6 @@ const CalendarView = () => {
 };
 
 export default CalendarView;
+
+
+

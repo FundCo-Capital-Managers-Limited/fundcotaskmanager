@@ -15,7 +15,7 @@ const setNoStore = (res) => {
   res.set('Expires', '0');
 };
 
-// ── Admin Login ───────────────────────────────────────────────────────────────
+// Admin Login
 export const adminLogin = async (req, res) => {
   const email = normalizeEmail(req.body?.email);
   const { password, rememberMe } = req.body;
@@ -67,7 +67,7 @@ export const adminLogin = async (req, res) => {
   }
 };
 
-// ── Get current admin user ────────────────────────────────────────────────────
+// Get current admin user
 export const getAdminMe = async (req, res) => {
   try {
     setNoStore(res);
@@ -161,3 +161,6 @@ export const adminLogout = async (req, res) => {
   clearRefreshCookie(res);
   res.json({ success: true, message: 'Logged out' });
 };
+
+
+

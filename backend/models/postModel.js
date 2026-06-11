@@ -1,4 +1,4 @@
-// backend/models/postModel.js — UPDATED: added isAnnouncement and announcementScope
+// backend/models/postModel.js UPDATED: added isAnnouncement and announcementScope
 import mongoose from 'mongoose';
 
 const commentSchema = new mongoose.Schema({
@@ -65,3 +65,6 @@ postSchema.index({ createdAt: -1 });
 
 const Post = mongoose.models.Post || mongoose.model('Post', postSchema);
 export default Post;
+
+
+

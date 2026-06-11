@@ -1,12 +1,66 @@
-# React + Vite
+# FundCo AI User Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+This package is the user-facing workspace for FundCo AI Version 1. It covers the day-to-day operating surface used by standard users: tasks, goals, meetings, reminders, team chat, document tools, AI tools, learning, reports, projects, performance views, and file access.
 
-Currently, two official plugins are available:
+## Technology
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- React 19
+- Vite
+- Axios for API transport
+- Socket.IO client for real-time channels
+- Jest and Testing Library for component and session-path tests
 
-## Expanding the ESLint configuration
+## Local development
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+```bash
+npm install
+npm run dev
+```
+
+The frontend expects the user backend to be running. If `VITE_API_URL` is not set, the client falls back to `http://localhost:4001`.
+
+## Build, lint, and test
+
+```bash
+npm run lint
+npm test -- --runInBand
+npm run build
+```
+
+## Responsibilities
+
+This frontend owns:
+
+- user authentication state and refresh handling
+- task, goal, and reminder interaction flows
+- team chat, file upload, meeting, and social surfaces
+- AI tool orchestration from the user side
+- report drafting and submission
+- learning and progress views
+
+It does not contain the source of truth for permission decisions. Authorization and final workflow validation remain backend responsibilities.
+
+## Configuration
+
+The frontend is intentionally light on required environment variables.
+
+- `VITE_API_URL` - optional explicit base URL for the user backend
+
+When unset, the runtime uses the local default described above.
+
+## Testing notes
+
+The current test suite focuses on the business paths most likely to regress quietly:
+
+- task modal validation and payload normalization
+- task item completion and submission behavior
+- user auth session storage and refresh handling
+- admin auth client behavior as consumed from the shared workspace
+- theme persistence
+
+The suite is not an exhaustive page-level browser test harness. It is meant to catch behavioral drift in the core client flows that have historically broken under fast iteration.
+
+## Related documents
+
+- [../backend/README.md](../backend/README.md)
+- [../backend/docs/API.md](../backend/docs/API.md)

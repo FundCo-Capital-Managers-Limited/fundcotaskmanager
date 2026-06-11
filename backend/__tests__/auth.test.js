@@ -1,53 +1,138 @@
-import { jest } from '@jest/globals';
-import request from 'supertest';
-import mongoose from 'mongoose';
-import { app } from '../server.js';
-import jwt from 'jsonwebtoken';
+process.env.USER_JWT_SECRET = process.env.USER_JWT_SECRET || 'test-user-secret';
+process.env.ADMIN_JWT_SECRET = process.env.ADMIN_JWT_SECRET || 'test-admin-secret';
+process.env.INTERNAL_API_TOKEN = process.env.INTERNAL_API_TOKEN || 'test-internal-token';
 
-jest.mock('jsonwebtoken');
+const mockUserModel = {
+  findById: jest.fn(),
+  updateOne: jest.fn(),
+};
 
-describe('Auth Middleware', () => {
-    beforeAll(async () => {
-        await mongoose.connect('mongodb://localhost/test', { useNewUrlParser: true, useUnifiedTopology: true });
+const mockSecurity = {
+  verifyPlatformToken: jest.fn(),
+};
+
+jest.mock('../models/userModel.js', () => ({
+  __esModule: true,
+  default: mockUserModel,
+}));
+
+jest.mock('../config/security.js', () => mockSecurity);
+
+const authMiddleware = require('../middleware/auth.js').default;
+
+const createResponse = () => {
+  const response = {
+    status: jest.fn(),
+    json: jest.fn(),
+  };
+
+  response.status.mockImplementation((statusCode) => {
+    response.statusCode = statusCode;
+    return response;
+  });
+
+  response.json.mockImplementation((payload) => {
+    response.body = payload;
+    return response;
+  });
+
+  return response;
+};
+
+describe('auth middleware', () => {
+  let consoleLogSpy;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+    mockUserModel.updateOne.mockResolvedValue({ acknowledged: true });
+  });
+
+  afterEach(() => {
+    consoleLogSpy.mockRestore();
+  });
+
+  it('rejects requests without a bearer token', async () => {
+    const response = createResponse();
+
+    await authMiddleware({ headers: {} }, response, jest.fn());
+
+    expect(response.status).toHaveBeenCalledWith(401);
+    expect(response.body).toEqual({ success: false, message: 'Not Authorized, token missing' });
+  });
+
+  it('rejects requests when the user cannot be found', async () => {
+    mockSecurity.verifyPlatformToken.mockReturnValue({ payload: { id: 'user-1' } });
+    mockUserModel.findById.mockReturnValue({
+      select: jest.fn().mockResolvedValue(null),
     });
 
-    afterAll(async () => {
-        await mongoose.connection.close();
+    const response = createResponse();
+
+    await authMiddleware(
+      { headers: { authorization: 'Bearer token-1' } },
+      response,
+      jest.fn(),
+    );
+
+    expect(mockSecurity.verifyPlatformToken).toHaveBeenCalledWith('token-1');
+    expect(response.status).toHaveBeenCalledWith(401);
+    expect(response.body).toEqual({ success: false, message: 'User not found' });
+  });
+
+  it('rejects deactivated users', async () => {
+    mockSecurity.verifyPlatformToken.mockReturnValue({ payload: { id: 'user-1' } });
+    mockUserModel.findById.mockReturnValue({
+      select: jest.fn().mockResolvedValue({ _id: 'user-1', isActive: false }),
     });
 
-    afterEach(() => {
-        jest.clearAllMocks();
+    const response = createResponse();
+
+    await authMiddleware(
+      { headers: { authorization: 'Bearer token-1' } },
+      response,
+      jest.fn(),
+    );
+
+    expect(response.status).toHaveBeenCalledWith(403);
+    expect(response.body).toEqual({ success: false, message: 'Account is deactivated' });
+  });
+
+  it('attaches the active user to the request and calls next', async () => {
+    const next = jest.fn();
+    const user = { _id: 'user-1', isActive: true, email: 'ada@fundco.ai' };
+
+    mockSecurity.verifyPlatformToken.mockReturnValue({ payload: { id: 'user-1' }, tokenType: 'user' });
+    mockUserModel.findById.mockReturnValue({
+      select: jest.fn().mockResolvedValue(user),
     });
 
-    it('should allow access with valid token', async () => {
-        jwt.verify.mockReturnValue({ id: 'user123' });
+    const request = {
+      headers: { authorization: 'Bearer token-1' },
+    };
+    const response = createResponse();
 
-        const res = await request(app)
-            .get('/api/tasks')
-            .set('Authorization', 'Bearer mockToken');
+    await authMiddleware(request, response, next);
 
-        expect(res.status).not.toBe(401);
-        expect(jwt.verify).toHaveBeenCalledWith('mockToken', process.env.JWT_SECRET);
+    expect(request.user).toBe(user);
+    expect(next).toHaveBeenCalledTimes(1);
+    expect(response.status).not.toHaveBeenCalled();
+  });
+
+  it('returns an invalid-token response when verification fails', async () => {
+    mockSecurity.verifyPlatformToken.mockImplementation(() => {
+      throw new Error('bad token');
     });
 
-    it('should return 401 with invalid token', async () => {
-        jwt.verify.mockImplementation(() => {
-            throw new Error('Invalid token');
-        });
+    const response = createResponse();
 
-        const res = await request(app)
-            .get('/api/tasks')
-            .set('Authorization', 'Bearer invalidToken');
+    await authMiddleware(
+      { headers: { authorization: 'Bearer bad-token' } },
+      response,
+      jest.fn(),
+    );
 
-        expect(res.status).toBe(401);
-        expect(res.body).toEqual({ success: false, message: 'Authentication error' });
-    });
-
-    it('should return 401 with missing token', async () => {
-        const res = await request(app)
-            .get('/api/tasks');
-
-        expect(res.status).toBe(401);
-        expect(res.body).toEqual({ success: false, message: 'No token provided' });
-    });
+    expect(response.status).toHaveBeenCalledWith(401);
+    expect(response.body).toEqual({ success: false, message: 'Token invalid or expired' });
+  });
 });

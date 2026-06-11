@@ -68,3 +68,6 @@ meetingReportSchema.index({ meetingDate: -1 });
 
 const MeetingReport = mongoose.models.MeetingReport || mongoose.model('MeetingReport', meetingReportSchema);
 export default MeetingReport;
+
+
+

@@ -1,4 +1,3 @@
-// src/pages/Goals.jsx
 import React, { useState, useEffect, useCallback } from 'react';
 import { useOutletContext, useNavigate } from 'react-router-dom';
 import {
@@ -15,7 +14,7 @@ import 'react-datepicker/dist/react-datepicker.css';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+// Helpers
 const calcProgress = (subGoals) => {
   if (!subGoals?.length) return 0;
   return Math.round((subGoals.filter(s => s.completed).length / subGoals.length) * 100);
@@ -28,7 +27,7 @@ const TYPE_CONFIG = {
 
 const TIMEFRAMES = ['daily','weekly','monthly','quarterly'];
 
-// ── Progress ring ─────────────────────────────────────────────────────────────
+// Progress ring
 const Ring = ({ pct, size = 56, stroke = 4, color = 'var(--brand-primary)' }) => {
   const r    = (size - stroke) / 2;
   const circ = 2 * Math.PI * r;
@@ -47,7 +46,7 @@ const Ring = ({ pct, size = 56, stroke = 4, color = 'var(--brand-primary)' }) =>
   );
 };
 
-// ── Stat card ─────────────────────────────────────────────────────────────────
+// Stat card
 const StatCard = ({ label, value, color, active, onClick }) => (
   <motion.div whileHover={{ y: -1 }} onClick={onClick}
     className="rounded-xl border p-4 cursor-pointer transition-all"
@@ -60,7 +59,7 @@ const StatCard = ({ label, value, color, active, onClick }) => (
   </motion.div>
 );
 
-// ── Goal card ─────────────────────────────────────────────────────────────────
+// Goal card
 const GoalCard = ({ goal, onClick, index }) => {
   const pct  = calcProgress(goal.subGoals);
   const tc   = TYPE_CONFIG[goal.type] || TYPE_CONFIG.personal;
@@ -119,7 +118,7 @@ const GoalCard = ({ goal, onClick, index }) => {
   );
 };
 
-// ── Field helper ──────────────────────────────────────────────────────────────
+// Field helper
 const Field = ({ label, children }) => (
   <div>
     <label className="block text-xs font-bold uppercase tracking-wide mb-1.5" style={{ color: 'var(--text-muted)' }}>
@@ -152,7 +151,7 @@ const FocusSelect = ({ children, ...props }) => {
     onFocus={() => setF(true)} onBlur={() => setF(false)}>{children}</select>;
 };
 
-// ── Goal form (shared by create & edit) ───────────────────────────────────────
+// Goal form (shared by create & edit)
 const GoalForm = ({ initial, onSubmit, onCancel, isLoading, isEdit = false, tasks = [] }) => {
   const [data, setData] = useState(initial);
   const [subInput, setSubInput] = useState('');
@@ -289,7 +288,7 @@ const GoalForm = ({ initial, onSubmit, onCancel, isLoading, isEdit = false, task
   );
 };
 
-// ── Goal detail modal (BATCH SUB-GOAL UPDATE) ───────────────────────────────
+// Goal detail modal (BATCH SUB-GOAL UPDATE)
 const GoalDetailModal = ({ goal, onClose, onUpdate, onDelete, isLoading, tasks = [] }) => {
   const [localGoal, setLocalGoal] = useState({ ...goal });
   const [localSubGoals, setLocalSubGoals] = useState(goal.subGoals || []);
@@ -480,9 +479,9 @@ const GoalDetailModal = ({ goal, onClose, onUpdate, onDelete, isLoading, tasks =
   );
 };
 
-// ════════════════════════════════════════════════════════════════════════════
-// ── MAIN PAGE ─────────────────────────────────────────────────────────────────
-// ════════════════════════════════════════════════════════════════════════════
+
+// MAIN PAGE
+
 const Goals = () => {
   const { user, onLogout } = useOutletContext();
   const navigate = useNavigate();
@@ -500,7 +499,7 @@ const Goals = () => {
     Authorization: `Bearer ${localStorage.getItem('token')}`,
   }), []);
 
-  // ── Socket ──────────────────────────────────────────────────────────────
+  // Socket
   useEffect(() => {
     const socket = io(API_BASE_URL, {
       auth: (cb) => cb({ token: localStorage.getItem('token') }),
@@ -513,7 +512,7 @@ const Goals = () => {
     return () => socket.disconnect();
   }, []);
 
-  // ── Auth interceptor ─────────────────────────────────────────────────────
+  // Auth interceptor
   useEffect(() => {
     const id = axios.interceptors.response.use(r => r, err => {
       if (err.response?.status === 401) { onLogout?.(); navigate('/login'); }
@@ -522,7 +521,7 @@ const Goals = () => {
     return () => axios.interceptors.response.eject(id);
   }, [onLogout, navigate]);
 
-  // ── Fetch Goals + Tasks ──────────────────────────────────────────────────
+  // Fetch Goals + Tasks
   const fetchGoals = useCallback(async () => {
     setIsLoading(true);
     try {
@@ -550,7 +549,7 @@ const Goals = () => {
     fetchTasks();
   }, [user, navigate, fetchGoals, fetchTasks]);
 
-  // ── Create ───────────────────────────────────────────────────────────────
+  // Create
   const handleCreate = async (data) => {
     if (!data.title.trim()) return toast.error('Title required');
     if (!data.subGoals?.length) return toast.error('Add at least one sub-goal');
@@ -566,7 +565,7 @@ const Goals = () => {
     } finally { setIsLoading(false); }
   };
 
-  // ── Update ───────────────────────────────────────────────────────────────
+  // Update
   const handleUpdate = async (data) => {
     if (!activeGoal?._id) return;
     if (!data.title.trim()) return toast.error('Title required');
@@ -583,7 +582,7 @@ const Goals = () => {
     } finally { setIsLoading(false); }
   };
 
-  // ── Delete ───────────────────────────────────────────────────────────────
+  // Delete
   const handleDelete = async () => {
     if (!activeGoal?._id) return;
     setIsLoading(true);
@@ -596,7 +595,7 @@ const Goals = () => {
     } finally { setIsLoading(false); }
   };
 
-  // ── Filter + sort ────────────────────────────────────────────────────────
+  // Filter + sort
   const filtered = goals.filter(g => {
     if (!g.title.toLowerCase().includes(search.toLowerCase())) return false;
     const pct = calcProgress(g.subGoals);
@@ -781,3 +780,6 @@ const Goals = () => {
 };
 
 export default Goals;
+
+
+

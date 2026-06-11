@@ -1,75 +1,95 @@
-import { describe, it, expect, beforeAll, afterAll, afterEach } from '@jest/globals';
-import { render, screen, fireEvent } from '@testing-library/react';
-import { server } from '../jest.setup.js';
+import { describe, it, expect, beforeEach, jest } from '@jest/globals';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import axios from 'axios';
 import TaskItem from '../src/components/TaskItem.jsx';
-import '@testing-library/jest-dom';
 
-jest.mock('../src/components/TaskModal.jsx', () => {
-    return () => <div>Mocked TaskModal</div>;
+jest.mock('axios', () => ({
+  __esModule: true,
+  default: {
+    put: jest.fn(),
+    post: jest.fn(),
+    delete: jest.fn(),
+  },
+}));
+
+const buildTask = (overrides = {}) => ({
+  _id: 'task-1',
+  title: 'Site survey',
+  description: 'Visit the project location',
+  priority: 'High',
+  completed: false,
+  submissionStatus: 'not_submitted',
+  checklist: [{ text: 'Visit the site', completed: false }],
+  createdAt: '2026-06-10T12:00:00.000Z',
+  dueDate: '2026-06-12T12:00:00.000Z',
+  ...overrides,
 });
 
-describe('TaskItem Component', () => {
-    beforeAll(() => server.listen());
-    afterEach(() => server.resetHandlers());
-    afterAll(() => server.close());
+describe('TaskItem', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    localStorage.clear();
+    localStorage.setItem('token', 'session-token');
+  });
 
-    const mockTask = {
-        _id: '123',
-        title: 'Test Task',
-        description: 'Test Description',
-        completed: 'No',
-        priority: 'medium',
-    };
+  it('shows the checklist-required guard instead of completing a task with no checklist', async () => {
+    const task = buildTask({ checklist: [] });
 
-    const mockOnEdit = jest.fn();
-    const mockOnDelete = jest.fn();
+    const { container } = render(<TaskItem task={task} />);
 
-    it('renders task details correctly', () => {
-        render(<TaskItem task={mockTask} onEdit={mockOnEdit} onDelete={mockOnDelete} />);
+    fireEvent.click(container.querySelector('button'));
 
-        expect(screen.getByText('Test Task')).toBeInTheDocument();
-        expect(screen.getByText('Test Description')).toBeInTheDocument();
-        expect(screen.getByText((content, element) => {
-            return element.tagName.toLowerCase() === 'span' && content === 'medium';
-        })).toBeInTheDocument();
+    expect(await screen.findByText(/checklist required/i)).toBeInTheDocument();
+    expect(axios.put).not.toHaveBeenCalled();
+  });
+
+  it('updates all checklist items when the completion toggle is used', async () => {
+    const onRefresh = jest.fn();
+    const task = buildTask({
+      checklist: [
+        { text: 'Visit the site', completed: false },
+        { text: 'Capture readings', completed: false },
+      ],
     });
 
-    it('calls onEdit when edit button is clicked', () => {
-        render(<TaskItem task={mockTask} onEdit={mockOnEdit} onDelete={mockOnDelete} />);
+    const { container } = render(<TaskItem task={task} onRefresh={onRefresh} />);
 
-        const dropdownButton = screen.getByTestId('dropdown-button');
-        fireEvent.click(dropdownButton);
+    fireEvent.click(container.querySelector('button'));
 
-        const editButton = screen.getByTestId('edit-button');
-        fireEvent.click(editButton);
+    await waitFor(() => {
+      expect(axios.put).toHaveBeenCalledWith(
+        expect.stringContaining('/api/tasks/task-1/gp'),
+        {
+          checklist: [
+            { text: 'Visit the site', completed: true },
+            { text: 'Capture readings', completed: true },
+          ],
+        },
+        { headers: { Authorization: 'Bearer session-token' } },
+      );
+    });
+    expect(onRefresh).toHaveBeenCalled();
+  });
 
-        expect(mockOnEdit).toHaveBeenCalledWith(mockTask);
+  it('submits a completed task for approval from the action menu', async () => {
+    const onRefresh = jest.fn();
+    const task = buildTask({
+      completed: true,
+      checklist: [{ text: 'Visit the site', completed: true }],
     });
 
-    it('calls onDelete when delete button is clicked', () => {
-        render(<TaskItem task={mockTask} onEdit={mockOnEdit} onDelete={mockOnDelete} />);
+    render(<TaskItem task={task} onRefresh={onRefresh} />);
 
-        const dropdownButton = screen.getByTestId('dropdown-button');
-        fireEvent.click(dropdownButton);
+    fireEvent.click(screen.getAllByRole('button')[1]);
+    fireEvent.click(screen.getByRole('button', { name: /submit for approval/i }));
 
-        const deleteButton = screen.getByTestId('delete-button');
-        fireEvent.click(deleteButton);
-
-        expect(mockOnDelete).toHaveBeenCalledWith(mockTask._id);
+    await waitFor(() => {
+      expect(axios.post).toHaveBeenCalledWith(
+        expect.stringContaining('/api/tasks/task-1/submit'),
+        {},
+        { headers: { Authorization: 'Bearer session-token' } },
+      );
     });
-
-    it('renders completed task correctly', () => {
-        const completedTask = {
-            _id: '124',
-            title: 'Completed Task',
-            description: 'Done',
-            completed: 'Yes',
-            priority: 'high',
-        };
-        render(<TaskItem task={completedTask} onEdit={mockOnEdit} onDelete={mockOnDelete} />);
-        expect(screen.getByText((content, element) => {
-            return element.tagName.toLowerCase() === 'span' && content === 'high';
-        })).toBeInTheDocument();
-        expect(screen.getByText('Completed Task')).toHaveClass('line-through');
-    });
+    expect(onRefresh).toHaveBeenCalled();
+  });
 });

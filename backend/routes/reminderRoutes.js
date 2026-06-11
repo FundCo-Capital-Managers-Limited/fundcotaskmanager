@@ -46,3 +46,6 @@ router.put('/:id/dismiss', authMiddleware, dismissReminder);
 router.put('/preferences', authMiddleware, updatePreferences);
 
 export default router;
+
+
+

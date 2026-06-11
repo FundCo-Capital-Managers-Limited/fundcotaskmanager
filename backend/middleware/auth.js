@@ -66,3 +66,6 @@ export default async function authMiddleware(req, res, next) {
 
 export const authMiddlewareAllowVirtualAdmin = async (req, res, next) =>
   attachAuthenticatedUser(req, res, next, { allowVirtualAdmin: true });
+
+
+

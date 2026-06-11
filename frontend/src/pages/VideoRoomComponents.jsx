@@ -1,5 +1,5 @@
 // src/pages/VideoRoomComponents.jsx
-// All logic preserved exactly — only styling converted to CSS variables
+// All logic preserved exactly only styling converted to CSS variables
 import React, { useState, useEffect, useRef } from 'react';
 import {
   Mic, MicOff, Video, VideoOff, Pin, PinOff,
@@ -14,9 +14,9 @@ export const getFullName = (user) => {
   return `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'Guest';
 };
 
-// ── Video Tile ────────────────────────────────────────────────────────────────
+// Video Tile
 // KEY: video element is always in DOM; srcObject set imperatively via useEffect.
-// This is the correct WebRTC pattern — never conditionally render <video>.
+// This is the correct WebRTC pattern never conditionally render video.
 export const VideoTile = React.memo(({
   stream, user, isLocal, mediaState, isPinned, onPin, isLarge, isSpeaking,
 }) => {
@@ -110,7 +110,7 @@ export const VideoTile = React.memo(({
 });
 VideoTile.displayName = 'VideoTile';
 
-// ── Floating Reaction ─────────────────────────────────────────────────────────
+// Floating Reaction
 export const FloatingReaction = ({ emoji, userName, onDone }) => {
   useEffect(() => {
     const t = setTimeout(onDone, 3500);
@@ -132,8 +132,8 @@ export const FloatingReaction = ({ emoji, userName, onDone }) => {
   );
 };
 
-// ── Chat Panel ────────────────────────────────────────────────────────────────
-// Messages live in parent (VideoRoom) — this is purely presentational.
+// Chat Panel
+// Messages live in parent (VideoRoom) this is purely presentational.
 export const ChatPanel = ({ messages, onSend, onClose, currentUser }) => {
   const [msg,    setMsg]    = useState('');
   const bottomRef = useRef(null);
@@ -231,7 +231,7 @@ export const ChatPanel = ({ messages, onSend, onClose, currentUser }) => {
   );
 };
 
-// ── Participants Panel ────────────────────────────────────────────────────────
+// Participants Panel
 export const ParticipantsPanel = ({ peers, localUser, localMediaState, hostId, onClose }) => {
   const allPeers = [
     { socketId: 'local', user: localUser, mediaState: localMediaState || {}, isLocal: true },

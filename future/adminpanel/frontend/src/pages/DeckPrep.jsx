@@ -899,7 +899,7 @@ const DeckPrep = () => {
                     </div>
                     <button type="button" className="btn-secondary" onClick={rawExtract} disabled={Boolean(busy) || (!file && !documentId)}><FileText className="h-4 w-4" />Extract</button>
                   </div>
-                  <textarea value={fullText} onChange={(event) => setFullText(event.target.value)} rows={9} className="input-base mt-4 resize-y text-sm" style={{ fontFamily: 'Georgia, \"Source Serif Pro\", serif', lineHeight: 1.7 }} placeholder="Full document text appears here." />
+                  <textarea value={fullText} onChange={(event) => setFullText(event.target.value)} rows={9} className="input-base mt-4 resize-y text-sm" style={{ fontFamily: 'Georgia, "Source Serif Pro", serif', lineHeight: 1.7 }} placeholder="Full document text appears here." />
                   <div className="mt-3 flex flex-wrap gap-2">
                     <button type="button" className="btn-secondary min-h-0 px-3 py-2 text-xs" onClick={saveFullText} disabled={Boolean(busy) || !documentId}><Check className="h-3.5 w-3.5" />Save text</button>
                     <button type="button" className="btn-secondary min-h-0 px-3 py-2 text-xs" onClick={() => downloadPlainText(fullText, deck.title || file?.name || 'deckprep-text')} disabled={!fullText}><Download className="h-3.5 w-3.5" />Download .txt</button>
@@ -1060,3 +1060,6 @@ const DeckPrep = () => {
 };
 
 export default DeckPrep;
+
+
+

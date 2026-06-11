@@ -47,3 +47,6 @@ const StickerPicker = ({ onPick, onClose }) => (
 );
 
 export default StickerPicker;
+
+
+

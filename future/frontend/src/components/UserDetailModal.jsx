@@ -182,7 +182,7 @@ const UserDetailModal = ({ isOpen, onClose, data, userId }) => {
                 </div>
               </div>
 
-              {/* Score breakdown — the key new section */}
+              {/* Score breakdown the key new section */}
               <div className="rounded-xl border overflow-hidden"
                 style={{ backgroundColor:'var(--bg-surface)', borderColor:'var(--border-color)' }}>
                 <div className="px-5 py-3 border-b" style={{ borderColor:'var(--border-color)', backgroundColor:'var(--bg-subtle)' }}>

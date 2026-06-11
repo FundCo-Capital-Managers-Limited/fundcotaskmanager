@@ -1,7 +1,7 @@
 import Reminder from '../models/reminderModel.js';
 import { buildTeamQuery } from '../middleware/teamFilter.js';
 
-// ── Get all reminders (team-filtered) ─────────────────────────────────────────
+// Get all reminders (team-filtered)
 export const getAllReminders = async (req, res) => {
   try {
     const query = buildTeamQuery(req.teamMemberIds, 'user');
@@ -23,7 +23,7 @@ export const getAllReminders = async (req, res) => {
   }
 };
 
-// ── Create reminder for user ──────────────────────────────────────────────────
+// Create reminder for user
 export const createReminderForUser = async (req, res) => {
   try {
     const { userId, type, message, remindAt, deliveryChannels, repeatInterval } = req.body;
@@ -49,7 +49,7 @@ export const createReminderForUser = async (req, res) => {
   }
 };
 
-// ── Delete reminder ───────────────────────────────────────────────────────────
+// Delete reminder
 export const deleteReminder = async (req, res) => {
   try {
     const reminder = await Reminder.findByIdAndDelete(req.params.id);
@@ -60,3 +60,6 @@ export const deleteReminder = async (req, res) => {
     res.status(500).json({ success: false, message: 'Failed to delete reminder' });
   }
 };
+
+
+

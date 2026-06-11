@@ -17,7 +17,7 @@ const LEVEL_COLORS = {
   expert:       { text:'#7c3aed', bg:'rgba(167,139,250,.1)', border:'rgba(167,139,250,.25)' },
 };
 
-// ── safe content renderer — handles undefined/null content gracefully ──────
+// safe content renderer handles undefined/null content gracefully
 function renderContent(raw) {
   const text = (raw != null ? String(raw) : '').trim();
   if (!text) return <p style={{color:'var(--lms-t3)',fontStyle:'italic',fontSize:14}}>No content available for this module.</p>;
@@ -25,7 +25,7 @@ function renderContent(raw) {
   return text.split('\n').map((line, i) => {
     const t = line.trim();
     if (!t) return <div key={i} style={{height:6}} />;
-    // All-caps short lines → section heading
+    // All-caps short lines section heading
     if (/^[A-Z0-9 &()/:–\-·]{5,65}$/.test(t) && t === t.toUpperCase() && t.length < 65) {
       return <h3 key={i} style={{fontFamily:'var(--lms-display)',fontSize:12,fontWeight:800,letterSpacing:'.07em',color:'var(--lms-accent)',margin:'22px 0 8px',textTransform:'uppercase',borderBottom:'2px solid var(--lms-s3)',paddingBottom:4}}>{t}</h3>;
     }
@@ -54,7 +54,7 @@ export default function CourseViewer({ courseId, progress, onBack, onProgressUpd
   const [savingModule,   setSavingModule]   = useState(false);
   const contentRef = useRef(null);
 
-  // ── KEY FIX: always load FULL course (modules with content) ───────────────
+  // KEY FIX: always load FULL course (modules with content)
   useEffect(() => {
     let cancelled = false;
     setLoading(true); setFetchError(false);
@@ -287,7 +287,7 @@ export default function CourseViewer({ courseId, progress, onBack, onProgressUpd
         </div>
 
         <div className="cv-body">
-          {/* ── SIDEBAR ── */}
+          {/* SIDEBAR */}
           <aside className="cv-sidebar">
             <div className="cv-sidebar-head">
               <h3>Course Content</h3>
@@ -332,7 +332,7 @@ export default function CourseViewer({ courseId, progress, onBack, onProgressUpd
             )}
           </aside>
 
-          {/* ── MAIN CONTENT ── */}
+          {/* MAIN CONTENT */}
           <main>
             <div className="cv-content-card" ref={contentRef}>
               {/* Header */}
