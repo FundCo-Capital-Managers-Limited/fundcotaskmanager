@@ -57,7 +57,7 @@ const Feedback = () => {
                     <main className="p-8">
                         <form onSubmit={handleSubmit} className="space-y-8">
                             <div>
-                                <label className="block text-sm text-[var(--text-secondary)] mb-2">What is your feedback about?</label>
+                                <label className="block text-sm text-[var(--text-secondary)] mb-2">What is your feedback about? <span className="text-red-500">*</span></label>
                                 <select
                                     value={category}
                                     onChange={e => setCategory(e.target.value)}
@@ -89,6 +89,11 @@ const Feedback = () => {
                                 <Send className="w-5 h-5" />
                                 {isSubmitting ? 'Submitting...' : 'Submit Feedback'}
                             </button>
+                            {!isSubmitting && (!category || !feedback.trim()) && (
+                                <p className="text-xs text-center -mt-4" style={{ color: 'var(--text-muted)' }}>
+                                    {!category ? 'Select a category' : 'Write your feedback'} to enable Submit.
+                                </p>
+                            )}
                         </form>
                     </main>
                 </motion.div>

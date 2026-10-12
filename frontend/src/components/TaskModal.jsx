@@ -241,8 +241,14 @@ const TaskModal = ({ isOpen, onClose, taskToEdit, onSave, onLogout, isReadOnly =
             {/* Checklist */}
             <div>
               <label className="block text-xs font-bold uppercase tracking-wider mb-1.5" style={{ color: 'var(--text-secondary)' }}>
-                Checklist {checklist.length > 0 && `(${checklist.filter((i) => i.completed).length}/${checklist.length})`}
+                Checklist <span className="text-red-500">*</span>{checklist.length > 0 && ` (${checklist.filter((i) => i.completed).length}/${checklist.length})`}
               </label>
+
+              {checklist.length === 0 && !revenueProjectTask && (
+                <p className="text-xs mb-2" style={{ color: 'var(--text-muted)' }}>
+                  Add at least one checklist item — a process breakdown is required before this task can be saved.
+                </p>
+              )}
 
               {revenueProjectTask ? (
                 <div

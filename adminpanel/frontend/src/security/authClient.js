@@ -137,7 +137,6 @@ const isRetryableRefreshError = (error) => {
   ).toLowerCase();
 
   return [
-    'refresh token missing',
     'network error',
     'failed to fetch',
     'load failed',

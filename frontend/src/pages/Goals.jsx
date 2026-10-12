@@ -207,7 +207,12 @@ const GoalForm = ({ initial, onSubmit, onCancel, isLoading, isEdit = false, task
         </Field>
       )}
 
-      <Field label={`Sub-Goals (${(data.subGoals||[]).length})`}>
+      <Field label={<>Sub-Goals <span className="text-red-500">*</span> ({(data.subGoals||[]).length})</>}>
+        {(data.subGoals || []).length === 0 && (
+          <p className="text-[11px] mb-2" style={{ color: 'var(--text-muted)' }}>
+            Add at least one sub-goal — this is required before the goal can be saved.
+          </p>
+        )}
         <div className="flex gap-2 mb-2">
           <FocusInput value={subInput} onChange={e => setSubInput(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && addSub()}
