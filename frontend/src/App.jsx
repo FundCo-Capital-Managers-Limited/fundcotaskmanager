@@ -56,6 +56,17 @@ const App = () => {
   const navigate = useNavigate();
   const [currentUser, setCurrentUser] = useState(() => readStoredUser());
   const [authReady, setAuthReady] = useState(false);
+  const [aiEnabled, setAiEnabled] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:4001';
+    fetch(`${apiBase}/api/grok/status`)
+      .then((r) => r.json())
+      .then((data) => { if (!cancelled) setAiEnabled(Boolean(data?.enabled)); })
+      .catch(() => { if (!cancelled) setAiEnabled(false); });
+    return () => { cancelled = true; };
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -213,7 +224,7 @@ const App = () => {
           <Route path="/analytics" element={<PerformanceAnalytics />} />
           <Route path="/performance" element={<PerformanceDashboard />} />
           <Route path="/social-feed" element={<SocialFeed />} />
-          <Route path="/ai-tools" element={<AiTools />} />
+          <Route path="/ai-tools" element={aiEnabled ? <AiTools /> : <Navigate to="/" replace />} />
           <Route path="/reminders" element={<Reminders />} />
           <Route path="/goals" element={<Goals />} />
           <Route path="/projects" element={<Projects />} />

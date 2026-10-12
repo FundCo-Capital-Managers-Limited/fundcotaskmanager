@@ -9,10 +9,15 @@ import {
   updateChat,
   deleteChat,
   clearToolHistory,
+  getAiStatus,
 } from '../controllers/grokController.js';
 
 const router = express.Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } });
+
+// Public, cheap availability check — lets the frontend hide AI features entirely
+// rather than show a provider-specific error when the AI backend isn't configured.
+router.get('/status', getAiStatus);
 
 router.use(authMiddlewareAllowVirtualAdmin);
 

@@ -330,7 +330,7 @@ const DocumentConverter = () => {
                             className="bg-[var(--bg-surface)] rounded-3xl p-6 w-full max-w-sm border border-[var(--border-color)] shadow-2xl"
                         >
                             <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-4">Convert PDF to Text?</h3>
-                            <p className="text-sm text-[var(--text-secondary)] mb-6">Do you want to convert this PDF to full text using Grok AI? This is recommended for extraction.</p>
+                            <p className="text-sm text-[var(--text-secondary)] mb-6">Do you want to convert this PDF to full text using AI? This is recommended for extraction.</p>
                             <div className="flex gap-4">
                                 <button onClick={() => handleConfirmConvert(true)} className="flex-1 py-3 bg-[var(--brand-primary)] text-white rounded-3xl">Yes, Convert</button>
                                 <button onClick={() => handleConfirmConvert(false)} className="flex-1 py-3 border border-[var(--border-color)] text-[var(--text-primary)] rounded-3xl">No, Skip</button>

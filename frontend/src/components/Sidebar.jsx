@@ -14,6 +14,7 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:4001';
 const UNREAD_POSTS_KEY = 'socialFeedUnreadCount';
 
 const Sidebar = ({ user, isExpanded, onToggle, mobileOpen = false, onCloseMobile }) => {
+  const [aiEnabled, setAiEnabled] = useState(false);
   const [chatUnreadTotal,   setChatUnreadTotal]   = useState(0);
   const [socialUnreadTotal, setSocialUnreadTotal] = useState(() => {
     const s = localStorage.getItem(UNREAD_POSTS_KEY);
@@ -48,6 +49,16 @@ const Sidebar = ({ user, isExpanded, onToggle, mobileOpen = false, onCloseMobile
       }
     } catch {}
   }, [user]);
+
+  /* Check AI availability once — hides AI Tools entirely rather than
+     surfacing a provider-specific error if the AI backend isn't configured. */
+  useEffect(() => {
+    let cancelled = false;
+    axios.get(`${API_BASE_URL}/api/grok/status`)
+      .then((res) => { if (!cancelled) setAiEnabled(Boolean(res.data?.enabled)); })
+      .catch(() => { if (!cancelled) setAiEnabled(false); });
+    return () => { cancelled = true; };
+  }, []);
 
   useEffect(() => { fetchUnreadTotal(); }, [fetchUnreadTotal]);
   useEffect(() => {
@@ -98,7 +109,7 @@ const Sidebar = ({ user, isExpanded, onToggle, mobileOpen = false, onCloseMobile
     { text: 'Reminders',      path: '/reminders',          icon: Bell,           badge: reminderBadge },
     { text: 'Team Chat',      path: '/team-chat',          icon: MessageSquare,  badge: chatBadge },
     { text: 'Social Feed',    path: '/social-feed',        icon: Instagram,      badge: socialBadge },
-    { text: 'AI Tools',       path: '/ai-tools',           icon: Sparkles },
+    ...(aiEnabled ? [{ text: 'AI Tools', path: '/ai-tools', icon: Sparkles }] : []),
     { text: 'Reports',        path: '/reports',            icon: FileText,        badge: reportBadge },
     { text: 'Performance',    path: '/performance',        icon: CreditCard },
     { text: 'Training',       path: '/training',           icon: BookOpen },

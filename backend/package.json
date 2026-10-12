@@ -4,9 +4,13 @@
     "version": "1.0.0",
     "main": "server.js",
     "scripts": {
-        "start": "nodemon server.js",
+        "start": "node server.js",
+        "dev": "nodemon server.js",
         "seed": "node seed/seedAll.js",
         "test": "jest --runInBand --coverage"
+    },
+    "engines": {
+        "node": ">=20"
     },
     "author": "",
     "license": "ISC",
@@ -40,7 +44,7 @@
         "nanoid": "^5.1.7",
         "node-cron": "^4.1.0",
         "node-fetch": "^3.3.2",
-        "nodemon": "^3.1.10",
+        "nodemailer": "^10.1.0",
         "openai": "^6.9.1",
         "pdf-lib": "^1.17.1",
         "pdf-parse": "^2.4.5",
@@ -48,7 +52,6 @@
         "pinata": "^1.10.1",
         "pptxgenjs": "^4.0.1",
         "readline-sync": "^1.4.10",
-        "resend": "^6.32.1",
         "sanitize-html": "^2.17.0",
         "socket.io": "^4.8.1",
         "unzipper": "^0.12.3",
@@ -65,6 +68,7 @@
         "jest": "^30.0.4",
         "jest-environment-jsdom": "^30.0.4",
         "jest-environment-node": "^30.0.4",
+        "nodemon": "^3.1.14",
         "supertest": "^7.1.3"
     }
 }

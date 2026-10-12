@@ -198,6 +198,12 @@ const toChatDetail = (chat) => ({
 });
 
 // Main chat handler (streaming SSE)
+// Cheap, public check so the frontend can hide AI features entirely instead
+// of surfacing a provider-specific error when the key is missing/invalid.
+export const getAiStatus = (req, res) => {
+  res.json({ enabled: Boolean(openai) });
+};
+
 export const grokChat = async (req, res) => {
   if (!openai) return res.status(503).json({ error: 'AI provider is not configured' });
 
