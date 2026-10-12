@@ -1,9 +1,9 @@
 import admin from 'firebase-admin';
 import User from '../models/userModel.js';
 
-//console.log('FIREBASE_CREDENTIALS:', process.env.FIREBASE_CREDENTIALS); // Debug
+const FIREBASE_ENABLED = Boolean(String(process.env.FIREBASE_CREDENTIALS || '').trim());
 
-if (!admin.apps.length) {
+if (FIREBASE_ENABLED && !admin.apps.length) {
     try {
         admin.initializeApp({
             credential: admin.credential.cert(JSON.parse(process.env.FIREBASE_CREDENTIALS)),
@@ -16,6 +16,11 @@ if (!admin.apps.length) {
 }
 
 const sendPushNotification = async ({ to, title, body }) => {
+    if (!FIREBASE_ENABLED) {
+        console.warn('Push notifications are disabled (FIREBASE_CREDENTIALS not set) — skipping push.');
+        return null;
+    }
+
     if (!to) {
         console.error('No push token provided');
         throw new Error('No push token provided');

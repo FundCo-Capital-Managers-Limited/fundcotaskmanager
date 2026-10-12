@@ -15,7 +15,6 @@ import AssignedTasks from './pages/Assigned';
 import CalendarView from './pages/Calendar';
 import TeamChat from './pages/TeamChat';
 import UrlShortener from './pages/UrlShortener';
-import FileStorage from './pages/FileStorage';
 import PerformanceAnalytics from './pages/PerformanceAnalytics';
 import PerformanceDashboard from './pages/PerformanceDashboard';
 import SocialFeed from './pages/SocialFeed';
@@ -25,13 +24,8 @@ import Goals from './pages/Goals';
 import Projects from './pages/Projects';
 import RevenueProjects from './pages/RevenueProjects';
 import Appraisals from './pages/Appraisals';
-import Meeting from './pages/Meeting';
 import Training from './pages/Training';
 import Feedback from './pages/Feedback';
-import DeckPrep from './pages/DeckPrep';
-import MeetingLobby from './pages/MeetingLobby';
-import VideoRoom from './pages/VideoRoom';
-import MeetingReports from './pages/MeetingReports.jsx';
 import { ThemeProvider } from './context/ThemeContext';
 import { NotificationProvider } from './context/NotificationContext.jsx';
 import {
@@ -215,7 +209,7 @@ const App = () => {
           <Route path="/calendar" element={<CalendarView />} />
           <Route path="/team-chat" element={<TeamChat />} />
           <Route path="/url-shortener" element={<UrlShortener />} />
-          <Route path="/file-storage" element={<FileStorage />} />
+          {/* File Storage hidden — Pinata/IPFS storage backend disabled, see docs/AUDIT_REPORT.md */}
           <Route path="/analytics" element={<PerformanceAnalytics />} />
           <Route path="/performance" element={<PerformanceDashboard />} />
           <Route path="/social-feed" element={<SocialFeed />} />
@@ -226,12 +220,9 @@ const App = () => {
           <Route path="/projects/:projectId" element={<Projects />} />
           <Route path="/revenue-projects" element={<RevenueProjects />} />
           <Route path="/appraisals" element={<Appraisals />} />
-          <Route path="/meeting" element={<Meeting />} />
+          {/* Meetings/DeckPrep hidden — see docs/AUDIT_REPORT.md */}
           <Route path="/training" element={<Training />} />
           <Route path="/feedback" element={<Feedback />} />
-          <Route path="/meeting-reports" element={<MeetingReports />} />
-          <Route path="/deck-prep" element={<DeckPrep />} />
-          <Route path="/document-converter" element={<Navigate to="/deck-prep" replace />} />
 
           {/* LAZY LOADED + Suspense (this fixes the huge chunk) */}
           <Route
@@ -243,13 +234,7 @@ const App = () => {
             }
           />
 
-          <Route path="/meetroom" element={<MeetingLobby />} />
         </Route>
-
-        <Route
-          path="/room/:roomId"
-          element={currentUser ? <VideoRoom embeddedUser={currentUser} onLogout={handleLogout} /> : <Navigate to="/login" replace />}
-        />
 
         <Route path="*" element={<Navigate to={currentUser ? '/' : '/login'} replace />} />
       </Routes>

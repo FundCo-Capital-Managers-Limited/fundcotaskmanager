@@ -4,10 +4,12 @@ import Task from '../models/taskModel.js';
 import OpenAI from 'openai';
 import { COMPANY_KNOWLEDGE, queryCompanyDocs } from '../services/grokService.js';
 
-const openai = new OpenAI({
-  apiKey: process.env.GROK_API_KEY,
-  baseURL: 'https://api.x.ai/v1',
-});
+const openai = process.env.GROK_API_KEY
+  ? new OpenAI({
+      apiKey: process.env.GROK_API_KEY,
+      baseURL: 'https://api.x.ai/v1',
+    })
+  : null;
 
 export async function sendChatMessage(req, res) {
   const { message } = req.body;
@@ -15,6 +17,10 @@ export async function sendChatMessage(req, res) {
 
   if (!message || !message.trim()) {
     return res.status(400).json({ success: false, message: 'Message is required' });
+  }
+
+  if (!openai) {
+    return res.status(503).json({ success: false, message: 'AI provider is not configured' });
   }
 
   try {

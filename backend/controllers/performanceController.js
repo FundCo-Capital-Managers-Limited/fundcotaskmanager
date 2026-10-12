@@ -16,10 +16,12 @@ import {
   LEVELS,
 } from '../utils/performanceCalculator.js';
 
-const openai = new OpenAI({
-  apiKey:  process.env.GROK_API_KEY,
-  baseURL: 'https://api.x.ai/v1',
-});
+const openai = process.env.GROK_API_KEY
+  ? new OpenAI({
+      apiKey: process.env.GROK_API_KEY,
+      baseURL: 'https://api.x.ai/v1',
+    })
+  : null;
 
 const getFullName = (user) => {
   if (!user) return 'Unknown User';
@@ -228,6 +230,8 @@ export const getUserDetails = async (req, res) => {
 
 // AI Analysis
 export const getUserAIAnalysis = async (req, res) => {
+  if (!openai) return res.status(503).json({ success: false, message: 'AI provider is not configured' });
+
   try {
     const { userId } = req.params;
     const isSelfView  = req.user.id === userId;

@@ -91,11 +91,9 @@ const AppRoutes = () => {
           <Route path="/social" element={<Suspense fallback={<Loader />}><Social /></Suspense>} />
           <Route path="/team-chat" element={<Suspense fallback={<Loader />}><TeamChat /></Suspense>} />
           <Route path="/ai-tools" element={<Suspense fallback={<Loader />}><AiTools /></Suspense>} />
-          <Route path="/deck-prep" element={<Suspense fallback={<Loader />}><DeckPrep /></Suspense>} />
-          <Route path="/files" element={<Suspense fallback={<Loader />}><FileStorage /></Suspense>} />
+          {/* Deck Prep / File Storage / Meetings hidden — see docs/AUDIT_REPORT.md */}
           <Route path="/training" element={<Suspense fallback={<Loader />}><Training /></Suspense>} />
           <Route path="/reminders" element={<Suspense fallback={<Loader />}><Reminders /></Suspense>} />
-          <Route path="/meetings" element={<Suspense fallback={<Loader />}><Meetings /></Suspense>} />
           <Route path="/feedbacks" element={<Suspense fallback={<Loader />}><Feedbacks /></Suspense>} />
           <Route path="/platform-activity" element={<Suspense fallback={<Loader />}><PlatformActivity /></Suspense>} />
           <Route path="/settings" element={<Suspense fallback={<Loader />}><ProfileSettings /></Suspense>} />

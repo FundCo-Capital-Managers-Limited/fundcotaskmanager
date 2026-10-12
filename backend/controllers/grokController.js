@@ -18,10 +18,12 @@ const truncate = (text, max) =>
     ? text.slice(0, max) + `\n\n[…truncated ${text.length - max} characters…]`
     : text;
 
-const openai = new OpenAI({
-  apiKey:  process.env.GROK_API_KEY,
-  baseURL: 'https://api.x.ai/v1',
-});
+const openai = process.env.GROK_API_KEY
+  ? new OpenAI({
+      apiKey: process.env.GROK_API_KEY,
+      baseURL: 'https://api.x.ai/v1',
+    })
+  : null;
 
 // Company knowledge
 const COMPANY_KNOWLEDGE = `
@@ -197,6 +199,8 @@ const toChatDetail = (chat) => ({
 
 // Main chat handler (streaming SSE)
 export const grokChat = async (req, res) => {
+  if (!openai) return res.status(503).json({ error: 'AI provider is not configured' });
+
   let { messages, taskContext, toolId, chatId } = req.body;
 
   // Parse JSON strings (from FormData)

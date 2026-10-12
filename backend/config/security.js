@@ -33,9 +33,6 @@ export const assertFutureBackendSecurityEnv = () => {
     'USER_JWT_SECRET',
     'ADMIN_JWT_SECRET',
     'INTERNAL_API_TOKEN',
-    'PINATA_API_KEY',
-    'PINATA_SECRET_API_KEY',
-    'PINATA_JWT',
     'BASE_URL',
     'FRONTEND_URL',
   ];

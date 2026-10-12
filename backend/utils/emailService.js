@@ -1,21 +1,9 @@
-import nodemailer from 'nodemailer';
+import { Resend } from 'resend';
 import validator from 'validator';
 
-const transporter = nodemailer.createTransport({
-    service: 'gmail',
-    host: 'smtp.gmail.com',
-    port: 587,
-    secure: false,
-    auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS,
-    },
-    tls: {
-        rejectUnauthorized: false,
-    },
-    debug: true,
-    logger: true,
-});
+const RESEND_API_KEY = String(process.env.RESEND_API_KEY || '').trim();
+const EMAIL_FROM = process.env.EMAIL_FROM || 'FundCo AI TM <onboarding@resend.dev>';
+const resend = RESEND_API_KEY ? new Resend(RESEND_API_KEY) : null;
 
 const sendEmail = async ({ to, subject, text, html }) => {
     if (!to || !validator.isEmail(to)) {
@@ -23,19 +11,27 @@ const sendEmail = async ({ to, subject, text, html }) => {
         throw new Error('Invalid or missing email address');
     }
 
+    if (!resend) {
+        console.warn(`Email sending is disabled (RESEND_API_KEY not set) — skipping email to ${to}.`);
+        return false;
+    }
+
     console.log(`Attempting to send email to ${to} | Subject: "${subject}"`);
 
     try {
-        await transporter.verify();
-        const info = await transporter.sendMail({
-            from: `"FundCo AI TM" <${process.env.EMAIL_USER}>`,
+        const { data, error } = await resend.emails.send({
+            from: EMAIL_FROM,
             to,
             subject,
             text,
             html: html || text,
         });
 
-        console.log(`Email sent successfully to ${to} | MessageId: ${info.messageId}`);
+        if (error) {
+            throw new Error(error.message || 'Unknown Resend error');
+        }
+
+        console.log(`Email sent successfully to ${to} | MessageId: ${data?.id}`);
         return true;
     } catch (error) {
         console.error(`Failed to send email to ${to}:`, error.message);

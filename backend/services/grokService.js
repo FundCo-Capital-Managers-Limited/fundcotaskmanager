@@ -1,9 +1,11 @@
 // backend/services/grokServices.js
 import OpenAI from 'openai';
-const openai = new OpenAI({
-  apiKey: process.env.GROK_API_KEY,
-  baseURL: 'https://api.x.ai/v1',
-});
+const openai = process.env.GROK_API_KEY
+  ? new OpenAI({
+      apiKey: process.env.GROK_API_KEY,
+      baseURL: 'https://api.x.ai/v1',
+    })
+  : null;
 
 export const COMPANY_KNOWLEDGE = `
 # FundCo Capital Managers Comprehensive Knowledge Base
@@ -417,6 +419,7 @@ Angwan Rina (Plateau), Shimankar (Plateau), Agbokim (Cross River), Bendeghe (Cro
 
 // Grok query with content restriction (enhanced to handle company docs)
 export const grokQuery = async (question, content) => {
+  if (!openai) throw new Error('AI provider is not configured (GROK_API_KEY missing)');
   const messages = [
     {
       role: 'system',
@@ -437,6 +440,7 @@ export const grokQuery = async (question, content) => {
 };
 // New: Query company docs using tools (e.g., for knowledge-base-query tool)
 export const queryCompanyDocs = async (query, fileName = 'all_company_docs.pdf') => {
+  if (!openai) throw new Error('AI provider is not configured (GROK_API_KEY missing)');
   // Use embedded COMPANY_KNOWLEDGE to answer queries
   const messages = [
     {

@@ -8,10 +8,12 @@ import OpenAI from 'openai';
 import { createNotification } from './notificationService.js';
 import { getNextRecurringReminderAt, getRecurrenceLabel } from './reminderRecurrence.js';
 
-const openai = new OpenAI({
-    apiKey: process.env.GROK_API_KEY,
-    baseURL: 'https://api.x.ai/v1',
-});
+const openai = process.env.GROK_API_KEY
+    ? new OpenAI({
+        apiKey: process.env.GROK_API_KEY,
+        baseURL: 'https://api.x.ai/v1',
+    })
+    : null;
 
 // Generate short, natural, contextual AI reminder
 const generateSmartReminderMessage = async (task, remindAt) => {
