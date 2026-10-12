@@ -4,6 +4,15 @@ This file is a living log of decisions, state, and open questions for this codeb
 Update it whenever something important is done or decided — don't let it go stale.
 Full original audit: [docs/AUDIT_REPORT.md](docs/AUDIT_REPORT.md).
 
+## Git commit convention (as of 2026-10-12)
+
+Commits made by Claude for this repo use:
+- **Author**: `Fundco Team <it@fundco.ng>`
+- **Committer**: whoever's local git profile is actually running the commit (unchanged, not overridden)
+- **Trailer**: `Co-Authored-By: <local git profile name/email>` (not a Claude attribution line — that convention was explicitly dropped for this repo)
+
+In practice: `git commit --author="Fundco Team <it@fundco.ng>" -m "..."` with a `Co-Authored-By:` trailer for the local profile. Note: for GitHub to show "Fundco Team" as a linked profile/avatar rather than plain text, `it@fundco.ng` needs to be a verified email on the `fundco-it` GitHub account — that's a GitHub account setting, not something git itself controls.
+
 ## Architecture (quick reference)
 
 Four services:
