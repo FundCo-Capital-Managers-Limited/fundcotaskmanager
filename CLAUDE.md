@@ -64,12 +64,12 @@ Four services:
 
 ## QA pass results (manual click-through, all 4 roles)
 
-Full report + 82 screenshots: `qa-screenshots/OPERATING_MANUAL.md` (gitignored, local only). Bugs found, not yet fixed:
-1. **Reminder creation always fails** server-side ("recurrence.weekdays must be array of day indexes 0-6") even with no recurrence configured — blocks the whole Reminders feature for standard users. Worth prioritizing, it's a full feature outage.
-2. Task creation silently requires ≥1 checklist item; error only shows after submit, not marked required in the UI.
-3. Goal creation has the identical issue with sub-goals.
-4. Feedback page's Submit button stays disabled until a category is picked, no inline hint why.
-5. Repeated 401→429 on `POST /api/user/refresh` in the first few seconds after every login — app recovers, but the retry pattern is noisy and worth tightening.
+Full report + 82 screenshots: `qa-screenshots/OPERATING_MANUAL.md` (gitignored, local only). Bugs found:
+1. **FIXED** — Reminder creation always failed server-side ("recurrence.weekdays must be array of day indexes 0-6") even with no recurrence configured. Root cause: passing `recurrence: null` into the Mongoose constructor/assignment still ran the nested subdocument's `weekdays` validator against an uninitialized value; passing `undefined` instead lets Mongoose skip the subdocument. Fixed in `backend/controllers/reminderController.js` (create + update).
+2. **FIXED** — Task creation silently required ≥1 checklist item with the error only showing after submit. Now marked required with an inline hint in `TaskModal.jsx`.
+3. **FIXED** — Goals had the identical issue with sub-goals. Same inline-hint fix in `Goals.jsx`.
+4. **FIXED** — Feedback page's Submit button stayed disabled until a category was picked with no hint why. Now shows what's missing, in `Feedback.jsx`.
+5. **FIXED** — Repeated 401→429 on `POST /api/user/refresh` after login. Root cause: `isRetryableRefreshError` treated a `'refresh token missing'` 401 as retryable, firing a second refresh call 350ms later for every unauthenticated/fresh page load (a missing cookie doesn't appear 350ms later). Fixed in both frontends' `security/authClient.js`.
 
 Positive: role-based access control is enforced route-side, not just hidden nav (Executive/Team-Lead hitting `/users` or `/platform-activity` directly get a real access-denied screen, confirmed by direct navigation, not just UI hiding).
 
