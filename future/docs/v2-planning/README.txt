@@ -1,8 +1,0 @@
-Generated V2 planning documents
-01_V2_Architecture_Document.docx
-02_V2_ADR_Set.docx
-03_V2_Event_Taxonomy_and_Operational_Data_Model.docx
-04_V2_Shared_Service_Refactor_Plan.docx
-05_V2_Admin_UX_Map.docx
-06_V2_Phased_Implementation_Backlog.docx
-07_V2_Formal_Execution_Backlog_and_Module_Ownership.docx

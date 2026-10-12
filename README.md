@@ -1,33 +1,19 @@
 ﻿# FundCo AI Repository
 
-FundCo AI is a multi-surface operating platform for company execution, collaboration, oversight, and controlled follow-on development.
-
-This repository contains two maintained platform surfaces:
-
-- the current Version 1 runtime applications at the repository root
-- the `future/` workspace used for controlled follow-on development
+FundCo AI is a multi-surface operating platform for company execution, collaboration, and oversight.
 
 ## Repository At A Glance
 
-### Version 1 runtime surfaces
+### Runtime surfaces
 
 - `frontend/` - user workspace frontend
 - `backend/` - user platform API, background jobs, and real-time services
 - `adminpanel/frontend/` - admin workspace frontend
 - `adminpanel/backend/` - admin API and real-time services
 
-### Future workspace
-
-- `future/frontend/` - future user workspace frontend
-- `future/backend/` - future user platform API and real-time service
-- `future/adminpanel/frontend/` - future admin workspace frontend
-- `future/adminpanel/backend/` - future admin API and real-time service
-- `future/landing/` - landing and platform access surface
-
 ### Shared supporting material
 
 - `diagrams/` - architecture and analysis diagrams used for technical orientation
-- `tree.txt` - repository structure snapshot
 
 ## What The Platform Covers
 
@@ -66,8 +52,6 @@ Each frontend and backend service is maintained as its own runnable unit. Setup 
 
 ## Documentation Map
 
-### Version 1
-
 - [frontend/README.md](frontend/README.md) - user frontend runbook
 - [backend/README.md](backend/README.md) - user backend runbook
 - [backend/docs/API.md](backend/docs/API.md) - user backend API reference
@@ -75,18 +59,8 @@ Each frontend and backend service is maintained as its own runnable unit. Setup 
 - [adminpanel/frontend/README.md](adminpanel/frontend/README.md) - admin frontend runbook
 - [adminpanel/backend/README.md](adminpanel/backend/README.md) - admin backend runbook
 - [adminpanel/backend/docs/API.md](adminpanel/backend/docs/API.md) - admin backend API reference
-
-### Future workspace
-
-- [future/README.md](future/README.md) - workspace layout and execution model
-- [future/frontend/README.md](future/frontend/README.md) - future user frontend runbook
-- [future/backend/README.md](future/backend/README.md) - future user backend runbook
-- [future/backend/docs/API.md](future/backend/docs/API.md) - future user backend API reference
-- [future/adminpanel/README.md](future/adminpanel/README.md) - future admin workspace overview
-- [future/adminpanel/frontend/README.md](future/adminpanel/frontend/README.md) - future admin frontend runbook
-- [future/adminpanel/backend/README.md](future/adminpanel/backend/README.md) - future admin backend runbook
-- [future/adminpanel/backend/docs/API.md](future/adminpanel/backend/docs/API.md) - future admin backend API reference
-- [future/landing/README.md](future/landing/README.md) - landing page notes
+- [CLAUDE.md](CLAUDE.md) - living project notes: decisions, open questions, future plans
+- [docs/AUDIT_REPORT.md](docs/AUDIT_REPORT.md) - full codebase audit
 
 ## System Diagrams
 
@@ -126,5 +100,3 @@ Shows the main frontend, backend, and integration boundaries at a component leve
 
 - Authentication is split by platform. User and admin services maintain separate access tokens and refresh cookies.
 - The platform uses both HTTP APIs and Socket.IO channels. Service-level API documentation calls out real-time behavior where relevant.
-- The root runtime and the `future/` workspace share domain concepts, but they should be treated as separate maintained surfaces.
-- Archive or backup directories are recovery material only and should not be treated as primary execution targets.

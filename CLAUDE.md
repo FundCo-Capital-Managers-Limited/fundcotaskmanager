@@ -21,7 +21,7 @@ Four services:
 - `adminpanel/backend/` → Render, separate service (port 4002 locally) — admin API, shares the same MongoDB as main backend
 - `adminpanel/frontend/` → Vercel, separate project (port 5174 locally) — admin dashboard
 
-`_backup/` and `future/` are dead/stale — not deployed, excluded from all work.
+`_backup/` and `future/` were confirmed dead/stale and deleted from the repo on 2026-10-12 (see Decisions below).
 
 ## Local dev setup (done)
 
@@ -87,5 +87,5 @@ Positive: role-based access control is enforced route-side, not just hidden nav 
 - **Launch AI Tools** when ready: add real Anthropic billing, set `AI_TOOLS_VISIBLE=true` on the main backend. No code work left.
 - Finish wiring the AI-hidden-when-unavailable behavior into `AIReportPanel`/`ReportEditor` (the admin frontend's AI Tools page is done, see above).
 - ~~Fix the drifted Mongoose schemas between `backend/models/` and `adminpanel/backend/models/`~~ **Checked 2026-10-12: mostly a non-issue.** Diffed every shared model field-by-field (not just by eyeballing the audit's two examples) — `userModel.js` and `taskModel.js` (the two the audit specifically named) are actually already in sync; so are `goalModel.js`, `postModel.js`, `reportModel.js`, `roomModel.js`, `learningMaterialModel.js` — all "differences" turned out to be formatting style only (compact vs. expanded object literals), not real schema drift. **One real bug did turn up**: `adminpanel/backend`'s own `reminderModel.js` was missing the `emailOverride` format validator and a secondary index (now added to match), and — more importantly — `adminpanel/backend/controllers/reminderController.js` has its own independent copy of the reminder-creation logic and had the **exact same `recurrence: null`-crashes-validation bug** just fixed on the main backend (same root cause, never caught because QA only exercised the main app's Reminders page, not the admin dashboard's "send reminder to user" feature). Fixed and verified the same way (reproduced against a running server, confirmed fixed, then confirmed no regression on the with-recurrence case).
-- Delete `_backup/` and `future/` once confirmed nobody needs them as reference (both are confirmed dead/stale, see audit).
+- ~~Delete `_backup/` and `future/`~~ **Done 2026-10-12.** Both confirmed dead/stale by the audit, removed from the repo along with the stale `tree.txt` (described an old pre-rename directory layout, see audit) and a stray committed dev-server log (`adminpanel/frontend/vite-dev.err`). README.md updated to drop all `future/`-workspace references.
 - Consider consolidating the duplicated `COMPANY_KNOWLEDGE` prompt blob (see Grok→Claude migration note above) — deliberately left alone during the migration, but worth a deliberate look later.
