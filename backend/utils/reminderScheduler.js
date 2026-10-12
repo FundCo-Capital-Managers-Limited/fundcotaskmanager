@@ -4,16 +4,9 @@ import User from '../models/userModel.js';
 import Task from '../models/taskModel.js';
 import { sendEmail } from './emailService.js';
 import { sendPushNotification } from './pushService.js';
-import OpenAI from 'openai';
+import { chatComplete } from '../services/aiClient.js';
 import { createNotification } from './notificationService.js';
 import { getNextRecurringReminderAt, getRecurrenceLabel } from './reminderRecurrence.js';
-
-const openai = process.env.GROK_API_KEY
-    ? new OpenAI({
-        apiKey: process.env.GROK_API_KEY,
-        baseURL: 'https://api.x.ai/v1',
-    })
-    : null;
 
 // Generate short, natural, contextual AI reminder
 const generateSmartReminderMessage = async (task, remindAt) => {
@@ -43,13 +36,12 @@ Give one practical, actionable suggestion based on the description and checklist
 Speak directly to the user. Be warm and encouraging. No emojis, no dashes, no titles.`;
 
     try {
-        const response = await openai.chat.completions.create({
-            model: 'grok-4',
+        const text = await chatComplete({
             messages: [{ role: 'user', content: prompt }],
             temperature: 0.7,
-            max_tokens: 120,
+            maxTokens: 120,
         });
-        return response.choices[0].message.content.trim();
+        return text.trim();
     } catch (err) {
         console.error('AI reminder generation failed:', err.message);
         return null;

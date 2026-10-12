@@ -1,5 +1,5 @@
 // backend/controllers/grokController.js
-import OpenAI from 'openai';
+import { chatComplete, chatCompleteStream, isAiConfigured } from '../services/aiClient.js';
 import GrokChat from '../models/grokModel.js';
 import { createRequire } from 'module';
 import { extractPdfTextFromBuffer } from '../utils/pdfTextExtractor.js';
@@ -17,13 +17,6 @@ const truncate = (text, max) =>
   text.length > max
     ? text.slice(0, max) + `\n\n[…truncated ${text.length - max} characters…]`
     : text;
-
-const openai = process.env.GROK_API_KEY
-  ? new OpenAI({
-      apiKey: process.env.GROK_API_KEY,
-      baseURL: 'https://api.x.ai/v1',
-    })
-  : null;
 
 // Company knowledge
 const COMPANY_KNOWLEDGE = `
@@ -148,16 +141,14 @@ const processFiles = async (files, lastMessage) => {
 // Auto-generate title + summary
 const generateTitleAndSummary = async (fullContent) => {
   try {
-    const resp = await openai.chat.completions.create({
-      model: 'grok-4',
+    const text = await chatComplete({
       messages: [
         { role: 'system', content: 'You generate a short title (max 8 words) and one-sentence summary for chat sessions. Reply with EXACTLY two lines:\nTitle: <title>\nSummary: <summary>' },
         { role: 'user',   content: `Generate title and summary for this response:\n\n${fullContent.slice(0, 800)}` },
       ],
       temperature: 0.3,
-      max_tokens: 100,
-    });
-    const text  = resp.choices[0].message.content || '';
+      maxTokens: 100,
+    }) || '';
     const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
     const title   = (lines.find(l => l.startsWith('Title:'))   || '').replace('Title:', '').trim()   || 'FundCo AI Chat';
     const summary = (lines.find(l => l.startsWith('Summary:')) || '').replace('Summary:', '').trim() || '';
@@ -200,12 +191,16 @@ const toChatDetail = (chat) => ({
 // Main chat handler (streaming SSE)
 // Cheap, public check so the frontend can hide AI features entirely instead
 // of surfacing a provider-specific error when the key is missing/invalid.
+// AI_TOOLS_VISIBLE is a separate, deliberate rollout switch — the feature can
+// be fully migrated and working while still reporting disabled here, so it
+// stays hidden from users until someone explicitly flips it on.
 export const getAiStatus = (req, res) => {
-  res.json({ enabled: Boolean(openai) });
+  const visible = String(process.env.AI_TOOLS_VISIBLE || '').trim().toLowerCase() === 'true';
+  res.json({ enabled: visible && isAiConfigured() });
 };
 
 export const grokChat = async (req, res) => {
-  if (!openai) return res.status(503).json({ error: 'AI provider is not configured' });
+  if (!isAiConfigured()) return res.status(503).json({ error: 'AI provider is not configured' });
 
   let { messages, taskContext, toolId, chatId } = req.body;
 
@@ -238,8 +233,7 @@ export const grokChat = async (req, res) => {
   res.setHeader('X-Accel-Buffering', 'no');
 
   try {
-    const stream = await openai.chat.completions.create({
-      model: 'grok-4',
+    const stream = chatCompleteStream({
       messages: [
         { role: 'system', content: systemContent },
         ...messages.map(m => ({
@@ -248,13 +242,11 @@ export const grokChat = async (req, res) => {
         })),
       ],
       temperature: 0.35,
-      max_tokens:  4096,
-      stream: true,
+      maxTokens:  4096,
     });
 
     let fullContent = '';
-    for await (const chunk of stream) {
-      const delta = chunk.choices[0]?.delta?.content || '';
+    for await (const delta of stream) {
       if (delta) {
         fullContent += delta;
         res.write(`data: ${JSON.stringify({ content: delta })}\n\n`);

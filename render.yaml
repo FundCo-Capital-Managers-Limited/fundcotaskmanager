@@ -26,8 +26,11 @@ services:
         sync: false
       - key: ADMIN_FRONTEND_URL
         sync: false
-      # - key: ANTHROPIC_API_KEY   (set once the Claude migration is live — see CLAUDE.md)
-      #   sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: AI_TOOLS_VISIBLE
+        value: "false"
+      # - key: ANTHROPIC_MODEL   (optional override, defaults to claude-sonnet-5)
       # - key: SMTP_HOST / SMTP_PORT / SMTP_USER / SMTP_PASS   (optional, see docs/AUDIT_REPORT.md)
       # - key: PINATA_JWT   (optional — file storage is currently hidden, not required)
       # - key: ZOOM_ACCOUNT_ID / ZOOM_CLIENT_ID / ZOOM_CLIENT_SECRET   (optional — meetings hidden)

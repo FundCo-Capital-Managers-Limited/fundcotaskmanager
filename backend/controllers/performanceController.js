@@ -2,7 +2,7 @@
 import User from '../models/userModel.js';
 import Task from '../models/taskModel.js';
 import Goal from '../models/goalModel.js';
-import OpenAI from 'openai';
+import { chatComplete, isAiConfigured } from '../services/aiClient.js';
 import {
   calculateUserTotalScore,
   calculateCompletionRate,
@@ -15,13 +15,6 @@ import {
   PRIORITY_WEIGHTS,
   LEVELS,
 } from '../utils/performanceCalculator.js';
-
-const openai = process.env.GROK_API_KEY
-  ? new OpenAI({
-      apiKey: process.env.GROK_API_KEY,
-      baseURL: 'https://api.x.ai/v1',
-    })
-  : null;
 
 const getFullName = (user) => {
   if (!user) return 'Unknown User';
@@ -230,7 +223,7 @@ export const getUserDetails = async (req, res) => {
 
 // AI Analysis
 export const getUserAIAnalysis = async (req, res) => {
-  if (!openai) return res.status(503).json({ success: false, message: 'AI provider is not configured' });
+  if (!isAiConfigured()) return res.status(503).json({ success: false, message: 'AI provider is not configured' });
 
   try {
     const { userId } = req.params;
@@ -284,14 +277,13 @@ ${taskList || 'No tasks found'}
 Goals completed: ${goals.filter(g => g.subGoals?.every(s => s.completed)).length} of ${goals.length}
 `.trim();
 
-    const response = await openai.chat.completions.create({
-      model:       'grok-4',
+    const noteText = await chatComplete({
       messages:    [{ role: 'system', content: systemPrompt }, { role: 'user', content: userDataForAI }],
       temperature: 0.4,
-      max_tokens:  950,
+      maxTokens:   950,
     });
 
-    let aiNote = response.choices[0].message.content.trim().replace(/\s+/g, ' ');
+    let aiNote = noteText.trim().replace(/\s+/g, ' ');
     res.json({ success: true, aiNote });
   } catch (err) {
     console.error('AI Analysis error:', err);

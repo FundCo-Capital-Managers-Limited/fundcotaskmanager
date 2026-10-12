@@ -1,14 +1,7 @@
 import Report from '../models/reportModel.js';
 import Task from '../models/taskModel.js';
-import OpenAI from 'openai';
+import { chatComplete, isAiConfigured } from '../services/aiClient.js';
 import { createNotification } from '../utils/notificationService.js';
-
-const openai = process.env.GROK_API_KEY
-  ? new OpenAI({
-      apiKey: process.env.GROK_API_KEY,
-      baseURL: 'https://api.x.ai/v1',
-    })
-  : null;
 
 const emitEvent = (req, event, data) => {
   try {
@@ -19,23 +12,15 @@ const emitEvent = (req, event, data) => {
 };
 
 const callGrokStream = async ({ systemPrompt, userContent }) => {
-  if (!openai) return '';
-  const stream = await openai.chat.completions.create({
-    model: 'grok-4',
+  if (!isAiConfigured()) return '';
+  return chatComplete({
     messages: [
       { role: 'system', content: systemPrompt },
       { role: 'user', content: userContent },
     ],
     temperature: 0.35,
-    max_tokens: 4096,
-    stream: true,
+    maxTokens: 4096,
   });
-
-  let full = '';
-  for await (const chunk of stream) {
-    full += chunk.choices[0]?.delta?.content || '';
-  }
-  return full;
 };
 
 const REPORT_SYSTEM = `You are a professional report writer. Rewrite the grounded report draft into clean, natural, first-person progress reporting for a manager. Use clear Markdown formatting with headers, bullet points, and bold text. Preserve the exact employee name, task titles, checklist item wording, dates, and status facts. Never use placeholders such as [Your Name]. Do not invent tasks, checklist items, metrics, or blockers. If the facts are limited, stay concise and honest.`;
@@ -277,7 +262,7 @@ export const generateAIReport = async (req, res) => {
     });
 
     let content = fallbackContent;
-    if (openai) {
+    if (isAiConfigured()) {
       try {
         const aiContent = await callGrokStream({
           systemPrompt: REPORT_SYSTEM,

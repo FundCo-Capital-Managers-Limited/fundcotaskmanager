@@ -1,11 +1,5 @@
 // backend/services/grokServices.js
-import OpenAI from 'openai';
-const openai = process.env.GROK_API_KEY
-  ? new OpenAI({
-      apiKey: process.env.GROK_API_KEY,
-      baseURL: 'https://api.x.ai/v1',
-    })
-  : null;
+import { chatComplete, isAiConfigured } from './aiClient.js';
 
 export const COMPANY_KNOWLEDGE = `
 # FundCo Capital Managers Comprehensive Knowledge Base
@@ -419,7 +413,7 @@ Angwan Rina (Plateau), Shimankar (Plateau), Agbokim (Cross River), Bendeghe (Cro
 
 // Grok query with content restriction (enhanced to handle company docs)
 export const grokQuery = async (question, content) => {
-  if (!openai) throw new Error('AI provider is not configured (GROK_API_KEY missing)');
+  if (!isAiConfigured()) throw new Error('AI provider is not configured (ANTHROPIC_API_KEY missing)');
   const messages = [
     {
       role: 'system',
@@ -430,17 +424,11 @@ export const grokQuery = async (question, content) => {
       content: `Materials: ${content}\n\nQuestion: ${question}`,
     },
   ];
-  const response = await openai.chat.completions.create({
-    model: 'grok-4',
-    messages,
-    temperature: 0.7,
-    max_tokens: 1024,
-  });
-  return response.choices[0].message.content;
+  return chatComplete({ messages, temperature: 0.7, maxTokens: 1024 });
 };
 // New: Query company docs using tools (e.g., for knowledge-base-query tool)
 export const queryCompanyDocs = async (query, fileName = 'all_company_docs.pdf') => {
-  if (!openai) throw new Error('AI provider is not configured (GROK_API_KEY missing)');
+  if (!isAiConfigured()) throw new Error('AI provider is not configured (ANTHROPIC_API_KEY missing)');
   // Use embedded COMPANY_KNOWLEDGE to answer queries
   const messages = [
     {
@@ -455,11 +443,5 @@ ${COMPANY_KNOWLEDGE}`,
       content: query,
     },
   ];
-  const response = await openai.chat.completions.create({
-    model: 'grok-4',
-    messages,
-    temperature: 0.3,
-    max_tokens: 4096,
-  });
-  return response.choices[0].message.content;
+  return chatComplete({ messages, temperature: 0.3, maxTokens: 4096 });
 };

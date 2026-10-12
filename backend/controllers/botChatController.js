@@ -1,15 +1,8 @@
 // backend/controllers/botChatController.js
 import BotChat from '../models/botChatModel.js';
 import Task from '../models/taskModel.js';
-import OpenAI from 'openai';
+import { chatComplete, isAiConfigured } from '../services/aiClient.js';
 import { COMPANY_KNOWLEDGE, queryCompanyDocs } from '../services/grokService.js';
-
-const openai = process.env.GROK_API_KEY
-  ? new OpenAI({
-      apiKey: process.env.GROK_API_KEY,
-      baseURL: 'https://api.x.ai/v1',
-    })
-  : null;
 
 export async function sendChatMessage(req, res) {
   const { message } = req.body;
@@ -19,7 +12,7 @@ export async function sendChatMessage(req, res) {
     return res.status(400).json({ success: false, message: 'Message is required' });
   }
 
-  if (!openai) {
+  if (!isAiConfigured()) {
     return res.status(503).json({ success: false, message: 'AI provider is not configured' });
   }
 
@@ -63,18 +56,14 @@ ${COMPANY_KNOWLEDGE}
 Respond concisely, use markdown for lists/tables. For actions like create/update/delete, confirm the change.
 `;
 
-    // Call Grok API
-    const response = await openai.chat.completions.create({
-      model: 'grok-4',
+    const botResponse = await chatComplete({
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: message }
       ],
       temperature: 0.3,
-      max_tokens: 1024,
+      maxTokens: 1024,
     });
-
-    const botResponse = response.choices[0].message.content;
 
     // Save bot response
     chat.messages.push({

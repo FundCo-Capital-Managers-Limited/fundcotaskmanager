@@ -1,6 +1,6 @@
 import axios from 'axios';
 import mongoose from 'mongoose';
-import OpenAI from 'openai';
+import { chatComplete, isAiConfigured } from '../services/aiClient.js';
 import Document from '../models/documentModel.js';
 import File from '../models/fileModel.js';
 import { repairAndParseJson } from '../utils/jsonRepair.js';
@@ -15,13 +15,6 @@ import {
   buildFallbackSlide,
 } from '../utils/deckBuilder.js';
 import { createNotification } from '../utils/notificationService.js';
-
-const openai = process.env.GROK_API_KEY
-  ? new OpenAI({
-      apiKey: process.env.GROK_API_KEY,
-      baseURL: 'https://api.x.ai/v1',
-    })
-  : null;
 
 const MAX_TEXT_FOR_SLIDES = 14_000;
 const MAX_TEXT_FOR_EXTRACTION = 18_000;
@@ -663,20 +656,22 @@ Rules:
 - Do not invent facts or figures.`;
 
 const callSlideModel = async ({ systemPrompt, userPrompt, responseFormat = false, temperature = 0.35, maxTokens = 6000 }) => {
-  if (!openai) return '';
-  const request = {
-    model: 'grok-4',
+  if (!isAiConfigured()) return '';
+  // Anthropic has no equivalent of OpenAI's response_format: json_object — enforce
+  // JSON via an explicit instruction instead. repairAndParseJson() is still the
+  // safety net for whatever imperfect JSON comes back.
+  const finalSystemPrompt = responseFormat
+    ? `${systemPrompt}\n\nRespond with ONLY a single valid JSON object. No markdown code fences, no commentary before or after the JSON.`
+    : systemPrompt;
+
+  return chatComplete({
     messages: [
-      { role: 'system', content: systemPrompt },
+      { role: 'system', content: finalSystemPrompt },
       { role: 'user', content: userPrompt },
     ],
     temperature,
-    max_tokens: maxTokens,
-  };
-
-  if (responseFormat) request.response_format = { type: 'json_object' };
-  const response = await openai.chat.completions.create(request);
-  return response.choices?.[0]?.message?.content || '';
+    maxTokens,
+  });
 };
 
 const generateSlideJson = async ({
@@ -720,7 +715,7 @@ const generateSlideJson = async ({
     titleHint,
   });
 
-  if (!openai) return ensureDeckHasPresentationBody(fallbackDeck, sourceText, instruction);
+  if (!isAiConfigured()) return ensureDeckHasPresentationBody(fallbackDeck, sourceText, instruction);
 
   let raw = '';
   try {
@@ -1355,7 +1350,7 @@ export const regenerateSlide = async (req, res) => {
     const sourceText = cleanText(document.extractedText || document.fullText).slice(0, 6000);
 
     let nextSlide = null;
-    if (openai) {
+    if (isAiConfigured()) {
       const prompt = [
         'Improve this single slide while keeping it grounded in the source context.',
         'Do not mention Deck Prep, Quick Convert, AI Guided Builder, the prompt, or the conversion process unless those exact terms appear in the source text.',
