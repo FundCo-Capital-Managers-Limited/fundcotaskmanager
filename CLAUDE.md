@@ -20,6 +20,8 @@ Four services:
 - `.env` files exist in `backend/`, `adminpanel/backend/`, `frontend/`, `adminpanel/frontend/` — all gitignored, never commit these.
 - Secrets (`USER_JWT_SECRET`, `ADMIN_JWT_SECRET`, `INTERNAL_API_TOKEN` / `USER_BACKEND_INTERNAL_TOKEN`) were generated locally and are consistent across both backends per the sharing rules in `config/security.js`.
 - All four services boot/build clean as of this writing (verified by actually starting each one, not just reading code).
+- **Self-registration is disabled server-side** (`registerUser` in `backend/controllers/userController.js` always returns 403 — "Admin creates accounts manually"). There is no bootstrap path for the very first admin account through the API: admin creation requires an existing admin (`superAdminOnly` on `adminpanel/backend`'s `POST /api/admin/users/`), and there is no seed script for it. The first admin had to be created by writing directly to the `users` collection in MongoDB (role=`admin` is what the `superAdminOnly` middleware checks for — there's no separate "admin" collection, admin accounts are just `User` documents with an elevated `role`). Test accounts for all four roles (`admin`, `executive`, `team-lead`, `standard`) exist in the local `fundco-dev` database as of this session — ask the session that set them up for credentials rather than re-bootstrapping, to avoid clutter.
+- A full manual QA pass (every page, every role, screenshots, write-up as an operating manual) was kicked off in the background — see whichever session/agent handled it for the resulting `qa-screenshots/OPERATING_MANUAL.md` (gitignored, not in version control).
 
 ## Decisions made so far
 
