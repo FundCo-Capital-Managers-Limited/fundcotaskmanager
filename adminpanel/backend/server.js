@@ -50,7 +50,7 @@ const httpServer = createServer(app);
 assertFutureAdminSecurityEnv();
 app.set('trust proxy', 1);
 
-const port = parseInt(process.env.ADMIN_PORT || '4002', 10);
+const port = parseInt(process.env.PORT || process.env.ADMIN_PORT || '4002', 10);
 console.log(`Starting Admin server on port: ${port}`);
 
 

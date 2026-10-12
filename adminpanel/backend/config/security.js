@@ -15,7 +15,6 @@ export const USER_BACKEND_INTERNAL_TOKEN = requireEnv('USER_BACKEND_INTERNAL_TOK
 
 export const assertFutureAdminSecurityEnv = () => {
   const required = [
-    'ADMIN_PORT',
     'MONGO_URI',
     'ADMIN_JWT_SECRET',
     'INTERNAL_API_TOKEN',
