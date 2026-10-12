@@ -249,7 +249,7 @@ export const createReminder = async (req, res) => {
             createdBy: req.user._id,
             isUserCreated: type === 'custom',
             repeatInterval: repeatInterval || null,
-            recurrence: normalizedRecurrence,
+            recurrence: normalizedRecurrence || undefined,
             isActive: true,
             emailOverride: emailOverride || null,
         });
@@ -310,7 +310,7 @@ export const updateReminder = async (req, res) => {
         reminder.deliveryChannels = buildDeliveryChannels(deliveryChannels, reminder.deliveryChannels);
         reminder.remindAt = new Date(remindAt);
         reminder.repeatInterval = repeatInterval || null;
-        reminder.recurrence = normalizedRecurrence;
+        reminder.recurrence = normalizedRecurrence || undefined;
         reminder.emailOverride = emailOverride || null;
         reminder.isUserCreated = type === 'custom';
         reminder.isActive = true;
