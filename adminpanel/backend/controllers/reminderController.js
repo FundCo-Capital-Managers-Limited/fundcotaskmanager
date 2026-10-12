@@ -116,7 +116,7 @@ export const createReminderForUser = async (req, res) => {
         createdBy: req.user._id,
         isUserCreated: false,
         repeatInterval: repeatInterval || null,
-        recurrence: normalizedRecurrence,
+        recurrence: normalizedRecurrence || undefined,
         isActive: true,
       });
 

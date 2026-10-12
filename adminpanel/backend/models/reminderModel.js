@@ -53,12 +53,22 @@ const reminderSchema = new mongoose.Schema(
       timezone: { type: String, default: 'Africa/Lagos', trim: true },
     },
     isActive: { type: Boolean, default: true, index: true },
-    emailOverride: { type: String, trim: true, lowercase: true, default: null },
+    emailOverride: {
+      type: String,
+      trim: true,
+      lowercase: true,
+      default: null,
+      validate: {
+        validator: v => !v || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v),
+        message: 'Invalid email address',
+      },
+    },
   },
   { timestamps: true, toJSON: { virtuals: true }, toObject: { virtuals: true } }
 );
 
 reminderSchema.index({ user: 1, remindAt: 1, status: 1, isActive: 1 });
+reminderSchema.index({ user: 1, isActive: 1, type: 1 });
 
 const Reminder = mongoose.models.Reminder || mongoose.model('Reminder', reminderSchema);
 export default Reminder;
