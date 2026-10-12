@@ -52,6 +52,17 @@ Four services:
    - MongoDB itself is unaffected by this — it should be hosted externally (e.g., MongoDB Atlas free tier), not on Render, regardless of Render's plan.
    - Bottom line: free is fine for a review/demo deployment where occasional slow first-loads and slightly-late reminders are acceptable. It is not reliable for anything time-sensitive (real-time chat expectations, exact-time reminders) until upgraded to a paid instance type that doesn't spin down.
 
+## QA pass results (manual click-through, all 4 roles)
+
+Full report + 82 screenshots: `qa-screenshots/OPERATING_MANUAL.md` (gitignored, local only). Bugs found, not yet fixed:
+1. **Reminder creation always fails** server-side ("recurrence.weekdays must be array of day indexes 0-6") even with no recurrence configured — blocks the whole Reminders feature for standard users. Worth prioritizing, it's a full feature outage.
+2. Task creation silently requires ≥1 checklist item; error only shows after submit, not marked required in the UI.
+3. Goal creation has the identical issue with sub-goals.
+4. Feedback page's Submit button stays disabled until a category is picked, no inline hint why.
+5. Repeated 401→429 on `POST /api/user/refresh` in the first few seconds after every login — app recovers, but the retry pattern is noisy and worth tightening.
+
+Positive: role-based access control is enforced route-side, not just hidden nav (Executive/Team-Lead hitting `/users` or `/platform-activity` directly get a real access-denied screen, confirmed by direct navigation, not just UI hiding).
+
 ## Future plans
 
 - **Bring back push notifications** once there's a reason to (Firebase credentials + a decision on whether Firebase is still the right vendor for it). Currently just disabled, not removed — `utils/pushService.js` guards cleanly and no-ops.
