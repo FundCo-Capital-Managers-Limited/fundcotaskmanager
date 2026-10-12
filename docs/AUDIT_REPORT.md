@@ -1,8 +1,10 @@
 # FundCo Platform — Codebase Audit Report
 
-**Date:** 2026-10-12
+**Date:** 2026-10-12 (original audit); addendum added same engagement, post-remediation
 **Scope:** Full repository audit — `backend/`, `frontend/`, `adminpanel/` (backend + frontend), `_backup/`, `future/`, root config and docs.
 **Purpose:** Pre-deployment review ahead of migrating to Render (backend services) + Vercel (frontend services), switching the AI provider from Grok/xAI to Claude/Anthropic, and removing/replacing the Pinata/IPFS file-storage layer.
+
+> **Note on the addendum (Section 6):** Sections 1–5 below are the original static-code audit — read-only review of the repository, no app was ever run. Section 6 is a **separate, later pass**: after the fixes from Sections 1–5 were implemented, all four services were actually started locally and clicked through end-to-end (every page, every user role, real interactions) using a seeded set of test accounts. Everything in Section 6 was found live, at runtime, by using the app — not by reading code — and did not appear anywhere in the original static audit. Treat Section 6 as newly discovered, not as something the original audit missed through carelessness; some of it (e.g. the boot-crash bugs) is the kind of defect that is invisible to static review and only surfaces when the server actually starts.
 
 ---
 
@@ -144,7 +146,36 @@ Build one shared `services/aiClient.js` wrapping the Anthropic SDK, and point al
 
 ---
 
-## 6. Overall assessment
+## 6. ADDENDUM — New findings from live testing (post-remediation)
+
+**Everything in this section was discovered after Sections 1–7, during two later rounds of work: (a) actually booting all four services locally, and (b) a full hands-on QA pass (Playwright-driven, all 4 user roles, every reachable page, real interactions) once the app was running.** None of this was in the original static audit — it could not have been, since static review of source code cannot surface a crash that only happens when the process actually starts, or a validation bug that only fires when a real request hits a real server.
+
+### 8.1 — Found while first getting the app to boot (not in original audit)
+
+Two boot-time crash bugs were found **only by actually starting the server**, not by reading the code — both are landmines that unconditional module-level code construction creates, and both are now fixed:
+
+1. `backend/utils/pushService.js` called `admin.initializeApp(...)` (Firebase) unconditionally at module-import time. `JSON.parse(undefined)` on a missing `FIREBASE_CREDENTIALS` crashed the entire server at boot, before even reaching the documented environment-variable checks in `config/security.js`. The original audit flagged Firebase as "likely dead/unused" but did not catch that it was also an unconditional import-time crash risk.
+2. Five files — `services/grokService.js`, `controllers/grokController.js`, `controllers/botChatController.js`, `controllers/performanceController.js`, `utils/reminderScheduler.js` — each constructed an `OpenAI` client unconditionally at import time. The `openai` SDK itself throws if `apiKey` is falsy, so a missing `GROK_API_KEY` crashed the server at boot, not merely at first AI-call time as the original audit's static analysis assumed (it correctly noted 3 of 6 call sites lacked a "guard," but running the app revealed the failure mode was worse than a graceful runtime error — it was a hard crash before the server could even start).
+
+Both are now fixed (conditional construction, matching the pattern the two already-safe files used) and verified by actually rebooting the server afterward.
+
+### 8.2 — Found during the full QA click-through pass (not in original audit)
+
+A Playwright-driven pass logged into the app as four seeded test accounts (one per role: `admin`, `executive`, `team-lead`, `standard`) and interacted with every reachable page in both the main app and the admin dashboard — creating tasks, goals, chat messages, social posts, feedback, and reminders, not just loading pages. Full detail and 82 screenshots: `qa-screenshots/OPERATING_MANUAL.md` (kept local, not committed to version control). Findings:
+
+1. **Reminder creation is completely broken for end users.** Submitting a new reminder always fails backend validation with `recurrence.weekdays must be array of day indexes 0-6` — even when no recurrence/repeat option is selected at all. This is a full feature outage for the `standard` role, not a cosmetic bug, and was not visible in the static audit because it requires an actual POST request against the running validation logic to trigger.
+2. **Task creation silently requires at least one checklist item.** The UI never marks this as required; the user only learns about it from an error banner that appears after they attempt to submit.
+3. **Goal creation has the identical pattern** with sub-goals — "Add at least one sub-goal" is only shown post-submission, not indicated as a requirement beforehand.
+4. **The Feedback page's Submit button stays silently disabled** until a category is selected from its dropdown, with no inline hint explaining why — a user can type a full message and have no idea why nothing happens when they click Submit.
+5. **Every login triggers a 401 followed by a 429 (rate-limited)** on `POST /api/user/refresh` within the first few seconds. The app recovers and continues working, but this retry pattern is noisy and risky — worth tightening so a legitimate user session isn't ever at risk of hitting that rate limit under normal use.
+
+**One positive confirmation worth recording:** role-based access control was verified to be enforced **server-side**, not just by hiding navigation links. Logging in as `executive` or `team-lead` and navigating directly to `/users` or `/platform-activity` by URL produced a real "Super Admin only" access-denied response from the server — not merely a hidden nav item that the route would have rendered anyway. This matters because the original audit could only confirm route definitions existed with `superAdminOnly` middleware attached in the source; it could not confirm the middleware actually fired correctly end-to-end without running the app.
+
+No 500 errors, crashes, or broken layouts were found anywhere else across the ~38 distinct pages visited in this pass.
+
+---
+
+## 7. Overall assessment
 
 The Pinata-as-primary-storage decision and the complete absence of any Render/Vercel deployment scaffolding (no `render.yaml`, no `.env.example` on either side, `nodemon` left as the production start command, Vercel auto-deploy explicitly disabled on both frontends) together suggest this codebase was built and tested locally but never actually taken through a real production deployment — it was left at "works on my machine," not shipped.
 
@@ -152,9 +183,10 @@ That said, the code itself is not uniformly weak. There's real defensive enginee
 
 ---
 
-## 7. Suggested order of work
+## 8. Suggested order of work
 
-1. **Render/Vercel deployment scaffolding** — nothing else matters until this exists: `render.yaml`/start scripts/`engines.node` for both backend services, `.env.example` for both, flip Vercel auto-deploy on, consolidate the API-URL env var naming on the frontend.
-2. **Pinata/IPFS decision and implementation** — choose Option A (replace with private S3) or Option B (true removal), then execute per the file list in Section 2.
-3. **Grok → Claude migration** — build the shared `services/aiClient.js`, migrate the six call sites, rewrite streaming/vision/JSON-mode handling, update the one frontend string.
-4. **Everything else in Section 5** is cleanup that can happen opportunistically alongside 1–3, not a blocker to deployment.
+1. **Render/Vercel deployment scaffolding** — nothing else matters until this exists: `render.yaml`/start scripts/`engines.node` for both backend services, `.env.example` for both, flip Vercel auto-deploy on, consolidate the API-URL env var naming on the frontend. *(Status: done — `render.yaml` added, start scripts fixed, both boot-crash bugs in Section 6.1 fixed as part of getting this far.)*
+2. **Pinata/IPFS decision and implementation** — choose Option A (replace with private S3) or Option B (true removal), then execute per the file list in Section 2. *(Status: hidden from both frontends, not yet replaced or removed at the backend level — decision still open.)*
+3. **Grok → Claude migration** — build the shared `services/aiClient.js`, migrate the six call sites, rewrite streaming/vision/JSON-mode handling, update the one frontend string. *(Status: intentionally paused — AI is hidden by default via `/api/grok/status` until a decision is made on whether to keep the AI feature at all; see CLAUDE.md.)*
+4. **Fix the reminder-creation bug (Section 6.2, #1)** — this is a full feature outage discovered during QA, not a nitpick; recommend treating it with the same priority as the deployment blockers above rather than filing it under general cleanup.
+5. **Everything else in Section 5 and the remaining Section 6.2 findings** (checklist/sub-goal UX, feedback button affordance, the refresh-token retry noise) is cleanup that can happen opportunistically, not a blocker to deployment.
