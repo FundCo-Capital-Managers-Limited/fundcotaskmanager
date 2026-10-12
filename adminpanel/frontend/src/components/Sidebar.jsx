@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { NavLink } from 'react-router-dom';
 import {
@@ -61,8 +61,10 @@ const formatBadge = (value) => {
   return value > 99 ? '99+' : String(value);
 };
 
-const SidebarInner = ({ user, hasRole, onLogout, collapsed, onNavigate, counts, onToggleCollapse }) => {
-  const items = navConfig.filter((item) => !item.roles || item.roles.some((role) => hasRole(role)));
+const SidebarInner = ({ user, hasRole, onLogout, collapsed, onNavigate, counts, onToggleCollapse, aiEnabled }) => {
+  const items = navConfig
+    .filter((item) => !item.roles || item.roles.some((role) => hasRole(role)))
+    .filter((item) => item.to !== '/ai-tools' || aiEnabled);
   const showText = !collapsed;
   const fullName = user?.fullName || `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || 'Admin';
   const roleLabel = user?.role === 'admin' ? 'Super Admin' : user?.role === 'executive' ? 'Executive' : user?.role === 'team-lead' ? 'Team Lead' : 'Standard';
@@ -165,6 +167,19 @@ const SidebarInner = ({ user, hasRole, onLogout, collapsed, onNavigate, counts, 
 const Sidebar = ({ user, hasRole, onLogout, collapsed, mobileOpen, onClose, onToggleCollapse }) => {
   const { counts } = useNotifications();
   const width = collapsed ? 'var(--sidebar-w-collapsed)' : 'var(--sidebar-w)';
+  const [aiEnabled, setAiEnabled] = useState(false);
+
+  // AI Tools calls the main user backend directly (not the admin backend), so its
+  // availability check lives there too — hide the nav entry unless it confirms AI is on.
+  useEffect(() => {
+    let cancelled = false;
+    const userApiBase = import.meta.env.VITE_USER_API_URL || 'http://localhost:4001';
+    fetch(`${userApiBase}/api/grok/status`)
+      .then((r) => r.json())
+      .then((data) => { if (!cancelled) setAiEnabled(Boolean(data?.enabled)); })
+      .catch(() => { if (!cancelled) setAiEnabled(false); });
+    return () => { cancelled = true; };
+  }, []);
 
   return (
     <>
@@ -185,6 +200,7 @@ const Sidebar = ({ user, hasRole, onLogout, collapsed, mobileOpen, onClose, onTo
           collapsed={collapsed}
           counts={counts}
           onToggleCollapse={onToggleCollapse}
+          aiEnabled={aiEnabled}
         />
       </aside>
 
@@ -200,7 +216,7 @@ const Sidebar = ({ user, hasRole, onLogout, collapsed, mobileOpen, onClose, onTo
               className="fixed left-0 top-0 z-50 h-screen border-r lg:hidden"
               style={{ width: 'var(--sidebar-w)', background: 'var(--c-panel)', borderColor: 'var(--c-border)' }}
             >
-              <SidebarInner user={user} hasRole={hasRole} onLogout={onLogout} collapsed={false} onNavigate={onClose} counts={counts} />
+              <SidebarInner user={user} hasRole={hasRole} onLogout={onLogout} collapsed={false} onNavigate={onClose} counts={counts} aiEnabled={aiEnabled} />
             </motion.aside>
           </>
         ) : null}

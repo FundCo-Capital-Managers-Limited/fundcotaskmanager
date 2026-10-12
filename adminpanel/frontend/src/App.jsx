@@ -1,4 +1,4 @@
-import React, { Suspense, lazy } from 'react';
+import React, { Suspense, lazy, useEffect, useState } from 'react';
 import { Navigate, Outlet, Route, Routes } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider, useAuth } from './context/AuthContext.jsx';
@@ -49,6 +49,17 @@ const ProtectedRoute = () => {
 
 const AppRoutes = () => {
   const { user, loading } = useAuth();
+  const [aiEnabled, setAiEnabled] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    const userApiBase = import.meta.env.VITE_USER_API_URL || 'http://localhost:4001';
+    fetch(`${userApiBase}/api/grok/status`)
+      .then((r) => r.json())
+      .then((data) => { if (!cancelled) setAiEnabled(Boolean(data?.enabled)); })
+      .catch(() => { if (!cancelled) setAiEnabled(false); });
+    return () => { cancelled = true; };
+  }, []);
 
   return (
     <>
@@ -90,7 +101,7 @@ const AppRoutes = () => {
           <Route path="/revenue-projects" element={<Suspense fallback={<Loader />}><RevenueProjects /></Suspense>} />
           <Route path="/social" element={<Suspense fallback={<Loader />}><Social /></Suspense>} />
           <Route path="/team-chat" element={<Suspense fallback={<Loader />}><TeamChat /></Suspense>} />
-          <Route path="/ai-tools" element={<Suspense fallback={<Loader />}><AiTools /></Suspense>} />
+          <Route path="/ai-tools" element={aiEnabled ? <Suspense fallback={<Loader />}><AiTools /></Suspense> : <Navigate to="/" replace />} />
           {/* Deck Prep / File Storage / Meetings hidden — see docs/AUDIT_REPORT.md */}
           <Route path="/training" element={<Suspense fallback={<Loader />}><Training /></Suspense>} />
           <Route path="/reminders" element={<Suspense fallback={<Loader />}><Reminders /></Suspense>} />
